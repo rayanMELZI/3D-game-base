@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -8,23 +9,35 @@ namespace FpsBase
     public enum GameMode
     {
         Duel = 0,           // 1v1, first to 10 kills
-        TeamDeathmatch = 1, // up to 4v4, first team to 30 kills
+        TeamDeathmatch = 1, // teams, first team to 30 kills
+        FreeForAll = 2,     // everyone for themselves, first to 20 kills
+        GunGame = 3,        // race through the arsenal, knife kill wins
     }
 
     /// <summary>
-    /// Server-authoritative match logic: teams, scores, win condition and match
-    /// restart. Lives on an in-scene NetworkObject in the multiplayer scene.
-    /// Both modes use two teams — a duel is simply teams of one.
+    /// Server-authoritative match logic: teams, scores, map selection,
+    /// win conditions and match restart. Lives on an in-scene NetworkObject.
+    /// Team modes use two teams; FFA/Gun Game give every player their own
+    /// "team" (unique color, everyone damages everyone).
     /// </summary>
     public class GameModeManager : NetworkBehaviour
     {
         public static GameModeManager Instance { get; private set; }
 
-        /// <summary>Chosen in the menu before StartHost is called.</summary>
+        // Chosen in the menu before StartHost is called.
         public static GameMode PendingHostMode = GameMode.Duel;
+        public static int PendingHostMap = 0;
+        public static bool PendingSniperOnly = false;
+
+        /// <summary>Gun Game weapon order by loadout index (knife last).</summary>
+        public static readonly int[] GunGameOrder = { 1, 2, 3, 4, 5, 6, 0 };
 
         public NetworkVariable<int> Mode = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<int> MapIndex = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> SniperOnly = new NetworkVariable<bool>(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam0 = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam1 = new NetworkVariable<int>(
@@ -33,14 +46,32 @@ namespace FpsBase
             true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> WinnerTeam = new NetworkVariable<int>(
             -1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<FixedString64Bytes> WinnerName = new NetworkVariable<FixedString64Bytes>(
+            default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<ulong> LastKillerId = new NetworkVariable<ulong>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public float restartDelay = 8f;
 
         public GameMode CurrentMode => (GameMode)Mode.Value;
         public bool IsMatchActive => MatchActive.Value;
-        public int ScoreLimit => CurrentMode == GameMode.Duel ? 10 : 30;
+        public bool IsTeamMode => CurrentMode == GameMode.Duel || CurrentMode == GameMode.TeamDeathmatch;
 
-        public static int MaxPlayersFor(GameMode mode) => mode == GameMode.Duel ? 2 : 8;
+        public int ScoreLimit
+        {
+            get
+            {
+                switch (CurrentMode)
+                {
+                    case GameMode.Duel: return 10;
+                    case GameMode.TeamDeathmatch: return 30;
+                    case GameMode.FreeForAll: return 20;
+                    default: return GunGameOrder.Length;
+                }
+            }
+        }
+
+        public static int MaxPlayersFor(GameMode mode) => mode == GameMode.Duel ? 5 : 8;
 
         // Client-side kill feed (filled by ClientRpc, read by NetworkGameHud).
         public struct KillFeedEntry
@@ -69,60 +100,103 @@ namespace FpsBase
             if (IsServer)
             {
                 Mode.Value = (int)PendingHostMode;
+                MapIndex.Value = PendingHostMap;
+                SniperOnly.Value = PendingSniperOnly;
                 ScoreTeam0.Value = 0;
                 ScoreTeam1.Value = 0;
                 WinnerTeam.Value = -1;
+                WinnerName.Value = default;
                 MatchActive.Value = true;
             }
             KillFeed.Clear();
+
+            // Everyone (host + clients) builds the selected map.
+            ApplyMap(0, MapIndex.Value);
+            MapIndex.OnValueChanged += ApplyMap;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            MapIndex.OnValueChanged -= ApplyMap;
+        }
+
+        private void ApplyMap(int previous, int index)
+        {
+            if (MultiplayerBootstrap.Instance != null)
+                MultiplayerBootstrap.Instance.SetMap(index);
         }
 
         // ------------------------------------------------------------------
         // Teams & spawns (server)
         // ------------------------------------------------------------------
 
-        /// <summary>Put the joining player on the smaller team (alternates in a duel).</summary>
         public int AssignTeam(ulong newClientId)
         {
-            int team0 = 0, team1 = 0;
-            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            if (!IsTeamMode)
             {
-                if (client.ClientId == newClientId || client.PlayerObject == null)
-                    continue;
-                var player = client.PlayerObject.GetComponent<NetworkPlayer>();
-                if (player == null)
-                    continue;
+                // FFA / Gun Game: give each player their own color slot.
+                var used = new bool[8];
+                ForEachPlayer(player =>
+                {
+                    if (player.OwnerClientId != newClientId)
+                        used[Mathf.Abs(player.Team.Value) % 8] = true;
+                });
+                for (int i = 0; i < used.Length; i++)
+                    if (!used[i])
+                        return i;
+                return (int)(newClientId % 8);
+            }
+
+            int team0 = 0, team1 = 0;
+            ForEachPlayer(player =>
+            {
+                if (player.OwnerClientId == newClientId)
+                    return;
                 if (player.Team.Value == 0) team0++;
                 else team1++;
-            }
+            });
             return team0 <= team1 ? 0 : 1;
+        }
+
+        /// <summary>Switch a player to the other team if it doesn't unbalance (team modes only).</summary>
+        public bool ServerTryChangeTeam(NetworkPlayer player)
+        {
+            if (!IsServer || !IsTeamMode || player == null)
+                return false;
+
+            int mine = 0, other = 0;
+            int myTeam = player.Team.Value;
+            ForEachPlayer(p =>
+            {
+                if (p.Team.Value == myTeam) mine++;
+                else other++;
+            });
+
+            if (other >= mine)
+                return false; // would unbalance
+
+            player.Team.Value = 1 - myTeam;
+            player.ServerRespawn();
+            return true;
         }
 
         public int TeamOf(ulong clientId)
         {
-            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)
-                && client.PlayerObject != null)
-            {
-                var player = client.PlayerObject.GetComponent<NetworkPlayer>();
-                if (player != null)
-                    return player.Team.Value;
-            }
-            return -1;
+            var player = PlayerOf(clientId);
+            return player != null ? player.Team.Value : -1;
         }
 
         public bool AreSameTeam(ulong a, ulong b)
         {
+            if (!IsTeamMode)
+                return false; // FFA / Gun Game: everyone is a target
             int teamA = TeamOf(a);
             return teamA >= 0 && teamA == TeamOf(b);
         }
 
-        /// <summary>Team 0 spawns on the -Z side, team 1 on the +Z side.</summary>
         public Vector3 GetSpawnPoint(int team)
         {
-            float z = 24f * (team == 0 ? -1f : 1f);
-            float[] lanes = { 0f, -18f, 18f, -9f, 9f };
-            float x = lanes[spawnCounter++ % lanes.Length];
-            return new Vector3(x, 0.1f, z);
+            return EnvironmentBuilder.GetSpawnPoint(MapIndex.Value, Mathf.Abs(team) % 2, spawnCounter++);
         }
 
         // ------------------------------------------------------------------
@@ -134,37 +208,57 @@ namespace FpsBase
             if (!IsServer || !MatchActive.Value)
                 return;
 
-            if (attackerId != victimId)
+            var victim = PlayerOf(victimId);
+            if (victim != null)
+                victim.Deaths.Value++;
+
+            var attacker = PlayerOf(attackerId);
+            if (attackerId != victimId && attacker != null)
             {
-                int team = TeamOf(attackerId);
-                if (team == 0) ScoreTeam0.Value++;
-                else if (team == 1) ScoreTeam1.Value++;
+                attacker.Kills.Value++;
+                LastKillerId.Value = attackerId;
+
+                switch (CurrentMode)
+                {
+                    case GameMode.Duel:
+                    case GameMode.TeamDeathmatch:
+                        int team = attacker.Team.Value;
+                        if (team == 0) ScoreTeam0.Value++;
+                        else ScoreTeam1.Value++;
+                        if (ScoreTeam0.Value >= ScoreLimit) EndMatch(0, null);
+                        else if (ScoreTeam1.Value >= ScoreLimit) EndMatch(1, null);
+                        break;
+
+                    case GameMode.FreeForAll:
+                        if (attacker.Kills.Value >= ScoreLimit)
+                            EndMatch(attacker.Team.Value, NameOf(attackerId));
+                        break;
+
+                    case GameMode.GunGame:
+                        attacker.GunGameLevel.Value++;
+                        if (attacker.GunGameLevel.Value >= GunGameOrder.Length)
+                            EndMatch(attacker.Team.Value, NameOf(attackerId));
+                        break;
+                }
             }
 
             string verb = headshot ? "HEADSHOT" : "eliminated";
             KillFeedClientRpc($"{NameOf(attackerId)}  {verb}  {NameOf(victimId)}");
-
-            if (ScoreTeam0.Value >= ScoreLimit) EndMatch(0);
-            else if (ScoreTeam1.Value >= ScoreLimit) EndMatch(1);
         }
 
-        /// <summary>Display name of a connected player (server-side lookup).</summary>
         public string NameOf(ulong clientId)
         {
-            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)
-                && client.PlayerObject != null)
-            {
-                var player = client.PlayerObject.GetComponent<NetworkPlayer>();
-                if (player != null && !player.PlayerName.Value.IsEmpty)
-                    return player.PlayerName.Value.ToString();
-            }
+            var player = PlayerOf(clientId);
+            if (player != null && !player.PlayerName.Value.IsEmpty)
+                return player.PlayerName.Value.ToString();
             return $"Player {clientId + 1}";
         }
 
-        private void EndMatch(int winner)
+        private void EndMatch(int winnerTeam, string winnerName)
         {
             MatchActive.Value = false;
-            WinnerTeam.Value = winner;
+            WinnerTeam.Value = winnerTeam;
+            WinnerName.Value = winnerName ?? "";
             StartCoroutine(RestartRoutine());
         }
 
@@ -175,21 +269,41 @@ namespace FpsBase
             ScoreTeam0.Value = 0;
             ScoreTeam1.Value = 0;
             WinnerTeam.Value = -1;
+            WinnerName.Value = default;
             MatchActive.Value = true;
 
+            ForEachPlayer(player =>
+            {
+                player.Kills.Value = 0;
+                player.Deaths.Value = 0;
+                player.GunGameLevel.Value = 0;
+                player.ServerRespawn();
+            });
+        }
+
+        // ------------------------------------------------------------------
+        // Helpers
+        // ------------------------------------------------------------------
+
+        public NetworkPlayer PlayerOf(ulong clientId)
+        {
+            if (NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)
+                && client.PlayerObject != null)
+                return client.PlayerObject.GetComponent<NetworkPlayer>();
+            return null;
+        }
+
+        private void ForEachPlayer(System.Action<NetworkPlayer> action)
+        {
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
             {
                 if (client.PlayerObject == null)
                     continue;
                 var player = client.PlayerObject.GetComponent<NetworkPlayer>();
                 if (player != null)
-                    player.ServerRespawn();
+                    action(player);
             }
         }
-
-        // ------------------------------------------------------------------
-        // Kill feed (all clients)
-        // ------------------------------------------------------------------
 
         [ClientRpc]
         private void KillFeedClientRpc(string message)
