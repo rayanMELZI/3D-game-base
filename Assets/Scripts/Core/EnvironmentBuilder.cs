@@ -68,13 +68,13 @@ namespace FpsBase
             ground.transform.SetParent(root);
             ground.transform.localScale = Vector3.one * (size / 10f);
             var groundMat = MakeMaterial(Color.white, 0f, 0.25f);
-            groundMat.mainTexture = MakeCheckerTexture(new Color(0.46f, 0.43f, 0.41f), new Color(0.39f, 0.37f, 0.36f));
+            groundMat.mainTexture = MakeTileTexture(new Color(0.46f, 0.43f, 0.41f), new Color(0.4f, 0.38f, 0.37f));
             groundMat.mainTextureScale = new Vector2(size / 8f, size / 8f); // one checker cell ≈ 1m
             ground.GetComponent<Renderer>().material = groundMat;
 
             // Perimeter walls with an emissive trim on top.
             var wallMat = MakeMaterial(new Color(0.5f, 0.52f, 0.55f), 0.1f, 0.35f);
-            var trimMat = MakeEmissiveMaterial(new Color(0.2f, 0.8f, 0.9f), 1.6f);
+            var trimMat = MakeEmissiveMaterial(new Color(0.2f, 0.8f, 0.9f), 2.4f);
             float wallH = 4f;
             for (int i = 0; i < 4; i++)
             {
@@ -123,8 +123,8 @@ namespace FpsBase
             }
 
             // Faint glowing spawn-zone strips so players know each side's color.
-            var spawn0Mat = MakeEmissiveMaterial(Team0Color, 0.7f);
-            var spawn1Mat = MakeEmissiveMaterial(Team1Color, 0.7f);
+            var spawn0Mat = MakeEmissiveMaterial(Team0Color, 1.4f);
+            var spawn1Mat = MakeEmissiveMaterial(Team1Color, 1.4f);
             Box(root, "SpawnZone0", new Vector3(0, 0.03f, -(half - 3f)), Vector3.zero, new Vector3(14f, 0.06f, 1.2f), spawn0Mat);
             Box(root, "SpawnZone1", new Vector3(0, 0.03f, half - 3f), Vector3.zero, new Vector3(14f, 0.06f, 1.2f), spawn1Mat);
         }
@@ -171,11 +171,11 @@ namespace FpsBase
             return mat;
         }
 
-        private static Texture2D MakeCheckerTexture(Color a, Color b)
+        /// <summary>Concrete-style floor tiles: subtle checker + noise grain + dark seams.</summary>
+        private static Texture2D MakeTileTexture(Color a, Color b)
         {
-            const int texSize = 128;
-            const int cells = 8;
-            const int cellPx = texSize / cells;
+            const int texSize = 256;
+            const int cellPx = 32; // 8 tiles per texture repeat
 
             var tex = new Texture2D(texSize, texSize, TextureFormat.RGB24, true);
             for (int y = 0; y < texSize; y++)
@@ -183,7 +183,17 @@ namespace FpsBase
                 for (int x = 0; x < texSize; x++)
                 {
                     bool even = ((x / cellPx) + (y / cellPx)) % 2 == 0;
-                    tex.SetPixel(x, y, even ? a : b);
+                    Color c = even ? a : b;
+
+                    // Grainy concrete noise.
+                    float noise = Mathf.PerlinNoise(x * 0.11f, y * 0.11f) * 0.06f - 0.03f;
+                    c = new Color(c.r + noise, c.g + noise, c.b + noise);
+
+                    // Dark seams between tiles.
+                    if (x % cellPx < 2 || y % cellPx < 2)
+                        c *= 0.78f;
+
+                    tex.SetPixel(x, y, c);
                 }
             }
             tex.wrapMode = TextureWrapMode.Repeat;

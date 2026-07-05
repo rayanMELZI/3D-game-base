@@ -283,15 +283,16 @@ namespace FpsBase
             line.startWidth = 0.02f;
             line.endWidth = 0.02f;
             line.material = tracerMaterial;
-            line.startColor = new Color(1f, 0.9f, 0.4f);
-            line.endColor = new Color(1f, 0.9f, 0.4f, 0.25f);
+            // HDR color > 1 so the tracer picks up bloom.
+            line.startColor = new Color(1.8f, 1.5f, 0.7f);
+            line.endColor = new Color(1.8f, 1.5f, 0.7f, 0.25f);
             UnityEngine.Object.Destroy(go, 0.05f);
         }
 
         public static void SpawnImpactMarker(Vector3 point, Vector3 normal)
         {
             if (impactMaterial == null)
-                impactMaterial = EnvironmentBuilder.MakeEmissiveMaterial(new Color(1f, 0.75f, 0.3f), 1.5f);
+                impactMaterial = EnvironmentBuilder.MakeEmissiveMaterial(new Color(1f, 0.75f, 0.3f), 2.2f);
 
             var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marker.name = "Impact";

@@ -98,9 +98,9 @@ namespace FpsBase
             if (headRenderer != null)
                 headRenderer.material = EnvironmentBuilder.MakeMaterial(new Color(0.13f, 0.14f, 0.16f), 0.5f, 0.7f);
             if (visorRenderer != null)
-                visorRenderer.material = EnvironmentBuilder.MakeEmissiveMaterial(new Color(0.65f, 0.92f, 1f), 1.6f);
+                visorRenderer.material = EnvironmentBuilder.MakeEmissiveMaterial(new Color(0.65f, 0.92f, 1f), 2.2f);
             if (chestStripeRenderer != null)
-                chestStripeRenderer.material = EnvironmentBuilder.MakeEmissiveMaterial(teamColor, 1.8f);
+                chestStripeRenderer.material = EnvironmentBuilder.MakeEmissiveMaterial(teamColor, 2.4f);
         }
 
         /// <summary>Retint an already-materialized body with a new team color.</summary>
@@ -112,7 +112,7 @@ namespace FpsBase
             if (chestStripeRenderer != null)
             {
                 chestStripeRenderer.material.color = teamColor;
-                chestStripeRenderer.material.SetColor("_EmissionColor", teamColor * 1.8f);
+                chestStripeRenderer.material.SetColor("_EmissionColor", teamColor * 2.4f);
             }
         }
 
