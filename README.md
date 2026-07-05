@@ -86,6 +86,33 @@ Assets/
                                # · NetworkGameHud · MultiplayerBootstrap · ClientAuthNetworkTransform
 ```
 
+## Graphics
+
+The game uses the built-in render pipeline with the **Post Processing** package
+(bloom + ACES filmic tonemapping + warm color grading + vignette + FXAA),
+configured entirely from code (`PostFx.cs`). The setup tool bakes the small
+`Assets/Resources/PostFxResources.prefab` it needs — re-run the tool after
+installing. Your own body renders **shadows-only** in first person (no clipping,
+but your full shadow — including the held weapon — stays visible).
+
+### Making it truly beautiful: importing other people's work
+
+Everything visual is generated from primitives behind three small builder
+classes, so real assets drop in cleanly:
+
+| What | Great free sources | Where to plug it in |
+|---|---|---|
+| Characters (rigged + animated) | **Mixamo** (free, auto-rigged + animations), Kenney "Blocky Characters", Synty POLYGON free samples | Replace the body built in `HumanoidBuilder.Build` with your model prefab; keep the head `Hitbox` |
+| Weapons | Kenney **"Blaster Kit"** / **"Weapon Pack"** (CC0), Asset Store free weapon packs | Return your prefab from `WeaponModelBuilder.Build` (keep the `Muzzle` child + flash light) |
+| Environment / props | Kenney "Prototype Kit", Synty POLYGON packs, Unity Asset Store free section, **poly.pizza** (CC0 models) | Build a real scene, or spawn prefabs in `EnvironmentBuilder.BuildArena` |
+| Skyboxes | Free HDRIs from **polyhaven.com** (CC0) | Assign in `EnvironmentBuilder.SetupLightingAndSky` instead of the procedural skybox |
+| Audio | **freesound.org**, Kenney audio packs (CC0) | Return real clips from the `SfxSynth` methods |
+
+Import via `Assets > Import Package` / dragging files into `Assets/`, or the
+Package Manager's "My Assets" tab for Asset Store items. Check each pack's
+license (CC0 = use freely; most Asset Store free packs allow game use, no
+redistribution of the raw assets).
+
 ## Architecture notes
 
 - **Offline and online share gameplay code** via `IDamageable`: offline `Health`
