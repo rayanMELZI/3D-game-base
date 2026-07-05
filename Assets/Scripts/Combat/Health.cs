@@ -7,12 +7,15 @@ namespace FpsBase
     /// Generic health component usable by the player, target dummies,
     /// enemies, destructibles — anything that can take damage.
     /// </summary>
-    public class Health : MonoBehaviour
+    public class Health : MonoBehaviour, IDamageable, IHealthSource
     {
         public float maxHealth = 100f;
 
         public float Current { get; private set; }
         public bool IsDead => Current <= 0f;
+
+        float IHealthSource.CurrentHealth => Current;
+        float IHealthSource.MaxHealth => maxHealth;
 
         /// <summary>Fired when health reaches zero.</summary>
         public event Action OnDeath;
@@ -25,10 +28,13 @@ namespace FpsBase
             Current = maxHealth;
         }
 
-        public void TakeDamage(float amount)
+        public void TakeDamage(float amount, bool headshot = false)
         {
             if (IsDead)
                 return;
+
+            if (headshot)
+                amount = maxHealth; // headshots are always lethal
 
             Current = Mathf.Max(0f, Current - amount);
             OnDamaged?.Invoke(amount);

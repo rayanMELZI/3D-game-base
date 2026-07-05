@@ -64,15 +64,21 @@ namespace FpsBase
 
         private IEnumerator DeathAndRespawn()
         {
-            // Fall over.
-            transform.rotation = uprightRotation * Quaternion.Euler(90f, 0f, 0f);
+            Effects.SpawnDeathBurst(transform.position + Vector3.up * 1.1f, new Color(0.85f, 0.25f, 0.2f));
+            SfxSynth.PlayAt(SfxSynth.Death(), transform.position, 0.8f);
+
+            // Hide and disable while "dead".
+            foreach (var r in renderers)
+                r.enabled = false;
             foreach (var c in colliders)
                 c.enabled = false;
 
             yield return new WaitForSeconds(respawnDelay);
 
-            // Stand back up, fully healed.
+            // Back up, fully healed.
             transform.rotation = uprightRotation;
+            foreach (var r in renderers)
+                r.enabled = true;
             foreach (var c in colliders)
                 c.enabled = true;
             health.ResetHealth();
