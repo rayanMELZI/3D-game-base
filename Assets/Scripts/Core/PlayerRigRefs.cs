@@ -29,24 +29,26 @@ namespace FpsBase
         [Tooltip("Every visual renderer (hidden while dead in multiplayer).")]
         public Renderer[] allRenderers;
 
-        private bool materialsApplied;
+        private bool initialized;
 
         // Prefab path: fields are already serialized when Awake runs.
         // Factory path: fields are wired after AddComponent, so PlayerFactory
-        // calls TryApplyMaterials() again once wiring is done.
-        private void Awake() => TryApplyMaterials();
+        // calls RuntimeInit() again once wiring is done.
+        private void Awake() => RuntimeInit();
 
-        public void TryApplyMaterials()
+        public void RuntimeInit()
         {
-            if (materialsApplied || !Application.isPlaying
+            if (initialized || !Application.isPlaying
                 || teamColorRenderers == null || teamColorRenderers.Length == 0)
                 return;
-            materialsApplied = true;
+            initialized = true;
 
             // Generated materials are applied at runtime (default team: blue).
             HumanoidBuilder.ApplyMaterials(
                 teamColorRenderers, headRenderer, visorRenderer,
                 chestStripeRenderer, allRenderers, EnvironmentBuilder.Team0Color);
+
+            PostFx.Attach(playerCamera);
         }
 
         /// <summary>Tint the body with a team color (multiplayer).</summary>

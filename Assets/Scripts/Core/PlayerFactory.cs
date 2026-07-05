@@ -76,7 +76,7 @@ namespace FpsBase
             rig.chestStripeRenderer = body.chestStripeRenderer;
             rig.headRenderers = body.headParts;
             rig.allRenderers = body.allRenderers;
-            rig.TryApplyMaterials(); // no-op in the editor prefab-baking path
+            rig.RuntimeInit(); // no-op in the editor prefab-baking path
             return rig;
         }
     }

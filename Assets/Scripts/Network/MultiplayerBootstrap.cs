@@ -23,8 +23,9 @@ namespace FpsBase
             EnvironmentBuilder.BuildArena(arenaSize);
 
             menuCamera = new GameObject("MenuCamera");
-            menuCamera.AddComponent<Camera>();
+            var cam = menuCamera.AddComponent<Camera>();
             menuCamera.AddComponent<AudioListener>();
+            PostFx.Attach(cam);
             menuCamera.transform.position = new Vector3(0, 22f, -36f);
             menuCamera.transform.rotation = Quaternion.Euler(32f, 0f, 0f);
         }
