@@ -1,97 +1,107 @@
-# 3D FPS Base (Unity)
+# SUNDOWN ARENA — 3D FPS Base (Unity)
 
-A minimal, dependency-free first-person shooter base project, meant to be cloned/copied
-as the starting point for future games.
+An asset-free online first-person shooter base: 1v1 Duel and Team Deathmatch,
+three weapons, humanoid characters with one-shot headshots, a full main menu,
+procedural sound effects and a stylized golden-hour look — everything generated
+from code, no models/textures/audio files.
 
-**What's in the box**
-- First-person player: WASD movement, sprint, jump, mouse look, cursor lock
-- Simple capsule characters (blue player, red target dummies that die and respawn)
-- Simple hitscan gun: automatic fire, ammo + reload, recoil, muzzle flash, tracers, hit markers
-- Flat ground arena with walls and a few crates
-- Generic `Health` component reusable for players, enemies, destructibles
-- Minimal HUD (crosshair, ammo, health bar) with zero asset dependencies
+> The original minimal version lives in the sibling folder
+> **`3D game base v1 (simple)`** — keep that as the clean starting point for
+> other games. Rename the game in `GameSettings.GameTitle`.
 
-Everything (level, player, gun, HUD) is **built from code** by one script
-(`GameBootstrap`) using Unity primitives — no models, prefabs, materials or
-packages required. That keeps the base portable and easy to reshape per game.
+**Features**
+- **Main menu** (builds boot into it): Play Online (host 1v1 / host TDM / join by
+  IP, player name), Practice Range (offline dummies), Settings (sensitivity,
+  FOV, volume, fullscreen, quality), Quit — plus an in-match pause menu (Esc)
+- **3 weapons**: semi-auto pistol, automatic rifle, one-shot **sniper** with scope;
+  switch with 1/2/3 or scroll
+- **Headshots are instant kills** — heads have real hitboxes above the body capsule
+- **Humanoid characters**: torso, helmet + glowing visor, swinging arms/legs
+  (procedural walk animation), team-colored suits with glowing chest stripes,
+  floating nametags, cube-burst death effect
+- **Online (Netcode for GameObjects)**: team balancing, server-checked scores and
+  friendly fire, kill feed with names and HEADSHOT tags, respawns, win banner +
+  jingle, automatic match restart
+- **Charm**: golden-hour sun + warm fog + procedural skybox, synthesized SFX
+  (gunshots per weapon, hit/headshot dings, reload, death, UI clicks, win
+  jingle), orbiting menu camera, tracers, hit markers, sprint FOV
 
----
+## Setup (after pulling these changes)
 
-## Getting started
+1. Open the project and let it compile.
+2. **Re-run `Tools > FPS Base > Setup Multiplayer (Scene + Player Prefab)`** —
+   this rebuilds the player prefab (new humanoid body + head hitbox), rebuilds
+   the Multiplayer scene (new menu), and **fixes the build scene order** so
+   builds boot into the main menu. Do this again whenever these generated
+   assets need to pick up code changes.
+3. Press Play in the Multiplayer scene (or `File > Build And Run`) → main menu.
 
-1. Install **Unity Hub**: https://unity.com/download
-2. In the Hub, install any recent editor — **Unity 6 (6000.x) LTS recommended**
-   (anything from 2021.3 LTS up works).
-3. In the Hub: **Add → Add project from disk** → select this folder.
-4. If the Hub warns the exact editor version isn't installed, just pick the one
-   you installed — Unity will upgrade the project automatically.
-5. Open the project (first import takes a couple of minutes), open
-   `Assets/Scenes/Main.unity` if it isn't open already, and press **Play**.
-
-> The scene looks empty in the editor — it only contains the `GameBootstrap`
-> object. The whole level is generated the moment you press Play.
+### Playing online
+- **Same PC test:** host in a standalone build, press Play in the editor → Play
+  Online → Join `127.0.0.1`.
+- **LAN:** friends join the host's local IPv4 (`ipconfig`). Allow the game / UDP
+  port **7777** through the host's Windows firewall.
+- **Internet:** port-forward 7777, or add Unity **Relay + Lobby** (see notes below).
 
 ## Controls
 
 | Input | Action |
 |---|---|
-| Mouse | Look |
-| WASD | Move |
-| Left Shift | Sprint |
-| Space | Jump |
-| Left Mouse | Shoot (hold for auto) |
+| Mouse / WASD / Shift / Space | Look / move / sprint / jump |
+| Left Mouse | Shoot (rifle auto, pistol & sniper per-click) |
+| Right Mouse (hold) | Sniper scope |
+| 1 / 2 / 3 or scroll | Pistol / Rifle / Sniper |
 | R | Reload |
-| Escape | Release cursor (click to re-lock) |
+| Escape | Pause menu (resume, settings, leave) |
+
+## Weapon balance (edit `WeaponDefinition.CreateDefaultLoadout`)
+
+| | Damage | Fire rate | Mag | Special |
+|---|---|---|---|---|
+| Pistol | 20 | 5/s semi | 12 | fast reload |
+| Rifle | 22 | 9/s auto | 30 | starting weapon |
+| Sniper | **100 (one-shot)** | 0.9/s | 5 | 16° scope |
+| Any weapon | — | — | — | **headshot = instant kill** |
 
 ## Project structure
 
 ```
 Assets/
-  Editor/FpsBaseMenu.cs          # Tools > FPS Base > Add Game Bootstrap (for new scenes)
-  Scenes/Main.unity              # contains only the GameBootstrap object
+  Editor/                      # Add Game Bootstrap · Setup Multiplayer (bakes prefab+scene, fixes scene order)
+  Scenes/                      # Multiplayer.unity (menu + online, scene 0) · Main.unity (practice)
   Scripts/
-    Core/GameBootstrap.cs        # builds the whole level + player at runtime
-    Player/PlayerMovement.cs     # CharacterController movement (walk/sprint/jump/gravity)
-    Player/MouseLook.cs          # camera pitch + body yaw, cursor lock, recoil recovery
-    Weapons/Gun.cs               # raycast shooting, ammo/reload, effects
-    Combat/Health.cs             # generic damage/death component
-    Combat/TargetDummy.cs        # respawning practice targets
-    UI/HudOverlay.cs             # IMGUI crosshair / ammo / health (no assets needed)
+    Core/
+      GameSettings.cs          # game title, saved player settings (PlayerPrefs)
+      GameBootstrap.cs         # practice range: arena + humanoid dummies + player
+      EnvironmentBuilder.cs    # golden-hour lighting/sky/fog + deterministic arena
+      HumanoidBuilder.cs       # primitive humanoid body + head hitbox + materials
+      PlayerFactory.cs         # player rig (controller, body, camera, weapons)
+      PlayerRigRefs.cs         # reference hub, runtime materials, team color
+    Player/                    # PlayerMovement · MouseLook (zoom/settings) · LimbAnimator
+    Weapons/                   # WeaponDefinition · WeaponModelBuilder · WeaponController
+    Combat/                    # IDamageable/IHealthSource · Health · Hitbox · TargetDummy · Effects
+    Audio/SfxSynth.cs          # procedurally synthesized sound effects
+    UI/                        # HudOverlay · MenuWidgets · OfflineMenu · Nametag
+    Network/                   # MainMenu · GameModeManager · NetworkPlayer/Health/Weapon
+                               # · NetworkGameHud · MultiplayerBootstrap · ClientAuthNetworkTransform
 ```
 
-## How to build on this base
+## Architecture notes
 
-- **Real level instead of the generated arena:** design your level in the scene,
-  then delete the environment parts of `GameBootstrap` (or the whole bootstrap)
-  and place the player as a prefab. The player/gun/health scripts don't care
-  how the scene was made.
-- **New weapons:** duplicate `Gun.cs` fields into variants (damage, fire rate,
-  magazine) or turn them into a `ScriptableObject` weapon config.
-- **Enemies:** put `Health` on anything; subscribe to `Health.OnDeath` for
-  loot, score, ragdolls, etc. `TargetDummy` shows the pattern.
-- **Real UI:** replace `HudOverlay` (IMGUI) with uGUI or UI Toolkit.
-
-## Making it online (multiplayer)
-
-Networking is intentionally **not** wired in yet — the code is kept
-single-responsibility so it's easy to add. Recommended path with Unity's
-official **Netcode for GameObjects (NGO)**:
-
-1. `Window > Package Manager` → install **Netcode for GameObjects**
-   (`com.unity.netcode.gameobjects`).
-2. Turn the player into a prefab with a `NetworkObject` component, and register
-   it as the *Player Prefab* on a `NetworkManager` in the scene.
-3. In `PlayerMovement`, `MouseLook`, and `Gun`, inherit from `NetworkBehaviour`
-   and early-out when `!IsOwner` (so you only control *your* player), and
-   disable the camera/audio listener on non-owned players.
-4. Send shots to the server with a `[ServerRpc]` in `Gun.Shoot()`; the server
-   does the raycast and applies damage; replicate health with a
-   `NetworkVariable<float>` in `Health`.
-5. Add a `NetworkTransform` (or client network transform) to the player prefab
-   so movement replicates.
-6. Test locally: build the game, run the build as host, and connect the editor
-   as client (NGO's `NetworkManager` inspector has Start Host / Start Client
-   buttons for quick testing).
-
-Alternative: **Mirror** (free, popular on the Asset Store) or **Photon Fusion**
-(hosted relay, easiest way to get internet play without your own servers).
+- **Offline and online share gameplay code** via `IDamageable`: offline `Health`
+  applies damage directly, online `NetworkHealth` routes it to the server (which
+  checks friendly fire / match state). Headshots are decided by `Hitbox` triggers.
+- **Head hitboxes**: the CharacterController capsule stops at the shoulders;
+  the head sphere has a *trigger* collider (never blocks movement) marked with
+  `Hitbox.isHead`. Weapon raycasts include triggers and check the marker.
+- **Hit detection is client-side** (simple, standard for indie MP). For
+  competitive play, move the raycast into a ServerRpc taking origin+direction.
+- **Add a game mode:** extend `GameMode`, its limits in `GameModeManager`, and a
+  button in `MainMenu`.
+- **Add a weapon:** a `WeaponDefinition` entry + optionally a model in
+  `WeaponModelBuilder`.
+- **Internet matchmaking:** install `com.unity.services.relay`, create a UGS
+  project, swap `SetConnectionData` in `MainMenu` for a Relay allocation.
+- **Real art later:** all visuals/audio are generated behind small builder/synth
+  classes — swap `HumanoidBuilder`/`WeaponModelBuilder`/`SfxSynth` outputs for
+  real assets without touching gameplay logic.
