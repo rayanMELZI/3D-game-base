@@ -21,7 +21,9 @@ namespace FpsBase
         public Transform thirdPersonWeaponAnchor;
 
         [Header("Humanoid body (wired by PlayerFactory)")]
+        public Transform bodyRoot;
         public Renderer[] teamColorRenderers;
+        public Renderer[] darkTeamRenderers;
         public Renderer headRenderer;
         public Renderer visorRenderer;
         public Renderer chestStripeRenderer;
@@ -46,7 +48,7 @@ namespace FpsBase
 
             // Generated materials are applied at runtime (default team: blue).
             HumanoidBuilder.ApplyMaterials(
-                teamColorRenderers, headRenderer, visorRenderer,
+                teamColorRenderers, darkTeamRenderers, headRenderer, visorRenderer,
                 chestStripeRenderer, allRenderers, EnvironmentBuilder.Team0Color);
 
             PostFx.Attach(playerCamera);
@@ -55,7 +57,7 @@ namespace FpsBase
         /// <summary>Tint the body with a team color (multiplayer).</summary>
         public void ApplyTeamColor(Color color)
         {
-            HumanoidBuilder.ApplyTeamColor(teamColorRenderers, chestStripeRenderer, color);
+            HumanoidBuilder.ApplyTeamColor(teamColorRenderers, darkTeamRenderers, chestStripeRenderer, color);
         }
 
         /// <summary>

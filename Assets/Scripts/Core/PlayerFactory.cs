@@ -22,8 +22,8 @@ namespace FpsBase
             controller.center = new Vector3(0, 0.78f, 0);
             controller.slopeLimit = 50f;
 
-            // --- Humanoid body with head hitbox ---
-            var body = HumanoidBuilder.Build(root.transform, addHeadHitbox: true);
+            // --- Humanoid body with full hitboxes (head trigger = lethal) ---
+            var body = HumanoidBuilder.Build(root.transform, addHitboxes: true);
 
             var limbAnimator = root.AddComponent<LimbAnimator>();
             limbAnimator.armL = body.armL;
@@ -73,7 +73,9 @@ namespace FpsBase
             rig.movement = movement;
             rig.weaponController = weaponController;
             rig.thirdPersonWeaponAnchor = tpAnchor.transform;
+            rig.bodyRoot = body.root.transform;
             rig.teamColorRenderers = body.teamRenderers;
+            rig.darkTeamRenderers = body.darkTeamRenderers;
             rig.headRenderer = body.headRenderer;
             rig.visorRenderer = body.visorRenderer;
             rig.chestStripeRenderer = body.chestStripeRenderer;

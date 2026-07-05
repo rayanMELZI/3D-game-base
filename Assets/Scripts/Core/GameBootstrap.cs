@@ -50,11 +50,11 @@ namespace FpsBase
             lookDir.y = 0;
             root.transform.rotation = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
 
-            // Same humanoid body as players, in hostile red — with a head hitbox,
+            // Same humanoid body as players, in hostile red — with full hitboxes,
             // so headshots one-shot dummies too.
-            var body = HumanoidBuilder.Build(root.transform, addHeadHitbox: true);
+            var body = HumanoidBuilder.Build(root.transform, addHitboxes: true);
             HumanoidBuilder.ApplyMaterials(
-                body.teamRenderers, body.headRenderer, body.visorRenderer,
+                body.teamRenderers, body.darkTeamRenderers, body.headRenderer, body.visorRenderer,
                 body.chestStripeRenderer, body.allRenderers, new Color(0.85f, 0.25f, 0.2f));
 
             // Body hitbox (matches the player: capsule up to the shoulders).
