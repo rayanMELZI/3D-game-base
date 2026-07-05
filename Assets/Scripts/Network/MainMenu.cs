@@ -7,20 +7,26 @@ namespace FpsBase
 {
     /// <summary>
     /// The game's front-end, drawn over the orbiting arena view:
-    ///  - Main menu: PLAY (host duel / host TDM / join by IP + player name),
-    ///    PRACTICE (offline range), SETTINGS, QUIT.
-    ///  - In-match pause menu (Escape): resume / settings / leave match.
-    /// Lives in the Multiplayer scene, which is the first scene in builds.
+    ///  - Main menu: PLAY (choose map / mode / snipers-only, host over LOCAL/LAN
+    ///    or join by IP with a proper connecting window), PRACTICE, SETTINGS, QUIT.
+    ///  - In-match pause menu (Escape): resume / switch team / settings / leave.
+    /// Steam play is scaffolded behind the FPSBASE_STEAM define — see README.
     /// </summary>
     public class MainMenu : MonoBehaviour
     {
         public const ushort Port = 7777;
+        private const float JoinTimeout = 10f;
 
         private enum MenuScreen { Root, Play, Settings }
 
         private MenuScreen screen = MenuScreen.Root;
         private string ipInput = "127.0.0.1";
         private string status = "";
+        private int selectedMap;
+        private GameMode selectedMode = GameMode.TeamDeathmatch;
+        private bool sniperOnly;
+        private bool connecting;
+        private float connectStart;
 
         private bool NetworkRunning =>
             NetworkManager.Singleton != null
@@ -29,20 +35,49 @@ namespace FpsBase
         private void Start()
         {
             if (NetworkManager.Singleton != null)
+            {
                 NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+                NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            }
+            UpdateChecker.EnsureStarted();
         }
 
         private void OnDestroy()
         {
             if (NetworkManager.Singleton != null)
+            {
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnect;
+                NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            }
+        }
+
+        private void Update()
+        {
+            // Join attempt timeout: without this, joining a game that doesn't
+            // exist would hang forever.
+            if (connecting && Time.time - connectStart > JoinTimeout)
+            {
+                NetworkManager.Singleton.Shutdown();
+                connecting = false;
+                status = $"No game found at {ipInput.Trim()}:{Port}.";
+            }
+        }
+
+        private void OnClientConnected(ulong clientId)
+        {
+            if (NetworkManager.Singleton.LocalClientId == clientId)
+            {
+                connecting = false;
+                status = "";
+            }
         }
 
         private void OnClientDisconnect(ulong clientId)
         {
             var nm = NetworkManager.Singleton;
-            if (!nm.IsServer) // join refused, host closed, connection lost...
+            if (!nm.IsServer)
             {
+                connecting = false;
                 status = string.IsNullOrEmpty(nm.DisconnectReason)
                     ? "Disconnected from server."
                     : nm.DisconnectReason;
@@ -59,15 +94,41 @@ namespace FpsBase
         {
             MenuWidgets.EnsureStyles();
 
+            if (connecting)
+            {
+                DrawConnectingWindow();
+                return;
+            }
+
             if (!NetworkRunning)
                 DrawMainMenu();
             else if (Cursor.lockState != CursorLockMode.Locked)
                 DrawPauseMenu();
         }
 
+        private void DrawConnectingWindow()
+        {
+            float w = 380f, h = 190f;
+            var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+            MenuWidgets.Panel(panel);
+
+            GUILayout.BeginArea(new Rect(panel.x + 30, panel.y + 24, w - 60, h - 48));
+            int dots = (int)(Time.time * 2f) % 4;
+            GUILayout.Label("CONNECTING" + new string('.', dots), MenuWidgets.Title, GUILayout.Height(48));
+            GUILayout.Label($"{ipInput.Trim()}:{Port}", MenuWidgets.Subtitle);
+            GUILayout.FlexibleSpace();
+            if (MenuWidgets.MenuButton("CANCEL", 36f))
+            {
+                NetworkManager.Singleton.Shutdown();
+                connecting = false;
+                status = "Join cancelled.";
+            }
+            GUILayout.EndArea();
+        }
+
         private void DrawMainMenu()
         {
-            float w = 440f, h = 460f;
+            float w = 460f, h = screen == MenuScreen.Play ? 600f : 470f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -75,7 +136,7 @@ namespace FpsBase
 
             GUILayout.Label(GameSettings.GameTitle, MenuWidgets.Title, GUILayout.Height(56));
             GUILayout.Label("online arena shooter · " + GameSettings.Version, MenuWidgets.Subtitle);
-            GUILayout.Space(18);
+            GUILayout.Space(14);
 
             switch (screen)
             {
@@ -85,14 +146,18 @@ namespace FpsBase
             }
 
             GUILayout.FlexibleSpace();
-            GUILayout.Label("WASD move · Shift sprint · Space jump · 1/2/3 weapons · Mouse2 scope · R reload",
+            GUILayout.Label("WASD move · Shift sprint · Ctrl crouch/slide · Space jump · Mouse2 aim · Tab scores",
                 MenuWidgets.Small);
             GUILayout.EndArea();
         }
 
         private void DrawRoot()
         {
-            if (MenuWidgets.MenuButton("PLAY ONLINE"))
+            if (UpdateChecker.UpdateAvailable)
+                GUILayout.Label($"Update available: {UpdateChecker.LatestVersion} (you have {GameSettings.Version})",
+                    MenuWidgets.Label);
+
+            if (MenuWidgets.MenuButton("PLAY"))
                 screen = MenuScreen.Play;
             GUILayout.Space(8);
             if (MenuWidgets.MenuButton("PRACTICE RANGE"))
@@ -122,15 +187,36 @@ namespace FpsBase
                 GameSettings.Save();
             }
             GUILayout.EndHorizontal();
-            GUILayout.Space(14);
+            GUILayout.Space(10);
 
-            if (MenuWidgets.MenuButton("HOST — 1V1 DUEL  (first to 10)"))
-                StartHost(GameMode.Duel);
+            // Match setup.
+            GUILayout.BeginHorizontal();
+            if (MenuWidgets.MenuButton($"MAP: {EnvironmentBuilder.MapNames[selectedMap]}", 32f))
+                selectedMap = (selectedMap + 1) % EnvironmentBuilder.MapNames.Length;
+            if (MenuWidgets.MenuButton(sniperOnly ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF", 32f))
+                sniperOnly = !sniperOnly;
+            GUILayout.EndHorizontal();
+            GUILayout.Space(4);
+            GUILayout.BeginHorizontal();
+            foreach (var mode in new[] { GameMode.Duel, GameMode.TeamDeathmatch, GameMode.FreeForAll, GameMode.GunGame })
+            {
+                string label = mode == GameMode.Duel ? "1V1"
+                    : mode == GameMode.TeamDeathmatch ? "TDM"
+                    : mode == GameMode.FreeForAll ? "FFA" : "GUN GAME";
+                var prev = GUI.backgroundColor;
+                if (selectedMode == mode)
+                    GUI.backgroundColor = MenuWidgets.Accent;
+                if (MenuWidgets.MenuButton(label, 30f))
+                    selectedMode = mode;
+                GUI.backgroundColor = prev;
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(12);
+            GUILayout.Label("LOCAL / LAN", MenuWidgets.Subtitle);
+            if (MenuWidgets.MenuButton("HOST GAME"))
+                StartHost();
             GUILayout.Space(6);
-            if (MenuWidgets.MenuButton("HOST — TEAM DEATHMATCH  (first to 30)"))
-                StartHost(GameMode.TeamDeathmatch);
-
-            GUILayout.Space(14);
             GUILayout.BeginHorizontal();
             ipInput = GUILayout.TextField(ipInput, MenuWidgets.Input, GUILayout.Height(30));
             if (MenuWidgets.MenuButton("JOIN", 30f))
@@ -139,13 +225,23 @@ namespace FpsBase
             GUILayout.Label($"LAN: enter the host's IP · port {Port} must be allowed in the host firewall",
                 MenuWidgets.Small);
 
+            GUILayout.Space(10);
+            GUILayout.Label("STEAM", MenuWidgets.Subtitle);
+#if FPSBASE_STEAM
+            if (MenuWidgets.MenuButton("HOST STEAM GAME (friends can join via overlay)"))
+                SteamLobbyService.HostLobby(selectedMode, selectedMap, sniperOnly);
+            GUILayout.Label("Friends: right-click you in the Steam friends list → Join Game.", MenuWidgets.Small);
+#else
+            GUILayout.Label("Not enabled — install Steamworks + the Steam transport and add the\nFPSBASE_STEAM define. Full steps in the README.", MenuWidgets.Small);
+#endif
+
             if (!string.IsNullOrEmpty(status))
             {
                 GUILayout.Space(6);
                 GUILayout.Label(status, MenuWidgets.Label);
             }
 
-            GUILayout.Space(10);
+            GUILayout.Space(8);
             if (MenuWidgets.MenuButton("BACK", 32f))
                 screen = MenuScreen.Root;
         }
@@ -177,7 +273,7 @@ namespace FpsBase
 
         private void DrawPauseMenu()
         {
-            float w = 380f, h = screen == MenuScreen.Settings ? 420f : 300f;
+            float w = 380f, h = screen == MenuScreen.Settings ? 430f : 350f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -200,6 +296,22 @@ namespace FpsBase
                 if (MenuWidgets.MenuButton("RESUME"))
                     MouseLook.LockCursor(true);
                 GUILayout.Space(8);
+
+                // Team switching (team modes only; the server validates balance).
+                var gameMode = GameModeManager.Instance;
+                if (gameMode != null && gameMode.IsSpawned && gameMode.IsTeamMode)
+                {
+                    if (MenuWidgets.MenuButton("SWITCH TEAM"))
+                    {
+                        var nm = NetworkManager.Singleton;
+                        var playerObject = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+                        var player = playerObject != null ? playerObject.GetComponent<NetworkPlayer>() : null;
+                        if (player != null)
+                            player.RequestTeamChange();
+                    }
+                    GUILayout.Space(8);
+                }
+
                 if (MenuWidgets.MenuButton("SETTINGS"))
                     screen = MenuScreen.Settings;
                 GUILayout.Space(8);
@@ -210,13 +322,15 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
-        // Hosting / joining
+        // Hosting / joining (LOCAL / LAN via UnityTransport)
         // ------------------------------------------------------------------
 
-        private void StartHost(GameMode mode)
+        private void StartHost()
         {
             var nm = NetworkManager.Singleton;
-            GameModeManager.PendingHostMode = mode;
+            GameModeManager.PendingHostMode = selectedMode;
+            GameModeManager.PendingHostMap = selectedMap;
+            GameModeManager.PendingSniperOnly = sniperOnly;
             ConfigureTransport("127.0.0.1");
 
             nm.NetworkConfig.ConnectionApproval = true;
@@ -241,9 +355,15 @@ namespace FpsBase
         private void StartClient()
         {
             ConfigureTransport(ipInput.Trim());
-            status = $"Connecting to {ipInput.Trim()}:{Port} ...";
-            if (!NetworkManager.Singleton.StartClient())
+            if (NetworkManager.Singleton.StartClient())
+            {
+                connecting = true;
+                connectStart = Time.time;
+            }
+            else
+            {
                 status = "Failed to start client.";
+            }
         }
 
         private void ConfigureTransport(string address)

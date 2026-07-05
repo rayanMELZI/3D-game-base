@@ -10,7 +10,14 @@ namespace FpsBase
     {
         /// <summary>Shown on the main menu — rename your game here.</summary>
         public const string GameTitle = "SUNDOWN ARENA";
-        public const string Version = "base v0.3";
+        public const string Version = "v4.0";
+
+        /// <summary>
+        /// URL of a plain-text file containing the latest version string
+        /// (e.g. https://raw.githubusercontent.com/you/repo/main/version.txt).
+        /// Empty = update checking disabled.
+        /// </summary>
+        public const string UpdateCheckUrl = "";
 
         public static string PlayerName;
         public static float MouseSensitivity; // multiplier, 0.2–3
