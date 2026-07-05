@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace FpsBase
 {
@@ -57,11 +58,15 @@ namespace FpsBase
             HumanoidBuilder.ApplyTeamColor(teamColorRenderers, chestStripeRenderer, color);
         }
 
-        /// <summary>Hide head parts for the local player so they never block the camera.</summary>
+        /// <summary>
+        /// First person: the local player's whole body becomes shadows-only —
+        /// it never clips into the camera, but the full shadow (with limbs and
+        /// weapon) stays on the ground. Other players still see the body.
+        /// </summary>
         public void SetFirstPerson(bool firstPerson)
         {
-            foreach (var r in headRenderers)
-                r.enabled = !firstPerson;
+            foreach (var r in allRenderers)
+                r.shadowCastingMode = firstPerson ? ShadowCastingMode.ShadowsOnly : ShadowCastingMode.On;
         }
 
         /// <summary>Show/hide the whole body (used while dead in multiplayer).</summary>
