@@ -22,6 +22,8 @@ namespace FpsBase
         public Vector3 spawnPoint;
         public float killY = -20f;
 
+        public bool IsSprinting { get; private set; }
+
         private CharacterController controller;
         private float verticalVelocity;
 
@@ -41,7 +43,8 @@ namespace FpsBase
             float inputZ = Input.GetAxisRaw("Vertical");
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
 
-            float speed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed;
+            IsSprinting = Input.GetKey(KeyCode.LeftShift) && moveDirection.sqrMagnitude > 0.1f;
+            float speed = IsSprinting ? sprintSpeed : walkSpeed;
 
             // --- Vertical movement (jump + gravity) ---
             if (grounded && verticalVelocity < 0f)
