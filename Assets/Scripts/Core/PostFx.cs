@@ -1,81 +1,80 @@
 using UnityEngine;
-using UnityEngine.Rendering.PostProcessing;
 
 namespace FpsBase
 {
     /// <summary>
-    /// Reference to the Post Processing package's internal resources, baked into
-    /// Assets/Resources/PostFxResources.prefab by the setup tool so the package
-    /// shaders are included in builds and available at runtime.
+    /// Self-contained post-processing (no packages needed): bloom that makes
+    /// the emissive trims/visors/tracers glow, ACES filmic tonemapping with a
+    /// warm grade, and a soft vignette. Implemented as a classic OnRenderImage
+    /// effect using Assets/Shaders/SundownPost.shader.
     /// </summary>
-    public class PostFxResourcesHolder : MonoBehaviour
+    [RequireComponent(typeof(Camera))]
+    public class SundownPostEffect : MonoBehaviour
     {
-        public PostProcessResources resources;
-    }
+        [Range(0f, 3f)] public float bloomIntensity = 1.2f;
+        [Range(0f, 2f)] public float bloomThreshold = 1f;
+        [Range(0f, 2f)] public float saturation = 1.15f;
+        [Range(0.5f, 1.5f)] public float contrast = 1.05f;
+        [Range(0f, 1f)] public float vignette = 0.35f;
 
-    /// <summary>
-    /// Runtime post-processing setup: bloom (makes all the emissive trims and
-    /// visors glow), ACES filmic tonemapping with warm grading, a soft vignette
-    /// and FXAA. Attached to every camera the game creates. If the setup tool
-    /// hasn't baked the resources holder yet, this silently does nothing.
-    /// </summary>
-    public static class PostFx
-    {
-        private const int VolumeLayer = 1; // built-in "TransparentFX" layer
+        private Material material;
 
-        private static PostProcessVolume globalVolume;
-
-        public static void Attach(Camera cam)
+        private void OnEnable()
         {
-            if (cam == null || cam.GetComponent<PostProcessLayer>() != null)
+            var shader = Shader.Find("Hidden/SundownPost");
+            if (shader == null || !shader.isSupported)
+            {
+                enabled = false; // fail soft: game renders without post fx
                 return;
-
-            var holderGo = Resources.Load<GameObject>("PostFxResources");
-            var holder = holderGo != null ? holderGo.GetComponent<PostFxResourcesHolder>() : null;
-            if (holder == null || holder.resources == null)
-                return; // tool not run yet — the game still works, just without post fx
-
-            cam.allowHDR = true;
-            var layer = cam.gameObject.AddComponent<PostProcessLayer>();
-            layer.Init(holder.resources);
-            layer.volumeTrigger = cam.transform;
-            layer.volumeLayer = 1 << VolumeLayer;
-            layer.antialiasingMode = PostProcessLayer.Antialiasing.FastApproximateAntialiasing;
-
-            EnsureGlobalVolume();
+            }
+            material = new Material(shader);
+            GetComponent<Camera>().allowHDR = true; // needed for bloom on emissives
         }
 
-        private static void EnsureGlobalVolume()
+        private void OnRenderImage(RenderTexture source, RenderTexture destination)
         {
-            if (globalVolume != null)
+            if (material == null)
+            {
+                Graphics.Blit(source, destination);
                 return;
+            }
 
-            var profile = ScriptableObject.CreateInstance<PostProcessProfile>();
+            // Bloom: bright-pass at quarter resolution, then two blur rounds.
+            int w = Mathf.Max(1, source.width / 4);
+            int h = Mathf.Max(1, source.height / 4);
+            var bloomA = RenderTexture.GetTemporary(w, h, 0, source.format);
+            var bloomB = RenderTexture.GetTemporary(w, h, 0, source.format);
 
-            var bloom = profile.AddSettings<Bloom>();
-            bloom.enabled.Override(true);
-            bloom.intensity.Override(2.6f);
-            bloom.threshold.Override(1.05f);
-            bloom.softKnee.Override(0.6f);
+            material.SetFloat("_Threshold", bloomThreshold);
+            Graphics.Blit(source, bloomA, material, 0);
+            for (int i = 0; i < 2; i++)
+            {
+                material.SetVector("_BlurDir", new Vector4(1, 0, 0, 0));
+                Graphics.Blit(bloomA, bloomB, material, 1);
+                material.SetVector("_BlurDir", new Vector4(0, 1, 0, 0));
+                Graphics.Blit(bloomB, bloomA, material, 1);
+            }
 
-            var grading = profile.AddSettings<ColorGrading>();
-            grading.enabled.Override(true);
-            grading.tonemapper.Override(Tonemapper.ACES);
-            grading.saturation.Override(12f);
-            grading.contrast.Override(10f);
-            grading.temperature.Override(8f);
-            grading.postExposure.Override(0.2f);
+            // Composite with tonemapping, grading and vignette.
+            material.SetTexture("_BloomTex", bloomA);
+            material.SetFloat("_BloomIntensity", bloomIntensity);
+            material.SetFloat("_Saturation", saturation);
+            material.SetFloat("_Contrast", contrast);
+            material.SetFloat("_Vignette", vignette);
+            Graphics.Blit(source, destination, material, 2);
 
-            var vignette = profile.AddSettings<Vignette>();
-            vignette.enabled.Override(true);
-            vignette.intensity.Override(0.28f);
-            vignette.smoothness.Override(0.4f);
+            RenderTexture.ReleaseTemporary(bloomA);
+            RenderTexture.ReleaseTemporary(bloomB);
+        }
+    }
 
-            var go = new GameObject("PostFxVolume");
-            go.layer = VolumeLayer;
-            globalVolume = go.AddComponent<PostProcessVolume>();
-            globalVolume.isGlobal = true;
-            globalVolume.sharedProfile = profile;
+    /// <summary>Attaches the post effect to every camera the game creates.</summary>
+    public static class PostFx
+    {
+        public static void Attach(Camera cam)
+        {
+            if (cam != null && cam.GetComponent<SundownPostEffect>() == null)
+                cam.gameObject.AddComponent<SundownPostEffect>();
         }
     }
 }

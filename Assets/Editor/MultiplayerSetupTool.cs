@@ -4,7 +4,6 @@ using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering.PostProcessing;
 
 namespace FpsBase.EditorTools
 {
@@ -31,7 +30,6 @@ namespace FpsBase.EditorTools
             BuildMultiplayerScene(playerPrefab);
             AddScenesToBuildSettings();
             EnsureAlwaysIncludedShaders();
-            BakePostFxResources();
 
             EditorUtility.DisplayDialog("FPS Base",
                 "Multiplayer setup complete.\n\n" +
@@ -109,7 +107,7 @@ namespace FpsBase.EditorTools
         /// </summary>
         private static void EnsureAlwaysIncludedShaders()
         {
-            string[] shaderNames = { "Standard", "Skybox/Procedural", "Sprites/Default" };
+            string[] shaderNames = { "Standard", "Skybox/Procedural", "Sprites/Default", "Hidden/SundownPost" };
 
             var graphicsSettings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/GraphicsSettings.asset")[0];
             var serialized = new SerializedObject(graphicsSettings);
@@ -137,37 +135,6 @@ namespace FpsBase.EditorTools
                 }
             }
             serialized.ApplyModifiedProperties();
-        }
-
-        /// <summary>
-        /// Bakes a Resources prefab referencing the Post Processing package's
-        /// internal resources so PostFx can initialize at runtime (and the
-        /// package shaders ship in builds).
-        /// </summary>
-        private static void BakePostFxResources()
-        {
-            var guids = AssetDatabase.FindAssets("t:PostProcessResources");
-            if (guids.Length == 0)
-            {
-                Debug.LogWarning("FPS Base: PostProcessResources not found — is com.unity.postprocessing installed? Post-processing will be disabled.");
-                return;
-            }
-            var resources = AssetDatabase.LoadAssetAtPath<PostProcessResources>(
-                AssetDatabase.GUIDToAssetPath(guids[0]));
-
-            if (!AssetDatabase.IsValidFolder("Assets/Resources"))
-                AssetDatabase.CreateFolder("Assets", "Resources");
-
-            var go = new GameObject("PostFxResources");
-            try
-            {
-                go.AddComponent<PostFxResourcesHolder>().resources = resources;
-                PrefabUtility.SaveAsPrefabAsset(go, "Assets/Resources/PostFxResources.prefab");
-            }
-            finally
-            {
-                Object.DestroyImmediate(go);
-            }
         }
 
         private static void AddScenesToBuildSettings()

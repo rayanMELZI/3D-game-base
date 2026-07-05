@@ -88,11 +88,11 @@ Assets/
 
 ## Graphics
 
-The game uses the built-in render pipeline with the **Post Processing** package
-(bloom + ACES filmic tonemapping + warm color grading + vignette + FXAA),
-configured entirely from code (`PostFx.cs`). The setup tool bakes the small
-`Assets/Resources/PostFxResources.prefab` it needs — re-run the tool after
-installing. Your own body renders **shadows-only** in first person (no clipping,
+The game uses the built-in render pipeline with a **self-contained post stack**
+(no packages): bloom + ACES filmic tonemapping + warm grading + vignette,
+implemented in `Assets/Shaders/SundownPost.shader` and attached to every camera
+by `PostFx.cs`. Re-run the setup tool once so the shader is force-included in
+builds. Your own body renders **shadows-only** in first person (no clipping,
 but your full shadow — including the held weapon — stays visible).
 
 ### Making it truly beautiful: importing other people's work
