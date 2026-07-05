@@ -1,134 +1,119 @@
 # SUNDOWN ARENA — 3D FPS Base (Unity)
 
-An asset-free online first-person shooter base: 1v1 Duel and Team Deathmatch,
-three weapons, humanoid characters with one-shot headshots, a full main menu,
-procedural sound effects and a stylized golden-hour look — everything generated
-from code, no models/textures/audio files.
+An asset-free online first-person shooter base: 4 game modes on 3 maps with a
+7-weapon arsenal, kill cam, scoreboard, crouch/slide/bunny-hop movement and a
+stylized golden-hour look with custom post-processing — everything generated
+from code. Rename the game in `GameSettings.GameTitle`.
 
-> The original minimal version lives in the sibling folder
-> **`3D game base v1 (simple)`** — keep that as the clean starting point for
-> other games. Rename the game in `GameSettings.GameTitle`.
+> The original minimal version lives in **`3D game base v1 (simple)`**.
 
-**Features**
-- **Main menu** (builds boot into it): Play Online (host 1v1 / host TDM / join by
-  IP, player name), Practice Range (offline dummies), Settings (sensitivity,
-  FOV, volume, fullscreen, quality), Quit — plus an in-match pause menu (Esc)
-- **3 weapons**: semi-auto pistol, automatic rifle, one-shot **sniper** with scope;
-  switch with 1/2/3 or scroll
-- **Headshots are instant kills** — heads have real hitboxes above the body capsule
-- **Humanoid characters**: torso, helmet + glowing visor, swinging arms/legs
-  (procedural walk animation), team-colored suits with glowing chest stripes,
-  floating nametags, cube-burst death effect
-- **Online (Netcode for GameObjects)**: team balancing, server-checked scores and
-  friendly fire, kill feed with names and HEADSHOT tags, respawns, win banner +
-  jingle, automatic match restart
-- **Charm**: golden-hour sun + warm fog + procedural skybox, synthesized SFX
-  (gunshots per weapon, hit/headshot dings, reload, death, UI clicks, win
-  jingle), orbiting menu camera, tracers, hit markers, sprint FOV
+## Features
 
-## Setup (after pulling these changes)
+- **Modes:** 1v1 Duel · Team Deathmatch · Free-For-All · **Gun Game** (race
+  through all 7 weapons, knife kill wins) — plus a **Snipers Only** toggle for
+  any mode
+- **Maps:** Arena · **Nuketown-style** (two houses, street, bus) ·
+  **Backrooms** (yellow maze, humming light panels) — picked when hosting,
+  synced to everyone
+- **Weapons (1–7):** Knife · Pistol · SMG · Shotgun (8 pellets) · Rifle ·
+  Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
+  jumps) — **aim-down-sights on right-click** for all, one-shot **headshots**,
+  reload animation + bar, fresh ammo every respawn
+- **Movement:** sprint, crouch (Ctrl), **slide** (sprint+Ctrl), **bunny hop**
+  (hold Space), synced to other players
+- **Kill cam:** on death you spectate your killer; at match end everyone
+  watches the final killer (live spectate, BO2-style presentation)
+- **Scoreboard (hold Tab):** K/D, team colors, Gun Game levels
+- **Team switching** from the pause menu (server keeps teams balanced)
+- **HUD:** big panel-based ammo/health blocks, low-HP vignette, kill feed
+  top-right, hit markers (red = headshot)
+- **Full-body hitboxes:** head (lethal), neck, torso, arms, hands, legs, feet
+- Layered synthesized gunshots per weapon, explosions, join-wait window with
+  cancel/timeout, floating nametags, humanoid characters with walk animation
 
-1. Open the project and let it compile.
+## Setup (after pulling)
+
+1. Open the project, let it compile.
 2. **Re-run `Tools > FPS Base > Setup Multiplayer (Scene + Player Prefab)`** —
-   this rebuilds the player prefab (new humanoid body + head hitbox), rebuilds
-   the Multiplayer scene (new menu), and **fixes the build scene order** so
-   builds boot into the main menu. Do this again whenever these generated
-   assets need to pick up code changes.
-3. Press Play in the Multiplayer scene (or `File > Build And Run`) → main menu.
-
-### Playing online
-- **Same PC test:** host in a standalone build, press Play in the editor → Play
-  Online → Join `127.0.0.1`.
-- **LAN:** friends join the host's local IPv4 (`ipconfig`). Allow the game / UDP
-  port **7777** through the host's Windows firewall.
-- **Internet:** port-forward 7777, or add Unity **Relay + Lobby** (see notes below).
+   rebuilds the player prefab and menu scene with the new components.
+3. Play the Multiplayer scene (or Build And Run) → PLAY → pick map/mode →
+   HOST GAME. Second player joins via IP (LAN) or `127.0.0.1` (same PC).
 
 ## Controls
 
 | Input | Action |
 |---|---|
-| Mouse / WASD / Shift / Space | Look / move / sprint / jump |
-| Left Mouse | Shoot (rifle auto, pistol & sniper per-click) |
-| Right Mouse (hold) | Sniper scope |
-| 1 / 2 / 3 or scroll | Pistol / Rifle / Sniper |
+| WASD / Shift / Space (hold) | Move / sprint / jump & bunny hop |
+| Left Ctrl (or C) | Crouch — while sprinting: **slide** |
+| Left Mouse / Right Mouse | Shoot / aim (sniper scopes) |
+| 1–7 or scroll | Weapons |
 | R | Reload |
-| Escape | Pause menu (resume, settings, leave) |
+| Tab (hold) | Scoreboard |
+| Escape | Pause (resume · switch team · settings · leave) |
 
-## Weapon balance (edit `WeaponDefinition.CreateDefaultLoadout`)
+## Playing over Steam (no port forwarding)
 
-| | Damage | Fire rate | Mag | Special |
-|---|---|---|---|---|
-| Pistol | 20 | 5/s semi | 12 | fast reload |
-| Rifle | 22 | 9/s auto | 30 | starting weapon |
-| Sniper | **100 (one-shot)** | 0.9/s | 5 | 16° scope |
-| Any weapon | — | — | — | **headshot = instant kill** |
+The menu's LOCAL/LAN section works out of the box. Steam play is scaffolded
+in `SteamLobbyService.cs` behind the `FPSBASE_STEAM` define:
 
-## Project structure
+1. Package Manager → **Add package from git URL**:
+   `https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net`
+2. Add the community **Steam transport for Netcode**:
+   `https://github.com/Unity-Technologies/multiplayer-community-contributions.git?path=/Transports/com.community.netcode.transport.steamworks`
+3. `Project Settings > Player > Scripting Define Symbols` → add `FPSBASE_STEAM`.
+4. In the Multiplayer scene, add the `SteamManager` component (ships with
+   Steamworks.NET) and a `SteamNetworkingSocketsTransport` next to the
+   NetworkManager. A `steam_appid.txt` containing `480` (Valve's test app)
+   in the project root lets you test while Steam is running.
+5. The menu's STEAM section activates: hosting creates a friends-only lobby;
+   friends join via **Steam overlay → Join Game**. Steam relays the traffic —
+   no IPs or router setup.
+
+For non-Steam internet play, Unity **Relay + Lobby** is the alternative
+(swap `SetConnectionData` in `MainMenu` for a Relay allocation).
+
+## Shipping updates (not full rebuilds)
+
+You always produce a build, but players should only **download the diff**:
+
+- **Steam (recommended, pairs with the above):** upload each build as a depot
+  via SteamPipe — Steam computes binary deltas and auto-updates players.
+  Typical code-only update ≈ a few MB, not the whole game.
+- **itch.io:** `butler push <build-folder> you/sundown-arena:windows` —
+  butler uploads only changed blocks; the itch app auto-patches players.
+- **Self-hosted:** keep builds in GitHub Releases and point
+  `GameSettings.UpdateCheckUrl` at a raw `version.txt`; the main menu then
+  shows "update available" (players re-download; simplest, no delta).
+
+Also note: Unity builds are deterministic-ish per platform — keeping
+`Library` intact between builds makes rebuilds fast; only ship the Build
+folder output.
+
+## Project structure (key files)
 
 ```
-Assets/
-  Editor/                      # Add Game Bootstrap · Setup Multiplayer (bakes prefab+scene, fixes scene order)
-  Scenes/                      # Multiplayer.unity (menu + online, scene 0) · Main.unity (practice)
-  Scripts/
-    Core/
-      GameSettings.cs          # game title, saved player settings (PlayerPrefs)
-      GameBootstrap.cs         # practice range: arena + humanoid dummies + player
-      EnvironmentBuilder.cs    # golden-hour lighting/sky/fog + deterministic arena
-      HumanoidBuilder.cs       # primitive humanoid body + head hitbox + materials
-      PlayerFactory.cs         # player rig (controller, body, camera, weapons)
-      PlayerRigRefs.cs         # reference hub, runtime materials, team color
-    Player/                    # PlayerMovement · MouseLook (zoom/settings) · LimbAnimator
-    Weapons/                   # WeaponDefinition · WeaponModelBuilder · WeaponController
-    Combat/                    # IDamageable/IHealthSource · Health · Hitbox · TargetDummy · Effects
-    Audio/SfxSynth.cs          # procedurally synthesized sound effects
-    UI/                        # HudOverlay · MenuWidgets · OfflineMenu · Nametag
-    Network/                   # MainMenu · GameModeManager · NetworkPlayer/Health/Weapon
-                               # · NetworkGameHud · MultiplayerBootstrap · ClientAuthNetworkTransform
+Assets/Scripts/
+  Core/      GameSettings (title/version/update URL) · EnvironmentBuilder (maps)
+             HumanoidBuilder (body + hitboxes) · PlayerFactory · PostFx · UpdateChecker
+  Player/    PlayerMovement (crouch/slide/bhop) · MouseLook · LimbAnimator · DeathCam
+  Weapons/   WeaponDefinition (balance!) · WeaponModelBuilder · WeaponController
+             RocketProjectile
+  Combat/    Health · NetworkHealth · Hitbox · Effects · TargetDummy
+  Audio/     SfxSynth (all sounds, synthesized)
+  UI/        HudOverlay · MenuWidgets · Nametag · OfflineMenu
+  Network/   GameModeManager (modes/scores/maps) · NetworkPlayer · NetworkWeapon
+             MainMenu · NetworkGameHud · MultiplayerBootstrap · SteamLobbyService
 ```
 
-## Graphics
+## Extending
 
-The game uses the built-in render pipeline with a **self-contained post stack**
-(no packages): bloom + ACES filmic tonemapping + warm grading + vignette,
-implemented in `Assets/Shaders/SundownPost.shader` and attached to every camera
-by `PostFx.cs`. Re-run the setup tool once so the shader is force-included in
-builds. Your own body renders **shadows-only** in first person (no clipping,
-but your full shadow — including the held weapon — stays visible).
-
-### Making it truly beautiful: importing other people's work
-
-Everything visual is generated from primitives behind three small builder
-classes, so real assets drop in cleanly:
-
-| What | Great free sources | Where to plug it in |
-|---|---|---|
-| Characters (rigged + animated) | **Mixamo** (free, auto-rigged + animations), Kenney "Blocky Characters", Synty POLYGON free samples | Replace the body built in `HumanoidBuilder.Build` with your model prefab; keep the head `Hitbox` |
-| Weapons | Kenney **"Blaster Kit"** / **"Weapon Pack"** (CC0), Asset Store free weapon packs | Return your prefab from `WeaponModelBuilder.Build` (keep the `Muzzle` child + flash light) |
-| Environment / props | Kenney "Prototype Kit", Synty POLYGON packs, Unity Asset Store free section, **poly.pizza** (CC0 models) | Build a real scene, or spawn prefabs in `EnvironmentBuilder.BuildArena` |
-| Skyboxes | Free HDRIs from **polyhaven.com** (CC0) | Assign in `EnvironmentBuilder.SetupLightingAndSky` instead of the procedural skybox |
-| Audio | **freesound.org**, Kenney audio packs (CC0) | Return real clips from the `SfxSynth` methods |
-
-Import via `Assets > Import Package` / dragging files into `Assets/`, or the
-Package Manager's "My Assets" tab for Asset Store items. Check each pack's
-license (CC0 = use freely; most Asset Store free packs allow game use, no
-redistribution of the raw assets).
-
-## Architecture notes
-
-- **Offline and online share gameplay code** via `IDamageable`: offline `Health`
-  applies damage directly, online `NetworkHealth` routes it to the server (which
-  checks friendly fire / match state). Headshots are decided by `Hitbox` triggers.
-- **Head hitboxes**: the CharacterController capsule stops at the shoulders;
-  the head sphere has a *trigger* collider (never blocks movement) marked with
-  `Hitbox.isHead`. Weapon raycasts include triggers and check the marker.
-- **Hit detection is client-side** (simple, standard for indie MP). For
-  competitive play, move the raycast into a ServerRpc taking origin+direction.
-- **Add a game mode:** extend `GameMode`, its limits in `GameModeManager`, and a
-  button in `MainMenu`.
-- **Add a weapon:** a `WeaponDefinition` entry + optionally a model in
-  `WeaponModelBuilder`.
-- **Internet matchmaking:** install `com.unity.services.relay`, create a UGS
-  project, swap `SetConnectionData` in `MainMenu` for a Relay allocation.
-- **Real art later:** all visuals/audio are generated behind small builder/synth
-  classes — swap `HumanoidBuilder`/`WeaponModelBuilder`/`SfxSynth` outputs for
-  real assets without touching gameplay logic.
+- **Balance:** everything lives in `WeaponDefinition.CreateDefaultLoadout()`.
+- **New mode:** extend `GameMode`, add scoring in `GameModeManager.ReportKill`,
+  a button in `MainMenu`.
+- **New map:** add a builder + name in `EnvironmentBuilder` (`MapNames`,
+  `BuildMap`, `GetSpawnPoint`).
+- **Real art:** swap the outputs of `HumanoidBuilder` / `WeaponModelBuilder` /
+  `SfxSynth` for imported assets (free sources: Mixamo, Kenney, Synty,
+  polyhaven.com, poly.pizza — all game-ready).
+- Hit detection is client-side (standard indie approach); for competitive play
+  move the raycast into a ServerRpc.
