@@ -79,7 +79,10 @@ namespace FpsBase
             // Recoil decays back to zero.
             recoil = Mathf.Lerp(recoil, 0f, recoilRecoverySpeed * Time.deltaTime);
 
-            transform.localRotation = Quaternion.Euler(pitch - recoil, 0f, 0f);
+            // Camera rolls a little while sliding.
+            float roll = movement != null ? movement.SlideBlend * -7f : 0f;
+
+            transform.localRotation = Quaternion.Euler(pitch - recoil, 0f, roll);
         }
 
         /// <summary>Called by the gun to kick the view upward.</summary>

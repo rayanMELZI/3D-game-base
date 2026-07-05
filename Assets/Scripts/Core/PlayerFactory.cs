@@ -56,7 +56,9 @@ namespace FpsBase
 
             // --- Gameplay components ---
             var movement = root.AddComponent<PlayerMovement>();
-            look.movement = movement; // sprint FOV boost
+            movement.cameraTransform = camGo.transform;
+            movement.bodyVisual = body.root.transform;
+            look.movement = movement; // sprint FOV boost + slide roll
 
             var weaponController = root.AddComponent<WeaponController>();
             weaponController.shootCamera = cam;
