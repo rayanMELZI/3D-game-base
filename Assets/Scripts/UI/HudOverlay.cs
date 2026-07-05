@@ -4,41 +4,66 @@ namespace FpsBase
 {
     /// <summary>
     /// Minimal HUD drawn with IMGUI (OnGUI) so it needs no Canvas, fonts or assets:
-    /// crosshair, ammo counter, health bar, and a pause hint when the cursor is unlocked.
+    /// crosshair, hit marker, sniper scope overlay, weapon/ammo info, health bar.
     /// Swap this for a real uGUI/UI Toolkit interface in your actual games.
     /// </summary>
     public class HudOverlay : MonoBehaviour
     {
-        public Gun gun;
-        public Health playerHealth;
+        public WeaponController weaponController;
+
+        /// <summary>Health readout (offline Health or multiplayer NetworkHealth). Set from code.</summary>
+        public IHealthSource HealthSource { get; set; }
 
         public float crosshairSize = 6f;
 
         private Texture2D whiteTex;
         private GUIStyle textStyle;
+        private GUIStyle smallStyle;
+        private float lastHitTime = -10f;
+        private bool lastHitWasHeadshot;
+        private bool subscribed;
 
         private void Awake()
         {
             whiteTex = Texture2D.whiteTexture;
         }
 
+        private void Update()
+        {
+            // The weapon controller is assigned after AddComponent, so subscribe lazily.
+            if (!subscribed && weaponController != null)
+            {
+                weaponController.TargetHit += headshot =>
+                {
+                    lastHitTime = Time.time;
+                    lastHitWasHeadshot = headshot;
+                };
+                subscribed = true;
+            }
+        }
+
         private void OnGUI()
         {
             if (textStyle == null)
             {
-                textStyle = new GUIStyle(GUI.skin.label)
-                {
-                    fontSize = 20,
-                    fontStyle = FontStyle.Bold,
-                };
+                textStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold };
                 textStyle.normal.textColor = Color.white;
+                smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
+                smallStyle.normal.textColor = new Color(1f, 1f, 1f, 0.65f);
             }
 
-            DrawCrosshair();
-            DrawAmmo();
+            bool zoomed = weaponController != null && weaponController.IsZoomed;
+            if (zoomed)
+                DrawScopeOverlay();
+            else
+                DrawCrosshair();
+
+            DrawHitMarker();
+            DrawWeaponInfo();
             DrawHealth();
-            DrawCursorHint();
         }
+
+        // ------------------------------------------------------------------
 
         private void DrawCrosshair()
         {
@@ -47,33 +72,87 @@ namespace FpsBase
             float s = crosshairSize;
 
             GUI.color = new Color(1f, 1f, 1f, 0.9f);
-            // Four small lines around the center.
-            GUI.DrawTexture(new Rect(cx - 1, cy - s - 8, 2, s), whiteTex);      // top
-            GUI.DrawTexture(new Rect(cx - 1, cy + 8, 2, s), whiteTex);          // bottom
-            GUI.DrawTexture(new Rect(cx - s - 8, cy - 1, s, 2), whiteTex);      // left
-            GUI.DrawTexture(new Rect(cx + 8, cy - 1, s, 2), whiteTex);          // right
+            GUI.DrawTexture(new Rect(cx - 1, cy - s - 8, 2, s), whiteTex);
+            GUI.DrawTexture(new Rect(cx - 1, cy + 8, 2, s), whiteTex);
+            GUI.DrawTexture(new Rect(cx - s - 8, cy - 1, s, 2), whiteTex);
+            GUI.DrawTexture(new Rect(cx + 8, cy - 1, s, 2), whiteTex);
             GUI.color = Color.white;
         }
 
-        private void DrawAmmo()
+        private void DrawHitMarker()
         {
-            if (gun == null)
+            float age = Time.time - lastHitTime;
+            if (age > 0.18f)
                 return;
 
-            string text = gun.IsReloading
-                ? "RELOADING..."
-                : $"{gun.CurrentAmmo} / {gun.magazineSize}";
+            float cx = Screen.width / 2f;
+            float cy = Screen.height / 2f;
+            // Headshots flash a bigger red X, body hits a soft white one.
+            GUI.color = lastHitWasHeadshot
+                ? new Color(1f, 0.2f, 0.15f, 1f - age / 0.18f)
+                : new Color(1f, 1f, 1f, 0.8f * (1f - age / 0.18f));
 
-            GUI.Label(new Rect(Screen.width - 220, Screen.height - 50, 200, 40), text, textStyle);
+            // X shape: rotate the GUI 45° around the center, draw a plus, rotate back.
+            var oldMatrix = GUI.matrix;
+            GUIUtility.RotateAroundPivot(45f, new Vector2(cx, cy));
+            GUI.DrawTexture(new Rect(cx - 1, cy - 14, 2, 9), whiteTex);
+            GUI.DrawTexture(new Rect(cx - 1, cy + 5, 2, 9), whiteTex);
+            GUI.DrawTexture(new Rect(cx - 14, cy - 1, 9, 2), whiteTex);
+            GUI.DrawTexture(new Rect(cx + 5, cy - 1, 9, 2), whiteTex);
+            GUI.matrix = oldMatrix;
+            GUI.color = Color.white;
+        }
+
+        private void DrawScopeOverlay()
+        {
+            float w = Screen.width;
+            float h = Screen.height;
+            float cx = w / 2f;
+            float cy = h / 2f;
+            float r = h * 0.42f; // scope "circle" radius
+
+            // Darken everything outside the center square area.
+            GUI.color = new Color(0f, 0f, 0f, 0.96f);
+            GUI.DrawTexture(new Rect(0, 0, cx - r, h), whiteTex);          // left
+            GUI.DrawTexture(new Rect(cx + r, 0, w - (cx + r), h), whiteTex); // right
+            GUI.DrawTexture(new Rect(cx - r, 0, 2 * r, cy - r), whiteTex);  // top
+            GUI.DrawTexture(new Rect(cx - r, cy + r, 2 * r, h - (cy + r)), whiteTex); // bottom
+
+            // Thin scope crosshair.
+            GUI.color = new Color(0f, 0f, 0f, 0.9f);
+            GUI.DrawTexture(new Rect(cx - r, cy - 0.5f, 2 * r, 1), whiteTex);
+            GUI.DrawTexture(new Rect(cx - 0.5f, cy - r, 1, 2 * r), whiteTex);
+            GUI.color = Color.white;
+        }
+
+        private void DrawWeaponInfo()
+        {
+            if (weaponController == null || weaponController.CurrentWeapon == null)
+                return;
+
+            var weapon = weaponController.CurrentWeapon;
+            string ammoText = weaponController.IsReloading
+                ? "RELOADING..."
+                : $"{weapon.displayName}   {weaponController.CurrentAmmo} / {weapon.magazineSize}";
+            GUI.Label(new Rect(Screen.width - 300, Screen.height - 54, 280, 40), ammoText, textStyle);
+
+            // Weapon slot list, current one highlighted.
+            for (int i = 0; i < weaponController.weapons.Length; i++)
+            {
+                bool current = i == weaponController.CurrentIndex;
+                smallStyle.normal.textColor = current ? new Color(1f, 0.85f, 0.3f) : new Color(1f, 1f, 1f, 0.45f);
+                GUI.Label(new Rect(Screen.width - 300 + i * 90, Screen.height - 26, 90, 20),
+                    $"{i + 1} {weaponController.weapons[i].displayName}", smallStyle);
+            }
         }
 
         private void DrawHealth()
         {
-            if (playerHealth == null)
+            if (HealthSource == null)
                 return;
 
             float barWidth = 200f;
-            float fill = Mathf.Clamp01(playerHealth.Current / playerHealth.maxHealth);
+            float fill = HealthSource.MaxHealth > 0 ? Mathf.Clamp01(HealthSource.CurrentHealth / HealthSource.MaxHealth) : 0f;
             var barRect = new Rect(20, Screen.height - 44, barWidth, 24);
 
             GUI.color = new Color(0f, 0f, 0f, 0.5f);
@@ -82,17 +161,8 @@ namespace FpsBase
             GUI.DrawTexture(new Rect(barRect.x, barRect.y, barWidth * fill, barRect.height), whiteTex);
             GUI.color = Color.white;
 
-            GUI.Label(new Rect(24, Screen.height - 46, 200, 30), Mathf.CeilToInt(playerHealth.Current).ToString(), textStyle);
+            GUI.Label(new Rect(24, Screen.height - 46, 200, 30), Mathf.CeilToInt(HealthSource.CurrentHealth).ToString(), textStyle);
         }
 
-        private void DrawCursorHint()
-        {
-            if (Cursor.lockState == CursorLockMode.Locked)
-                return;
-
-            var rect = new Rect(0, Screen.height / 2f + 40, Screen.width, 40);
-            var centered = new GUIStyle(textStyle) { alignment = TextAnchor.MiddleCenter };
-            GUI.Label(rect, "PAUSED — click to play  (WASD move · Shift sprint · Space jump · Mouse1 shoot · R reload)", centered);
-        }
     }
 }
