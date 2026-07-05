@@ -11,7 +11,7 @@ namespace FpsBase
     {
         public static MultiplayerBootstrap Instance { get; private set; }
 
-        public float arenaSize = 60f;
+        public int CurrentMap { get; private set; }
 
         private GameObject menuCamera;
 
@@ -20,7 +20,8 @@ namespace FpsBase
             Instance = this;
 
             EnvironmentBuilder.SetupLightingAndSky();
-            EnvironmentBuilder.BuildArena(arenaSize);
+            EnvironmentBuilder.BuildMap(0);
+            CurrentMap = 0;
 
             menuCamera = new GameObject("MenuCamera");
             var cam = menuCamera.AddComponent<Camera>();
@@ -52,6 +53,18 @@ namespace FpsBase
         {
             if (menuCamera != null)
                 menuCamera.SetActive(active);
+        }
+
+        /// <summary>Rebuilds the level for the selected map (synced by GameModeManager).</summary>
+        public void SetMap(int index)
+        {
+            if (index == CurrentMap)
+                return;
+            var old = GameObject.Find(EnvironmentBuilder.MapRootName);
+            if (old != null)
+                Destroy(old);
+            EnvironmentBuilder.BuildMap(index);
+            CurrentMap = index;
         }
     }
 }
