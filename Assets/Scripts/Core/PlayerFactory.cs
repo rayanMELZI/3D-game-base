@@ -30,6 +30,7 @@ namespace FpsBase
             limbAnimator.armR = body.armR;
             limbAnimator.legL = body.legL;
             limbAnimator.legR = body.legR;
+            limbAnimator.aimPose = true; // players hold their weapon with both hands
 
             // --- Camera at eye height ---
             var camGo = new GameObject("PlayerCamera");
@@ -47,10 +48,11 @@ namespace FpsBase
             var weaponHolder = new GameObject("WeaponHolder");
             weaponHolder.transform.SetParent(camGo.transform, false);
 
-            // --- Third-person weapon anchor (what other players see in multiplayer) ---
+            // --- Third-person weapon anchor: between the raised hands, used for the
+            // owner's shadows-only gun and for the model other players see ---
             var tpAnchor = new GameObject("ThirdPersonWeaponAnchor");
             tpAnchor.transform.SetParent(root.transform, false);
-            tpAnchor.transform.localPosition = new Vector3(0.3f, 1.22f, 0.25f);
+            tpAnchor.transform.localPosition = new Vector3(0.12f, 1.32f, 0.35f);
 
             // --- Gameplay components ---
             var movement = root.AddComponent<PlayerMovement>();
@@ -61,6 +63,7 @@ namespace FpsBase
             weaponController.mouseLook = look;
             weaponController.viewmodelHolder = weaponHolder.transform;
             weaponController.selfRoot = root.transform;
+            weaponController.thirdPersonAnchor = tpAnchor.transform;
 
             // --- Reference hub ---
             var rig = root.AddComponent<PlayerRigRefs>();

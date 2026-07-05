@@ -19,6 +19,9 @@ namespace FpsBase
         public float stepFrequency = 2.6f; // swing cycles per meter-ish
         public float maxSwingDegrees = 38f;
 
+        [Tooltip("Arms raised forward holding a weapon instead of hanging at the sides.")]
+        public bool aimPose;
+
         private Vector3 lastPosition;
         private float phase;
         private float swingWeight; // 0 idle → 1 running
@@ -48,8 +51,18 @@ namespace FpsBase
 
             if (legL != null) legL.localRotation = Quaternion.Euler(swing, 0, 0);
             if (legR != null) legR.localRotation = Quaternion.Euler(-swing, 0, 0);
-            if (armL != null) armL.localRotation = Quaternion.Euler(-swing * 0.8f, 0, breathe + 4f);
-            if (armR != null) armR.localRotation = Quaternion.Euler(swing * 0.8f, 0, -breathe - 4f);
+
+            if (aimPose)
+            {
+                // Two hands up holding the weapon; only a slight bob while moving.
+                if (armL != null) armL.localRotation = Quaternion.Euler(-52f + swing * 0.15f, 20f, breathe * 0.5f - 6f);
+                if (armR != null) armR.localRotation = Quaternion.Euler(-70f + swing * 0.15f, -14f, breathe * 0.5f + 6f);
+            }
+            else
+            {
+                if (armL != null) armL.localRotation = Quaternion.Euler(-swing * 0.8f, 0, breathe + 4f);
+                if (armR != null) armR.localRotation = Quaternion.Euler(swing * 0.8f, 0, -breathe - 4f);
+            }
         }
     }
 }

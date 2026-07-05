@@ -17,6 +17,8 @@ namespace FpsBase
         public Transform viewmodelHolder;
         [Tooltip("Root of this player — its own colliders are ignored by shots.")]
         public Transform selfRoot;
+        [Tooltip("Body anchor for the shadows-only held weapon (so your shadow holds a gun).")]
+        public Transform thirdPersonAnchor;
 
         // Not serialized on purpose: the loadout always comes from
         // WeaponDefinition.CreateDefaultLoadout(), so balance edits in code apply
@@ -36,6 +38,8 @@ namespace FpsBase
         public bool IsZoomed { get; private set; }
 
         private WeaponModelInstance[] models;
+        private WeaponModelInstance shadowModel; // shadows-only copy held at the body
+        private bool hasShadowModel;
         private int[] ammo;
         private float nextFireTime;
         private float reloadEndTime;
@@ -56,6 +60,28 @@ namespace FpsBase
                 models[i] = WeaponModelBuilder.Build(weapons[i], viewmodelHolder, weapons[i].viewOffset, castShadows: false);
                 models[i].root.SetActive(i == CurrentIndex);
             }
+            RebuildShadowModel();
+        }
+
+        /// <summary>
+        /// The viewmodel doesn't cast shadows (it would look huge), so a
+        /// shadows-only copy of the current weapon is held at the body — your
+        /// shadow visibly carries the gun.
+        /// </summary>
+        private void RebuildShadowModel()
+        {
+            if (hasShadowModel)
+            {
+                Destroy(shadowModel.root);
+                hasShadowModel = false;
+            }
+            if (thirdPersonAnchor == null)
+                return;
+
+            shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true);
+            foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            hasShadowModel = true;
         }
 
         private void OnDisable()
@@ -65,6 +91,14 @@ namespace FpsBase
             reloadPending = false;
             if (models != null && models[CurrentIndex].muzzleFlash != null)
                 models[CurrentIndex].muzzleFlash.enabled = false;
+            if (hasShadowModel)
+                shadowModel.root.SetActive(false); // no floating gun shadow while dead
+        }
+
+        private void OnEnable()
+        {
+            if (hasShadowModel)
+                shadowModel.root.SetActive(true);
         }
 
         private void Update()
@@ -142,6 +176,7 @@ namespace FpsBase
             CurrentIndex = index;
             models[CurrentIndex].root.SetActive(true);
             nextFireTime = Time.time + 0.25f; // draw time
+            RebuildShadowModel();
         }
 
         private void StartReload()
