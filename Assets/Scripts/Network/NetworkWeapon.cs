@@ -12,7 +12,7 @@ namespace FpsBase
     public class NetworkWeapon : NetworkBehaviour
     {
         public NetworkVariable<int> WeaponIndex = new NetworkVariable<int>(
-            1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+            WeaponDefinition.DefaultIndex, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         private PlayerRigRefs rig;
         private WeaponModelInstance thirdPersonModel;
@@ -101,12 +101,27 @@ namespace FpsBase
             Vector3 from = hasThirdPersonModel
                 ? thirdPersonModel.muzzle.position
                 : transform.position + Vector3.up * 1.4f;
-            WeaponController.SpawnTracerLine(from, endPoint);
 
-            // Positional gunshot so you can hear where enemies are firing from.
             var weapons = rig.weaponController.weapons;
             int index = Mathf.Clamp(WeaponIndex.Value, 0, weapons.Length - 1);
-            SfxSynth.PlayAt(SfxSynth.Shot(weapons[index].model), from, 0.8f);
+            var weapon = weapons[index];
+
+            if (!weapon.isMelee)
+                WeaponController.SpawnTracerLine(from, endPoint);
+
+            // Positional gunshot so you can hear where enemies are firing from.
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), from, 0.8f);
+
+            // Remote rocket: explosion at the predicted impact after the flight time.
+            if (weapon.isProjectile)
+                StartCoroutine(RemoteExplosion(endPoint, Vector3.Distance(from, endPoint) / Mathf.Max(1f, weapon.projectileSpeed)));
+        }
+
+        private System.Collections.IEnumerator RemoteExplosion(Vector3 point, float delay)
+        {
+            yield return new WaitForSeconds(Mathf.Min(delay, 4f));
+            Effects.SpawnExplosion(point);
+            SfxSynth.PlayAt(SfxSynth.Explosion(), point, 1f);
         }
     }
 }

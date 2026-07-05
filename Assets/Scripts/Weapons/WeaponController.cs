@@ -4,10 +4,11 @@ using UnityEngine;
 namespace FpsBase
 {
     /// <summary>
-    /// Manages the player's weapons: switching (1/2/3 or scroll wheel), firing
-    /// (raycast hitscan), reloading, sniper zoom, recoil and shot effects.
-    /// Damage goes through IDamageable, so the same code works offline (Health)
-    /// and online (NetworkHealth routes it to the server).
+    /// Manages the player's weapons: switching (1–7 / scroll), firing (hitscan,
+    /// shotgun pellets, melee swings or rockets), reloading with a viewmodel
+    /// animation, aim-down-sights on every weapon (sniper scopes), recoil and
+    /// effects. Damage goes through IDamageable so the same code works offline
+    /// and online.
     /// </summary>
     public class WeaponController : MonoBehaviour
     {
@@ -26,15 +27,22 @@ namespace FpsBase
         [NonSerialized]
         public WeaponDefinition[] weapons = WeaponDefinition.CreateDefaultLoadout();
 
+        /// <summary>Game modes can pin the weapon (Gun Game, sniper only).</summary>
+        [NonSerialized]
+        public bool lockSwitching;
+
         /// <summary>Raised after every local shot with the end point (for network replication).</summary>
         public event Action<Vector3> ShotFired;
         /// <summary>Raised when a shot damaged something; true = headshot (HUD hit marker + sound).</summary>
         public event Action<bool> TargetHit;
 
-        public int CurrentIndex { get; private set; } = 1; // start with the rifle
+        public int CurrentIndex { get; private set; } = WeaponDefinition.DefaultIndex;
         public WeaponDefinition CurrentWeapon => weapons[CurrentIndex];
         public int CurrentAmmo => ammo[CurrentIndex];
         public bool IsReloading => reloadPending;
+        /// <summary>0..1 while reloading (drives the HUD bar and viewmodel animation).</summary>
+        public float ReloadProgress =>
+            reloadPending ? 1f - Mathf.Clamp01((reloadEndTime - Time.time) / CurrentWeapon.reloadTime) : 0f;
         public bool IsZoomed { get; private set; }
 
         private WeaponModelInstance[] models;
@@ -45,6 +53,7 @@ namespace FpsBase
         private float reloadEndTime;
         private bool reloadPending;
         private float flashOffTime;
+        private float adsBlend;
         private Vector3 currentKick; // viewmodel kickback offset
 
         private static Material tracerMaterial;
@@ -63,30 +72,30 @@ namespace FpsBase
             RebuildShadowModel();
         }
 
-        /// <summary>
-        /// The viewmodel doesn't cast shadows (it would look huge), so a
-        /// shadows-only copy of the current weapon is held at the body — your
-        /// shadow visibly carries the gun.
-        /// </summary>
-        private void RebuildShadowModel()
+        /// <summary>Refill every magazine (called on respawn).</summary>
+        public void ResetAmmo()
         {
-            if (hasShadowModel)
-            {
-                Destroy(shadowModel.root);
-                hasShadowModel = false;
-            }
-            if (thirdPersonAnchor == null)
+            if (ammo == null)
                 return;
+            for (int i = 0; i < weapons.Length; i++)
+                ammo[i] = weapons[i].magazineSize;
+            reloadPending = false;
+        }
 
-            shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true);
-            foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
-            hasShadowModel = true;
+        /// <summary>Force a specific weapon (Gun Game level, sniper-only).</summary>
+        public void ForceWeapon(int index)
+        {
+            index = Mathf.Clamp(index, 0, weapons.Length - 1);
+            if (index == CurrentIndex)
+                return;
+            if (models == null)
+                CurrentIndex = index; // before Start: just set the starting weapon
+            else
+                SwitchTo(index);
         }
 
         private void OnDisable()
         {
-            // Clean state when control is taken away (death, match end, cursor free).
             SetZoom(false);
             reloadPending = false;
             if (models != null && models[CurrentIndex].muzzleFlash != null)
@@ -109,11 +118,8 @@ namespace FpsBase
             var weapon = CurrentWeapon;
             var model = models[CurrentIndex];
 
-            // Muzzle flash timeout + viewmodel kick recovery run even while paused.
             if (model.muzzleFlash != null && model.muzzleFlash.enabled && Time.time >= flashOffTime)
                 model.muzzleFlash.enabled = false;
-            currentKick = Vector3.Lerp(currentKick, Vector3.zero, 12f * Time.deltaTime);
-            model.root.transform.localPosition = weapon.viewOffset + currentKick;
 
             // Finish a pending reload.
             if (reloadPending && Time.time >= reloadEndTime)
@@ -122,20 +128,23 @@ namespace FpsBase
                 reloadPending = false;
             }
 
+            AnimateViewmodel(weapon, model);
+
             if (Cursor.lockState != CursorLockMode.Locked)
             {
                 SetZoom(false);
                 return;
             }
 
-            HandleSwitching();
+            if (!lockSwitching)
+                HandleSwitching();
             weapon = CurrentWeapon; // may have changed
 
-            // Zoom (right mouse, only for weapons that have one).
+            // Aim down sights (every weapon; sniper scopes).
             SetZoom(Input.GetMouseButton(1) && weapon.zoomFov > 0f && !reloadPending);
 
             // Manual reload.
-            if (Input.GetKeyDown(KeyCode.R) && !reloadPending && ammo[CurrentIndex] < weapon.magazineSize)
+            if (Input.GetKeyDown(KeyCode.R) && CanReload(weapon))
                 StartReload();
 
             if (reloadPending)
@@ -144,21 +153,53 @@ namespace FpsBase
             bool firePressed = weapon.automatic ? Input.GetButton("Fire1") : Input.GetButtonDown("Fire1");
             if (firePressed && Time.time >= nextFireTime)
             {
-                if (ammo[CurrentIndex] > 0)
+                if (weapon.magazineSize <= 0 || ammo[CurrentIndex] > 0)
                     Shoot();
                 else
                     StartReload();
             }
         }
 
+        private bool CanReload(WeaponDefinition weapon) =>
+            !reloadPending && weapon.magazineSize > 0 && ammo[CurrentIndex] < weapon.magazineSize;
+
+        // ------------------------------------------------------------------
+        // Viewmodel motion: ADS blend, kick recovery, reload dip
+        // ------------------------------------------------------------------
+
+        private void AnimateViewmodel(WeaponDefinition weapon, WeaponModelInstance model)
+        {
+            adsBlend = Mathf.MoveTowards(adsBlend, IsZoomed && !weapon.hideWhenZoomed ? 1f : 0f, 9f * Time.deltaTime);
+            currentKick = Vector3.Lerp(currentKick, Vector3.zero, 12f * Time.deltaTime);
+
+            Vector3 basePos = Vector3.Lerp(weapon.viewOffset, weapon.adsOffset, adsBlend);
+            Quaternion baseRot = Quaternion.identity;
+
+            // Reload: dip the weapon down and tilt it, smoothly in and out.
+            float reload = ReloadProgress;
+            if (reload > 0f)
+            {
+                float wave = Mathf.Sin(Mathf.Clamp01(reload) * Mathf.PI); // 0→1→0
+                basePos += new Vector3(0, -0.09f * wave, -0.03f * wave);
+                baseRot = Quaternion.Euler(38f * wave, 0f, 24f * wave);
+            }
+
+            model.root.transform.localPosition = basePos + currentKick;
+            model.root.transform.localRotation = baseRot;
+        }
+
+        // ------------------------------------------------------------------
+        // Switching
         // ------------------------------------------------------------------
 
         private void HandleSwitching()
         {
             int target = -1;
-            if (Input.GetKeyDown(KeyCode.Alpha1)) target = 0;
-            if (Input.GetKeyDown(KeyCode.Alpha2)) target = 1;
-            if (Input.GetKeyDown(KeyCode.Alpha3)) target = 2;
+            for (int i = 0; i < weapons.Length && i < 9; i++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i))
+                    target = i;
+            }
 
             float scroll = Input.GetAxis("Mouse ScrollWheel");
             if (scroll > 0.01f) target = (CurrentIndex + 1) % weapons.Length;
@@ -200,55 +241,114 @@ namespace FpsBase
                 models[CurrentIndex].root.SetActive(!zoom);
         }
 
+        // ------------------------------------------------------------------
+        // Firing
+        // ------------------------------------------------------------------
+
         private void Shoot()
         {
             var weapon = CurrentWeapon;
             var model = models[CurrentIndex];
 
-            ammo[CurrentIndex]--;
+            if (weapon.magazineSize > 0)
+                ammo[CurrentIndex]--;
             nextFireTime = Time.time + 1f / weapon.fireRate;
 
-            Ray ray = shootCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            Vector3 endPoint = ray.GetPoint(weapon.range);
+            Vector3 endPoint;
+            if (weapon.isProjectile)
+                endPoint = FireRocket(weapon);
+            else
+                endPoint = FireHitscan(weapon);
 
-            if (TryRaycastIgnoringSelf(ray, weapon.range, out RaycastHit hit))
-            {
-                endPoint = hit.point;
-
-                var damageable = hit.collider.GetComponentInParent<IDamageable>();
-                if (damageable != null)
-                {
-                    var hitbox = hit.collider.GetComponent<Hitbox>();
-                    bool headshot = hitbox != null && hitbox.isHead;
-                    damageable.TakeDamage(weapon.damage, headshot);
-                    TargetHit?.Invoke(headshot);
-                    SfxSynth.Play2D(headshot ? SfxSynth.Headshot() : SfxSynth.Hit(), 0.7f);
-                }
-
-                SpawnImpactMarker(hit.point, hit.normal);
-            }
-
-            // Effects.
-            if (model.muzzleFlash != null && model.root.activeSelf)
+            // Shared feedback.
+            if (model.muzzleFlash != null && model.root.activeSelf && !weapon.isMelee)
             {
                 model.muzzleFlash.enabled = true;
                 flashOffTime = Time.time + 0.045f;
             }
-            SpawnTracerLine(model.root.activeSelf ? model.muzzle.position : shootCamera.transform.position, endPoint);
-            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), shootCamera.transform.position, 0.8f);
-            currentKick += new Vector3(0, 0.01f, -0.07f);
-
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), shootCamera.transform.position, 0.85f);
+            currentKick += weapon.isMelee ? new Vector3(0, 0.01f, 0.12f) : new Vector3(0, 0.01f, -0.07f);
             if (mouseLook != null)
                 mouseLook.AddRecoil(weapon.recoil * (IsZoomed ? 0.6f : 1f));
 
             ShotFired?.Invoke(endPoint);
         }
 
-        /// <summary>Raycast that skips the shooter's own colliders.</summary>
+        private Vector3 FireHitscan(WeaponDefinition weapon)
+        {
+            Vector3 forward = shootCamera.transform.forward;
+            Vector3 endPoint = shootCamera.transform.position + forward * weapon.range;
+            bool anyHit = false;
+            bool anyHeadshot = false;
+
+            int pellets = Mathf.Max(1, weapon.pellets);
+            float damagePerPellet = weapon.damage;
+
+            for (int p = 0; p < pellets; p++)
+            {
+                Vector3 dir = forward;
+                if (weapon.spreadDegrees > 0f && pellets > 1)
+                {
+                    Vector2 spread = UnityEngine.Random.insideUnitCircle
+                        * Mathf.Tan(weapon.spreadDegrees * Mathf.Deg2Rad);
+                    dir = (forward + shootCamera.transform.right * spread.x + shootCamera.transform.up * spread.y).normalized;
+                }
+
+                var ray = new Ray(shootCamera.transform.position, dir);
+                Vector3 pelletEnd = ray.origin + dir * weapon.range;
+
+                if (TryRaycastIgnoringSelf(ray, weapon.range, out RaycastHit hit))
+                {
+                    pelletEnd = hit.point;
+                    var damageable = hit.collider.GetComponentInParent<IDamageable>();
+                    if (damageable != null)
+                    {
+                        var hitbox = hit.collider.GetComponent<Hitbox>();
+                        bool headshot = hitbox != null && hitbox.isHead;
+                        damageable.TakeDamage(damagePerPellet, headshot);
+                        anyHit = true;
+                        anyHeadshot |= headshot;
+                    }
+                    SpawnImpactMarker(hit.point, hit.normal);
+                }
+
+                if (!weapon.isMelee)
+                    SpawnTracerLine(CurrentViewMuzzle(), pelletEnd);
+                if (p == 0)
+                    endPoint = pelletEnd;
+            }
+
+            if (anyHit)
+            {
+                TargetHit?.Invoke(anyHeadshot);
+                SfxSynth.Play2D(anyHeadshot ? SfxSynth.Headshot() : SfxSynth.Hit(), 0.7f);
+            }
+            return endPoint;
+        }
+
+        private Vector3 FireRocket(WeaponDefinition weapon)
+        {
+            RocketProjectile.Launch(
+                CurrentViewMuzzle(), shootCamera.transform.forward,
+                weapon.projectileSpeed, weapon.damage, weapon.explosionRadius, selfRoot);
+
+            // Predicted end point for remote tracer/explosion effects.
+            var ray = new Ray(shootCamera.transform.position, shootCamera.transform.forward);
+            if (TryRaycastIgnoringSelf(ray, weapon.range, out RaycastHit hit))
+                return hit.point;
+            return ray.origin + ray.direction * weapon.range;
+        }
+
+        private Vector3 CurrentViewMuzzle()
+        {
+            var model = models[CurrentIndex];
+            return model.root.activeSelf ? model.muzzle.position : shootCamera.transform.position;
+        }
+
+        /// <summary>Raycast that skips the shooter's own colliders (triggers included: hitboxes).</summary>
         private bool TryRaycastIgnoringSelf(Ray ray, float range, out RaycastHit best)
         {
             best = default;
-            // Triggers included: head hitboxes are trigger colliders.
             var hits = Physics.RaycastAll(ray, range, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide);
             float bestDistance = float.MaxValue;
             bool found = false;
@@ -264,6 +364,26 @@ namespace FpsBase
                 }
             }
             return found;
+        }
+
+        // ------------------------------------------------------------------
+        // Shadow model (your shadow holds the current gun)
+        // ------------------------------------------------------------------
+
+        private void RebuildShadowModel()
+        {
+            if (hasShadowModel)
+            {
+                Destroy(shadowModel.root);
+                hasShadowModel = false;
+            }
+            if (thirdPersonAnchor == null)
+                return;
+
+            shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true);
+            foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            hasShadowModel = true;
         }
 
         // ------------------------------------------------------------------
