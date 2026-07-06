@@ -39,6 +39,7 @@ namespace FpsBase
         private NetworkTransform netTransform;
         private CharacterController characterController;
         private float remoteCrouchBlend;
+        private bool respawning;
 
         private void Awake()
         {
@@ -125,8 +126,9 @@ namespace FpsBase
 
             var gameMode = GameModeManager.Instance;
 
-            // Freeze input while dead or between matches.
-            bool canPlay = !IsDead.Value && (gameMode == null || gameMode.IsMatchActive);
+            // Freeze input while dead, between matches, or during a respawn teleport
+            // (the respawn coroutine holds control until the map is built locally).
+            bool canPlay = !IsDead.Value && !respawning && (gameMode == null || gameMode.IsMatchActive);
             if (rig.movement.enabled != canPlay)
                 rig.movement.enabled = canPlay;
             if (rig.weaponController.enabled != canPlay)
@@ -274,10 +276,24 @@ namespace FpsBase
         [ClientRpc]
         private void RespawnClientRpc(Vector3 position, float yaw, ClientRpcParams rpcParams = default)
         {
+            StartCoroutine(RespawnRoutine(position, yaw));
+        }
+
+        private IEnumerator RespawnRoutine(Vector3 position, float yaw)
+        {
             DeathCam.End();
 
-            var rotation = Quaternion.Euler(0, yaw, 0);
+            // Hold the player frozen until the correct map is actually built on
+            // THIS client — otherwise a joining player teleports before the ground
+            // exists and falls through the world (respawning into the void forever).
+            respawning = true;
             characterController.enabled = false;
+
+            float timeout = Time.time + 6f;
+            while (!LocalMapReady() && Time.time < timeout)
+                yield return null;
+
+            var rotation = Quaternion.Euler(0, yaw, 0);
             if (netTransform != null)
                 netTransform.Teleport(position, rotation, transform.localScale);
             else
@@ -287,8 +303,19 @@ namespace FpsBase
             }
             characterController.enabled = true;
             rig.movement.spawnPoint = position; // fall-out-of-world safety respawn
+            rig.weaponController.ResetAmmo();    // fresh magazines every life
+            respawning = false;
+        }
 
-            rig.weaponController.ResetAmmo(); // fresh magazines every life
+        /// <summary>True once this client has finished building the map the match is on.</summary>
+        private bool LocalMapReady()
+        {
+            var boot = MultiplayerBootstrap.Instance;
+            var gameMode = GameModeManager.Instance;
+            if (boot == null || gameMode == null || !gameMode.IsSpawned)
+                return false;
+            return boot.CurrentMap == gameMode.MapIndex.Value
+                && GameObject.Find(EnvironmentBuilder.MapRootName) != null;
         }
     }
 }

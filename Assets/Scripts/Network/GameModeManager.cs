@@ -194,9 +194,57 @@ namespace FpsBase
             return teamA >= 0 && teamA == TeamOf(b);
         }
 
+        /// <summary>
+        /// Picks a spawn among the map's candidates: snaps each to solid ground
+        /// (so nobody ever spawns in the void) and chooses the one farthest from
+        /// living enemies (so nobody gets spawn-killed).
+        /// </summary>
         public Vector3 GetSpawnPoint(int team)
         {
-            return EnvironmentBuilder.GetSpawnPoint(MapIndex.Value, Mathf.Abs(team) % 2, spawnCounter++);
+            int side = IsTeamMode ? Mathf.Abs(team) % 2 : -1;
+            var candidates = MapCatalog.SpawnCandidates(MapIndex.Value, side);
+
+            // Positions of everyone currently alive except this team's members.
+            var enemies = new List<Vector3>();
+            ForEachPlayer(p =>
+            {
+                if (p == null || !p.IsSpawned || p.IsDead.Value)
+                    return;
+                bool sameTeam = IsTeamMode && p.Team.Value == team;
+                if (!sameTeam)
+                    enemies.Add(p.transform.position);
+            });
+
+            Vector3 best = SnapToGround(candidates[0]);
+            float bestScore = float.NegativeInfinity;
+            foreach (var raw in candidates)
+            {
+                Vector3 grounded = SnapToGround(raw);
+                float nearestEnemy = float.MaxValue;
+                foreach (var e in enemies)
+                    nearestEnemy = Mathf.Min(nearestEnemy, Vector3.Distance(e, grounded));
+
+                // No enemies yet → rotate through candidates so players don't stack.
+                float score = enemies.Count == 0
+                    ? (spawnCounter + Vector3.Dot(grounded, Vector3.one)) % 97f
+                    : nearestEnemy;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = grounded;
+                }
+            }
+            spawnCounter++;
+            return best;
+        }
+
+        /// <summary>Raycast down onto real geometry so the spawn is never floating over a hole.</summary>
+        private static Vector3 SnapToGround(Vector3 pos)
+        {
+            if (Physics.Raycast(pos + Vector3.up * 30f, Vector3.down, out var hit, 60f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return hit.point + Vector3.up * 0.3f;
+            return pos + Vector3.up * 0.3f;
         }
 
         // ------------------------------------------------------------------
