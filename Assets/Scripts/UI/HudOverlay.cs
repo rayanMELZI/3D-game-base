@@ -19,6 +19,7 @@ namespace FpsBase
 
         private Texture2D whiteTex;
         private GUIStyle bigNumber;
+        private GUIStyle leftNumber;
         private GUIStyle mediumText;
         private GUIStyle smallText;
         private float lastHitTime = -10f;
@@ -56,6 +57,7 @@ namespace FpsBase
                 mediumText.normal.textColor = new Color(1f, 1f, 1f, 0.92f);
                 smallText = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
                 smallText.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
+                leftNumber = new GUIStyle(bigNumber) { alignment = TextAnchor.MiddleLeft };
             }
 
             bool zoomed = weaponController != null && weaponController.IsZoomed
@@ -194,9 +196,8 @@ namespace FpsBase
             var panel = new Rect(20, Screen.height - 118, 290, 74);
             Panel(panel);
 
-            bigNumber.normal.textColor = Color.Lerp(new Color(1f, 0.3f, 0.25f), Color.white, fill);
-            var numStyle = new GUIStyle(bigNumber) { alignment = TextAnchor.MiddleLeft };
-            GUI.Label(new Rect(panel.x + 16, panel.y + 6, 110, 48), Mathf.CeilToInt(hp).ToString(), numStyle);
+            leftNumber.normal.textColor = Color.Lerp(new Color(1f, 0.3f, 0.25f), Color.white, fill);
+            GUI.Label(new Rect(panel.x + 16, panel.y + 6, 110, 48), Mathf.CeilToInt(hp).ToString(), leftNumber);
 
             var barRect = new Rect(panel.x + 16, panel.y + panel.height - 18, panel.width - 32, 10);
             GUI.color = new Color(1f, 1f, 1f, 0.15f);

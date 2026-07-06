@@ -10,7 +10,7 @@ namespace FpsBase
         /// <summary>Classic charm: the character bursts into glowing physical cubes.</summary>
         public static void SpawnDeathBurst(Vector3 center, Color color)
         {
-            var mat = EnvironmentBuilder.MakeEmissiveMaterial(color, 1.4f);
+            var mat = EnvironmentBuilder.SharedMaterial(color, emission: 1.4f);
             SpawnCubeBurst(center, mat, 12, 3.5f, 5f, 0.12f, 0.28f, 1.1f, 1.7f);
         }
 
@@ -26,7 +26,7 @@ namespace FpsBase
             flash.range = 16f;
             Object.Destroy(flashGo, 0.15f);
 
-            var hotMat = EnvironmentBuilder.MakeEmissiveMaterial(new Color(1f, 0.55f, 0.15f), 2.6f);
+            var hotMat = EnvironmentBuilder.SharedMaterial(new Color(1f, 0.55f, 0.15f), emission: 2.6f);
             SpawnCubeBurst(center, hotMat, 16, 7f, 8f, 0.15f, 0.35f, 0.5f, 0.9f);
         }
 

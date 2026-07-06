@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -29,6 +30,36 @@ namespace FpsBase
         public static Color Team0Color => TeamPalette[0];
         public static Color Team1Color => TeamPalette[1];
         public static Color TeamColor(int team) => TeamPalette[Mathf.Abs(team) % TeamPalette.Length];
+
+        // ------------------------------------------------------------------
+        // Shared material cache
+        //
+        // IMPORTANT: Unity does NOT free a `new Material(...)` when the object
+        // using it is destroyed — it leaks in native graphics memory. Anything
+        // spawned repeatedly at runtime (weapon models, death/explosion cubes,
+        // rockets) must reuse cached materials instead of allocating fresh ones,
+        // or memory grows the whole session and the game slowly chokes.
+        // These materials are never mutated, so sharing them is safe.
+        // ------------------------------------------------------------------
+
+        private static readonly Dictionary<long, Material> sharedMaterials = new Dictionary<long, Material>();
+
+        public static Material SharedMaterial(Color color, float metallic = 0f, float smoothness = 0.5f, float emission = 0f)
+        {
+            // Key on quantized appearance so visually-identical requests share one material.
+            long key = Quant(color.r) | (Quant(color.g) << 8) | (Quant(color.b) << 16)
+                       | ((long)Quant(metallic) << 24) | ((long)Quant(smoothness) << 32)
+                       | ((long)Quant(Mathf.Clamp01(emission / 4f)) << 40);
+
+            if (sharedMaterials.TryGetValue(key, out var cached) && cached != null)
+                return cached;
+
+            var mat = emission > 0f ? MakeEmissiveMaterial(color, emission) : MakeMaterial(color, metallic, smoothness);
+            sharedMaterials[key] = mat;
+            return mat;
+        }
+
+        private static long Quant(float v) => (long)Mathf.Clamp(Mathf.RoundToInt(v * 255f), 0, 255);
 
         // ------------------------------------------------------------------
         // Map catalog

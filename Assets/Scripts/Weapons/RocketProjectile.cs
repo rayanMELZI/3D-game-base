@@ -29,7 +29,7 @@ namespace FpsBase
             body.transform.localRotation = Quaternion.Euler(90, 0, 0);
             body.transform.localScale = new Vector3(0.07f, 0.16f, 0.07f);
             body.GetComponent<Renderer>().material =
-                EnvironmentBuilder.MakeMaterial(new Color(0.35f, 0.3f, 0.25f), 0.4f, 0.5f);
+                EnvironmentBuilder.SharedMaterial(new Color(0.35f, 0.3f, 0.25f), 0.4f, 0.5f);
 
             var tip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             Destroy(tip.GetComponent<Collider>());
@@ -37,7 +37,7 @@ namespace FpsBase
             tip.transform.localPosition = new Vector3(0, 0, 0.18f);
             tip.transform.localScale = Vector3.one * 0.09f;
             tip.GetComponent<Renderer>().material =
-                EnvironmentBuilder.MakeEmissiveMaterial(new Color(1f, 0.6f, 0.2f), 2.5f);
+                EnvironmentBuilder.SharedMaterial(new Color(1f, 0.6f, 0.2f), emission: 2.5f);
 
             var light = go.AddComponent<Light>();
             light.type = LightType.Point;

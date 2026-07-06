@@ -15,7 +15,27 @@ namespace FpsBase
         private GUIStyle feedStyle;
         private GUIStyle bannerStyle;
         private GUIStyle rowStyle;
+        private GUIStyle modeStyle;   // reused (was allocated every frame)
+        private GUIStyle subStyle;
+        private GUIStyle headerStyle;
         private int lastWinner = -1;
+
+        // Cached player lookups — FindObjectsByType is slow and allocates, so we
+        // must not call it every OnGUI (which runs twice per frame). Refresh a
+        // few times a second instead.
+        private NetworkPlayer[] cachedPlayers = new NetworkPlayer[0];
+        private float nextPlayerRefresh;
+        private NetworkPlayer cachedLocal;
+
+        private NetworkPlayer[] Players()
+        {
+            if (Time.unscaledTime >= nextPlayerRefresh || cachedPlayers.Length == 0)
+            {
+                cachedPlayers = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+                nextPlayerRefresh = Time.unscaledTime + 0.4f;
+            }
+            return cachedPlayers;
+        }
 
         private void Update()
         {
@@ -76,6 +96,9 @@ namespace FpsBase
                 fontSize = 46, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
             };
             rowStyle = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold };
+            modeStyle = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter, fontSize = 13 };
+            subStyle = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter };
+            headerStyle = new GUIStyle(rowStyle) { fontSize = 14 };
         }
 
         // ------------------------------------------------------------------
@@ -98,7 +121,6 @@ namespace FpsBase
         {
             float cx = Screen.width / 2f;
 
-            var modeStyle = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter, fontSize = 13 };
             modeStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
             GUI.Label(new Rect(cx - 260, 8, 520, 18), ModeTitle(gameMode), modeStyle);
 
@@ -158,7 +180,7 @@ namespace FpsBase
 
         private void DrawScoreboard(GameModeManager gameMode)
         {
-            var players = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None)
+            var players = Players()
                 .OrderByDescending(p => p.Kills.Value)
                 .ThenBy(p => p.Deaths.Value)
                 .ToArray();
@@ -172,14 +194,13 @@ namespace FpsBase
             GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, 3), Texture2D.whiteTexture);
             GUI.color = Color.white;
 
-            var header = new GUIStyle(rowStyle) { fontSize = 14 };
-            header.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
-            GUI.Label(new Rect(panel.x + 20, panel.y + 12, w - 40, 20), ModeTitle(gameMode), header);
-            GUI.Label(new Rect(panel.x + 20, panel.y + 40, 300, 20), "PLAYER", header);
+            headerStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
+            GUI.Label(new Rect(panel.x + 20, panel.y + 12, w - 40, 20), ModeTitle(gameMode), headerStyle);
+            GUI.Label(new Rect(panel.x + 20, panel.y + 40, 300, 20), "PLAYER", headerStyle);
             GUI.Label(new Rect(panel.x + w - 170, panel.y + 40, 60, 20),
-                gameMode.CurrentMode == GameMode.GunGame ? "LVL" : "", header);
-            GUI.Label(new Rect(panel.x + w - 110, panel.y + 40, 40, 20), "K", header);
-            GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 40, 20), "D", header);
+                gameMode.CurrentMode == GameMode.GunGame ? "LVL" : "", headerStyle);
+            GUI.Label(new Rect(panel.x + w - 110, panel.y + 40, 40, 20), "K", headerStyle);
+            GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 40, 20), "D", headerStyle);
 
             float y = panel.y + 66f;
             foreach (var player in players)
@@ -217,11 +238,10 @@ namespace FpsBase
                 bannerStyle.normal.textColor = color;
                 GUI.Label(new Rect(0, Screen.height * 0.16f, Screen.width, 60), winText, bannerStyle);
 
-                var sub = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter };
-                sub.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+                subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
                 string camLabel = DeathCam.CurrentLabel;
                 GUI.Label(new Rect(0, Screen.height * 0.16f + 62, Screen.width, 24),
-                    camLabel != null ? camLabel + "  ·  next match starting soon..." : "Next match starting soon...", sub);
+                    camLabel != null ? camLabel + "  ·  next match starting soon..." : "Next match starting soon...", subStyle);
                 return;
             }
 
@@ -232,27 +252,29 @@ namespace FpsBase
                 bannerStyle.normal.textColor = new Color(1f, 0.3f, 0.25f);
                 GUI.Label(new Rect(0, Screen.height * 0.14f, Screen.width, 56), "ELIMINATED", bannerStyle);
 
-                var sub = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter };
-                sub.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+                subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
                 string camLabel = DeathCam.CurrentLabel;
                 GUI.Label(new Rect(0, Screen.height * 0.14f + 58, Screen.width, 24),
-                    camLabel != null ? camLabel : "Respawning...", sub);
+                    camLabel != null ? camLabel : "Respawning...", subStyle);
             }
         }
 
         // ------------------------------------------------------------------
 
-        private static NetworkPlayer LocalPlayer()
+        private NetworkPlayer LocalPlayer()
         {
+            if (cachedLocal != null)
+                return cachedLocal;
             var nm = NetworkManager.Singleton;
             var po = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
-            return po != null ? po.GetComponent<NetworkPlayer>() : null;
+            cachedLocal = po != null ? po.GetComponent<NetworkPlayer>() : null;
+            return cachedLocal;
         }
 
-        private static NetworkPlayer FindPlayer(ulong clientId)
+        private NetworkPlayer FindPlayer(ulong clientId)
         {
-            foreach (var player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
-                if (player.OwnerClientId == clientId)
+            foreach (var player in Players())
+                if (player != null && player.OwnerClientId == clientId)
                     return player;
             return null;
         }

@@ -175,13 +175,9 @@ namespace FpsBase
             go.GetComponent<Renderer>().material = mat;
         }
 
+        // Shared cache: weapon models are rebuilt on every switch (Gun Game
+        // changes weapon each kill), so fresh materials here would leak.
         private static Material MakeMat(Color color, float metallic, float smoothness)
-        {
-            var mat = new Material(Shader.Find("Standard"));
-            mat.color = color;
-            mat.SetFloat("_Metallic", metallic);
-            mat.SetFloat("_Glossiness", smoothness);
-            return mat;
-        }
+            => EnvironmentBuilder.SharedMaterial(color, metallic, smoothness);
     }
 }
