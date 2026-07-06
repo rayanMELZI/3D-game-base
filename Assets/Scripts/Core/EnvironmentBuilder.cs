@@ -81,11 +81,18 @@ namespace FpsBase
         public static Vector3 GetSpawnPoint(int mapIndex, int side, int counter)
         {
             float sign = side == 0 ? -1f : 1f;
+
+            // Nuketown spawns along X (behind each house); the others along Z.
+            if (mapIndex == 1)
+            {
+                float[] zl = { 0f, -3f, 3f, -6f, 6f };
+                return new Vector3(20f * sign, 0.1f, zl[counter % zl.Length]);
+            }
+
             float[] lanes;
             float z;
             switch (mapIndex)
             {
-                case 1: lanes = new[] { 0f, -6f, 6f, -10f, 10f }; z = 21f; break;
                 case 2: lanes = new[] { 0f, -12f, 12f, -6f, 6f }; z = 17f; break;
                 default: lanes = new[] { 0f, -18f, 18f, -9f, 9f }; z = 24f; break;
             }
@@ -194,83 +201,90 @@ namespace FpsBase
         private static void BuildNuketown()
         {
             var root = new GameObject(MapRootName).transform;
-            const float halfX = 16f, halfZ = 26f;
 
-            Ground(root, halfX * 2f, halfZ * 2f, new Color(0.5f, 0.46f, 0.36f), new Color(0.44f, 0.41f, 0.32f));
+            // X runs between the two houses (and the two spawns), Z is depth.
+            // Layout approximates the provided top-down sketch.
+            Ground(root, 50f, 34f, new Color(0.5f, 0.46f, 0.36f), new Color(0.44f, 0.41f, 0.32f));
 
-            // Street strip across the middle.
+            var fenceMat = MakeMaterial(new Color(0.82f, 0.8f, 0.75f), 0f, 0.35f);
+
+            // Angled perimeter (clockwise XZ polygon): the top edge peaks over
+            // each house and dips at center; the bottom has a central yard bay.
+            Vector2[] outline =
+            {
+                new Vector2(-23f,  7f), new Vector2(-9f, 10f), new Vector2(-3f,  7f),
+                new Vector2(  3f,  7f), new Vector2( 9f, 10f), new Vector2(23f,  7f),
+                new Vector2( 24f, -3f), new Vector2( 6f, -6f),
+                new Vector2(  6f,-13f), new Vector2(-5f,-13f), new Vector2(-5f, -6f),
+                new Vector2(-24f, -3f),
+            };
+            for (int i = 0; i < outline.Length; i++)
+                AngledWall(root, outline[i], outline[(i + 1) % outline.Length], 3.6f, 0.4f, fenceMat);
+
+            // Street down the center (along Z).
             var asphalt = MakeMaterial(new Color(0.3f, 0.3f, 0.32f), 0.05f, 0.25f);
-            Box(root, "Street", new Vector3(0, 0.03f, 0), Vector3.zero, new Vector3(halfX * 2f, 0.06f, 17f), asphalt);
+            Box(root, "Street", new Vector3(0, 0.03f, -1f), Vector3.zero, new Vector3(11f, 0.06f, 28f), asphalt);
 
-            // Perimeter fence.
-            var fenceMat = MakeMaterial(new Color(0.85f, 0.83f, 0.78f), 0f, 0.35f);
-            PerimeterWalls(root, halfX, halfZ, 2.2f, fenceMat);
+            // Left house (teal): rectangular body + a porch bay toward the street.
+            var houseA = MakeMaterial(new Color(0.4f, 0.62f, 0.62f), 0f, 0.35f);
+            BuildNukeHouse(root, new Vector3(-13f, 0, 1f), 11f, 10f, +1, houseA, fenceMat);
+            Box(root, "PorchA", new Vector3(-6.5f, 1.3f, -3.5f), Vector3.zero, new Vector3(3.5f, 2.6f, 4f), houseA);
 
-            // The two houses (pastel colors, facing each other).
-            BuildHouse(root, -1, MakeMaterial(new Color(0.35f, 0.62f, 0.62f), 0f, 0.35f), fenceMat);
-            BuildHouse(root, 1, MakeMaterial(new Color(0.82f, 0.68f, 0.32f), 0f, 0.35f), fenceMat);
+            // Right house (yellow): main body + a wing reaching toward center.
+            var houseB = MakeMaterial(new Color(0.82f, 0.68f, 0.32f), 0f, 0.35f);
+            BuildNukeHouse(root, new Vector3(13f, 0, -0.5f), 11f, 10f, -1, houseB, fenceMat);
+            Box(root, "WingB", new Vector3(6.5f, 1.3f, 3f), Vector3.zero, new Vector3(3.5f, 2.6f, 5f), houseB);
 
-            // Yard fences along the street with a center gap.
-            foreach (float sz in new[] { -1f, 1f })
-                foreach (float sx in new[] { -1f, 1f })
-                    Box(root, "YardFence", new Vector3(8.25f * sx, 0.9f, 8.5f * sz), Vector3.zero, new Vector3(13.5f, 1.8f, 0.3f), fenceMat);
-
-            // Center bus and two cars.
+            // Center bus + street cover.
             var busMat = MakeMaterial(new Color(0.72f, 0.62f, 0.2f), 0.2f, 0.5f);
-            var carMat1 = MakeMaterial(new Color(0.65f, 0.25f, 0.2f), 0.5f, 0.7f);
-            var carMat2 = MakeMaterial(new Color(0.25f, 0.4f, 0.6f), 0.5f, 0.7f);
-            Box(root, "Bus", new Vector3(2.5f, 1.5f, 0), Vector3.zero, new Vector3(2.8f, 3f, 8.5f), busMat);
-            Box(root, "Car", new Vector3(-5f, 0.55f, 4f), new Vector3(0, 12f, 0), new Vector3(1.9f, 1.1f, 4f), carMat1);
-            Box(root, "Car", new Vector3(-4.5f, 0.55f, -4.5f), new Vector3(0, -8f, 0), new Vector3(1.9f, 1.1f, 4f), carMat2);
+            Box(root, "Bus", new Vector3(1.5f, 1.5f, 0.5f), Vector3.zero, new Vector3(2.6f, 3f, 8f), busMat);
 
-            // Barrels for flavor.
+            var crateMat = MakeMaterial(new Color(0.55f, 0.4f, 0.25f), 0.05f, 0.3f);
+            Box(root, "Crate", new Vector3(-2.5f, 0.6f, -3f), new Vector3(0, 20f, 0), Vector3.one * 1.2f, crateMat);
+            Box(root, "Crate", new Vector3(3f, 0.6f, 5.5f), new Vector3(0, -15f, 0), Vector3.one * 1.2f, crateMat);
+            Box(root, "Crate", new Vector3(0.5f, 0.6f, -10.5f), Vector3.zero, Vector3.one * 1.2f, crateMat); // yard bay
+
             var barrelMat = MakeMaterial(new Color(0.45f, 0.5f, 0.35f), 0.3f, 0.5f);
-            Cylinder(root, "Barrel", new Vector3(9f, 0.6f, 2f), new Vector3(0.8f, 0.6f, 0.8f), barrelMat);
-            Cylinder(root, "Barrel", new Vector3(-9.5f, 0.6f, -1.5f), new Vector3(0.8f, 0.6f, 0.8f), barrelMat);
+            Cylinder(root, "Barrel", new Vector3(-0.5f, 0.6f, -6.5f), new Vector3(0.8f, 0.6f, 0.8f), barrelMat);
+            Cylinder(root, "Barrel", new Vector3(2f, 0.6f, -8f), new Vector3(0.8f, 0.6f, 0.8f), barrelMat);
 
-            SpawnStrips(root, halfZ - 2.5f, 10f);
+            // Spawn strips behind each house (the two X ends).
+            Box(root, "SpawnZone0", new Vector3(-20f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 9f), MakeEmissiveMaterial(Team0Color, 1.4f));
+            Box(root, "SpawnZone1", new Vector3(20f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 9f), MakeEmissiveMaterial(Team1Color, 1.4f));
         }
 
-        /// <summary>Two-story house: doorways, an upper window over the street, side ramp to a balcony.</summary>
-        private static void BuildHouse(Transform root, int sideSign, Material wallMat, Material trimMat)
+        /// <summary>
+        /// Enclosed house facing the street along X: solid back + sides, a
+        /// door opening on the street-facing wall, and a flat roof reachable by
+        /// an external ramp (rooftop play). doorDirX = +1 → door faces +X.
+        /// </summary>
+        private static void BuildNukeHouse(Transform root, Vector3 c, float w, float d, int doorDirX, Material wallMat, Material roofMat)
         {
-            float s = sideSign;
-            var c = new Vector3(0, 0, 13f * s); // house center
-            const float w = 10f, d = 7f, floorH = 2.6f;
-            float front = -d / 2f * s; // toward the street
+            const float h = 3f;
+            float hx = w / 2f, hz = d / 2f;
 
-            // Ground floor walls: front + back with door gaps, solid sides.
-            foreach (float f in new[] { front, -front })
-            {
-                Box(root, "HouseWall", c + new Vector3(-3f, floorH / 2f, f), Vector3.zero, new Vector3(4f, floorH, 0.25f), wallMat);
-                Box(root, "HouseWall", c + new Vector3(3f, floorH / 2f, f), Vector3.zero, new Vector3(4f, floorH, 0.25f), wallMat);
-                Box(root, "HouseWall", c + new Vector3(0, 2.35f, f), Vector3.zero, new Vector3(2f, 0.5f, 0.25f), wallMat); // door header
-            }
-            Box(root, "HouseWall", c + new Vector3(-w / 2f, floorH / 2f, 0), Vector3.zero, new Vector3(0.25f, floorH, d), wallMat);
-            Box(root, "HouseWall", c + new Vector3(w / 2f, floorH / 2f, 0), Vector3.zero, new Vector3(0.25f, floorH, d), wallMat);
+            // Side walls (run along X, at ±Z).
+            Box(root, "HouseWall", c + new Vector3(0, h / 2f,  hz), Vector3.zero, new Vector3(w, h, 0.3f), wallMat);
+            Box(root, "HouseWall", c + new Vector3(0, h / 2f, -hz), Vector3.zero, new Vector3(w, h, 0.3f), wallMat);
 
-            // Second floor slab + walls with a wide window over the street.
-            Box(root, "HouseFloor2", c + new Vector3(0, floorH + 0.1f, 0), Vector3.zero, new Vector3(w, 0.2f, d), trimMat);
-            Box(root, "HouseWall2", c + new Vector3(0, floorH + 0.65f, front), Vector3.zero, new Vector3(w, 0.9f, 0.25f), wallMat); // sill
-            Box(root, "HouseWall2", c + new Vector3(0, floorH + 2.35f, front), Vector3.zero, new Vector3(w, 0.5f, 0.25f), wallMat); // header
-            Box(root, "HouseWall2", c + new Vector3(-4f, floorH + 1.55f, front), Vector3.zero, new Vector3(2f, 1.3f, 0.25f), wallMat);
-            Box(root, "HouseWall2", c + new Vector3(4f, floorH + 1.55f, front), Vector3.zero, new Vector3(2f, 1.3f, 0.25f), wallMat);
-            Box(root, "HouseWall2", c + new Vector3(0, floorH + 1.3f, -front), Vector3.zero, new Vector3(w, floorH, 0.25f), wallMat); // solid back
-            Box(root, "HouseWall2", c + new Vector3(-w / 2f, floorH + 1.3f, 0), Vector3.zero, new Vector3(0.25f, floorH, d), wallMat);
-            Box(root, "HouseWall2", c + new Vector3(w / 2f, floorH + 1.3f, 0), Vector3.zero, new Vector3(0.25f, floorH, d), wallMat);
+            // Solid back wall (away from center).
+            Box(root, "HouseWall", c + new Vector3(-doorDirX * hx, h / 2f, 0), Vector3.zero, new Vector3(0.3f, h, d), wallMat);
 
-            // Roof.
-            Box(root, "HouseRoof", c + new Vector3(0, floorH * 2f + 0.3f, 0), Vector3.zero, new Vector3(w + 0.6f, 0.25f, d + 0.6f), trimMat);
+            // Street-facing wall with a central door gap + lintel above it.
+            float fx = doorDirX * hx;
+            const float gap = 2.4f;
+            float segLen = (d - gap) / 2f;
+            float segOff = gap / 2f + segLen / 2f;
+            Box(root, "HouseWall", c + new Vector3(fx, h / 2f,  segOff), Vector3.zero, new Vector3(0.3f, h, segLen), wallMat);
+            Box(root, "HouseWall", c + new Vector3(fx, h / 2f, -segOff), Vector3.zero, new Vector3(0.3f, h, segLen), wallMat);
+            Box(root, "HouseWall", c + new Vector3(fx, h - 0.45f, 0),     Vector3.zero, new Vector3(0.3f, 0.9f, gap), wallMat);
 
-            // Balcony over the street + side ramp up to it.
-            Box(root, "Balcony", c + new Vector3(0, floorH + 0.1f, front - 1.1f * s), Vector3.zero, new Vector3(w, 0.2f, 2.2f), trimMat);
-            Box(root, "BalconyRail", c + new Vector3(0, floorH + 0.6f, front - 2.1f * s), Vector3.zero, new Vector3(w, 1f, 0.15f), trimMat);
-            // Ramp beside the house: bottom at the back yard, top meeting the balcony.
-            // Positive X euler tilts the +Z end down, so the street-side end rises for s=1.
-            Box(root, "BalconyRamp",
-                c + new Vector3(w / 2f + 1.2f, (floorH + 0.2f) / 2f, -1.55f * s),
-                new Vector3(22f * s, 0, 0),
-                new Vector3(1.8f, 0.2f, 6.8f), trimMat);
+            // Flat roof you can stand on + external ramp on the +Z side.
+            Box(root, "HouseRoof", c + new Vector3(0, h + 0.15f, 0), Vector3.zero, new Vector3(w + 0.4f, 0.3f, d + 0.4f), roofMat);
+            Box(root, "HouseRamp",
+                c + new Vector3(0, h / 2f, hz + 2.6f),
+                new Vector3(26f, 0, 0),
+                new Vector3(2.6f, 0.25f, 7f), roofMat);
         }
 
         // ------------------------------------------------------------------
@@ -365,6 +379,22 @@ namespace FpsBase
             bool alongX = Mathf.Abs(x2 - x1) > Mathf.Abs(z2 - z1);
             var scale = alongX ? new Vector3(length, height, 0.4f) : new Vector3(0.4f, height, length);
             Box(root, "MazeWall", center, Vector3.zero, scale, mat);
+        }
+
+        /// <summary>A wall box between two XZ points, rotated to align with the segment (for angled perimeters).</summary>
+        private static void AngledWall(Transform root, Vector2 a, Vector2 b, float height, float thickness, Material mat)
+        {
+            Vector2 mid = (a + b) * 0.5f;
+            Vector2 dir = b - a;
+            float len = dir.magnitude;
+            float yaw = Mathf.Atan2(dir.x, dir.y) * Mathf.Rad2Deg; // Vector2.y holds the world Z
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "Wall";
+            go.transform.SetParent(root);
+            go.transform.position = new Vector3(mid.x, height / 2f, mid.y);
+            go.transform.rotation = Quaternion.Euler(0, yaw, 0);
+            go.transform.localScale = new Vector3(thickness, height, len);
+            go.GetComponent<Renderer>().material = mat;
         }
 
         /// <summary>Glowing team-colored strips marking the spawn zones.</summary>

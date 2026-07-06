@@ -257,7 +257,12 @@ namespace FpsBase
             Vector3 pos = GameModeManager.Instance != null
                 ? GameModeManager.Instance.GetSpawnPoint(Team.Value)
                 : new Vector3(0, 0.1f, -20f);
-            float yaw = Team.Value % 2 == 0 ? 0f : 180f; // face the other side
+
+            // Face the middle of the map (works whatever axis the map spawns on).
+            Vector3 toCenter = new Vector3(-pos.x, 0f, -pos.z);
+            float yaw = toCenter.sqrMagnitude > 0.01f
+                ? Quaternion.LookRotation(toCenter).eulerAngles.y
+                : 0f;
 
             RespawnClientRpc(pos, yaw, new ClientRpcParams
             {
