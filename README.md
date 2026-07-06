@@ -51,58 +51,134 @@ from code. Rename the game in `GameSettings.GameTitle`.
 | Tab (hold) | Scoreboard |
 | Escape | Pause (resume · switch team · settings · leave) |
 
+## Making your own map (no code)
+
+The maps are now designer-friendly — build them by dragging objects in the
+Unity editor:
+
+1. **Tools > FPS Base > New Map** → name it → it creates a prefab in
+   `Assets/Resources/Maps/` and opens it in **Prefab Mode** (an isolated
+   editing view).
+2. **Build the level.** Add objects with `GameObject > 3D Object > Cube`
+   (etc.) — they must have **colliders**, and Unity primitives already do.
+   You can drag in imported models/props too; just make sure they have a
+   collider (add a Mesh/Box Collider component).
+3. **Place spawns.** The starter map has colored `SpawnPoint` markers —
+   blue = team 0, orange = team 1, green = anyone (FFA/Gun Game). Move them
+   where players should appear. Duplicate them for more spawns. (Their gizmo
+   arrow shows the facing, but the game overrides facing to look at the map
+   center anyway.)
+4. **Press Ctrl+S.** Done — the map now appears in the in-game **MAP** button
+   automatically (maps are sorted by name, so all players see the same list).
+
+Notes:
+- The map's root object is instantiated at the world origin, so build around
+  `(0,0,0)`. Team 0 conventionally spawns toward −Z, team 1 toward +Z.
+- If you place no SpawnPoints, the game falls back to a safe default ring.
+- The two built-in maps (Arena, Backrooms) are still generated from code in
+  `EnvironmentBuilder` as examples.
+
 ## Playing over Steam (no port forwarding)
 
-The menu's LOCAL/LAN section works out of the box. Steam play is scaffolded
-in `SteamLobbyService.cs` behind the `FPSBASE_STEAM` define:
+The menu's LOCAL/LAN section works out of the box. Steam play is scaffolded in
+`SteamLobbyService.cs`, disabled until you add the packages and the
+`FPSBASE_STEAM` define. Full steps:
 
-1. Package Manager → **Add package from git URL**:
-   `https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net`
-2. Add the community **Steam transport for Netcode**:
-   `https://github.com/Unity-Technologies/multiplayer-community-contributions.git?path=/Transports/com.community.netcode.transport.steamworks`
-3. `Project Settings > Player > Scripting Define Symbols` → add `FPSBASE_STEAM`.
-4. In the Multiplayer scene, add the `SteamManager` component (ships with
-   Steamworks.NET) and a `SteamNetworkingSocketsTransport` next to the
-   NetworkManager. A `steam_appid.txt` containing `480` (Valve's test app)
-   in the project root lets you test while Steam is running.
-5. The menu's STEAM section activates: hosting creates a friends-only lobby;
-   friends join via **Steam overlay → Join Game**. Steam relays the traffic —
-   no IPs or router setup.
+1. **Steamworks.NET** (Steam API wrapper) — Package Manager → **+** → *Add
+   package from git URL*:
+   ```
+   https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net
+   ```
+   *(You already did this step.)*
+2. **The Steam transport for Netcode** — same *Add package from git URL*. The
+   correct package (the one that uses Steamworks.NET) is
+   `steamnetworkingsockets` — the earlier `...transport.steamworks` name was
+   wrong and 404s. Use exactly:
+   ```
+   https://github.com/Unity-Technologies/multiplayer-community-contributions.git?path=/Transports/com.community.netcode.transport.steamnetworkingsockets
+   ```
+   If Package Manager rejects the URL, the alternative is to download that repo
+   and copy the `com.community.netcode.transport.steamnetworkingsockets` folder
+   into your project's `Packages/` folder (embedded package) — same result.
+3. **Enable the code** — `Project Settings > Player > Scripting Define Symbols`
+   → add `FPSBASE_STEAM` (semicolon-separated if there are others) → Apply.
+   This is what turns on everything inside `SteamLobbyService.cs` and the
+   STEAM button in the menu.
+4. **Scene setup** — in `Assets/Scenes/Multiplayer.unity`, select the
+   `NetworkManager` object and:
+   - Add a **`SteamManager`** component (it ships inside Steamworks.NET).
+   - Add a **`SteamNetworkingSocketsTransport`** component (from the package in
+     step 2), and set it as the NetworkManager's *Network Transport* (the field
+     currently pointing at UnityTransport). Keep UnityTransport too if you want
+     LAN as a fallback; the code swaps to the Steam one when hosting via Steam.
+5. **App ID for testing** — create a text file `steam_appid.txt` containing just
+   `480` in the project root (and next to the built `.exe`). 480 is Valve's
+   public test app "Spacewar". Steam must be **running and logged in**. Ship
+   with your own App ID once you have one from Steamworks.
+6. **Play** — the menu's STEAM section now works: **HOST STEAM GAME** creates a
+   friends-only lobby; a friend opens the **Steam overlay (Shift+Tab) → your
+   name → Join Game**. Steam's relay handles NAT/firewall, so no IPs or port
+   forwarding. (This is peer-to-peer with the host as server — "Steam servers"
+   meaning Steam's relay, not a dedicated server you rent.)
 
-For non-Steam internet play, Unity **Relay + Lobby** is the alternative
-(swap `SetConnectionData` in `MainMenu` for a Relay allocation).
+If any Steam type names differ in your package version, the two things the code
+needs are: a `SteamManager.Initialized` check and a transport component with a
+`ConnectToSteamID` field — both are what the current package provides.
 
-## Shipping updates (not full rebuilds)
+For non-Steam internet play, Unity **Relay + Lobby** is the alternative (swap
+`SetConnectionData` in `MainMenu` for a Relay allocation).
 
-You always produce a build, but players should only **download the diff**:
+## Shipping updates (so players don't redownload the whole game)
 
-- **Steam (recommended, pairs with the above):** upload each build as a depot
-  via SteamPipe — Steam computes binary deltas and auto-updates players.
-  Typical code-only update ≈ a few MB, not the whole game.
-- **itch.io:** `butler push <build-folder> you/sundown-arena:windows` —
-  butler uploads only changed blocks; the itch app auto-patches players.
-- **Self-hosted:** keep builds in GitHub Releases and point
-  `GameSettings.UpdateCheckUrl` at a raw `version.txt`; the main menu then
-  shows "update available" (players re-download; simplest, no delta).
+You always produce a full build in Unity (`File > Build Settings > Build`), but
+the **distribution platform** is what patches players with only the changed
+bytes. You don't do the diffing yourself. Pick one:
 
-Also note: Unity builds are deterministic-ish per platform — keeping
-`Library` intact between builds makes rebuilds fast; only ship the Build
-folder output.
+**Steam (best if you're already using Steam play):**
+1. Get a Steamworks account + App ID (one-time, ~$100 to publish an app).
+2. Download the **Steamworks SDK**, which includes **SteamPipe** / `steamcmd`.
+3. Write a small app-build + depot-build script (`.vdf` files — templates are
+   in the SDK) pointing at your Unity `Build/` folder.
+4. Run `steamcmd +run_app_build yourapp.vdf`. Steam uploads, and for each
+   later build it computes a **binary delta** — players auto-update, usually
+   downloading only a few MB for a code change.
+
+**itch.io (simplest, free):**
+1. Install **butler** (itch's CLI): `itch.io/docs/butler`.
+2. `butler push "Build/" yourname/your-game:windows` after each build.
+3. butler uploads only changed blocks; the itch.io app auto-patches players.
+   No app ID, no cost.
+
+**Self-hosted / GitHub Releases (no delta, simplest to set up):**
+- Upload each build as a GitHub Release zip. Set
+  `GameSettings.UpdateCheckUrl` to a raw text file holding the latest version
+  (e.g. `https://raw.githubusercontent.com/you/repo/main/version.txt`). The
+  main menu already reads it and shows "update available" when it differs from
+  `GameSettings.Version`. Players download the new zip manually (full download,
+  no patching).
+
+Rule of thumb: **Steam or itch = automatic delta patching; GitHub = manual full
+download with an in-game "update available" notice.** In all cases you only
+distribute the contents of the Unity `Build/` output folder, never the whole
+Unity project.
 
 ## Project structure (key files)
 
 ```
 Assets/Scripts/
-  Core/      GameSettings (title/version/update URL) · EnvironmentBuilder (maps)
-             HumanoidBuilder (body + hitboxes) · PlayerFactory · PostFx · UpdateChecker
+  Core/      GameSettings (title/version/update URL) · MapCatalog (map list)
+             EnvironmentBuilder (built-in maps) · SpawnPoint · HumanoidBuilder
+             PlayerFactory · PostFx · UpdateChecker
   Player/    PlayerMovement (crouch/slide/bhop) · MouseLook · LimbAnimator · DeathCam
   Weapons/   WeaponDefinition (balance!) · WeaponModelBuilder · WeaponController
              RocketProjectile
   Combat/    Health · NetworkHealth · Hitbox · Effects · TargetDummy
   Audio/     SfxSynth (all sounds, synthesized)
   UI/        HudOverlay · MenuWidgets · Nametag · OfflineMenu
-  Network/   GameModeManager (modes/scores/maps) · NetworkPlayer · NetworkWeapon
+  Network/   GameModeManager (modes/scores/maps/spawns) · NetworkPlayer · NetworkWeapon
              MainMenu · NetworkGameHud · MultiplayerBootstrap · SteamLobbyService
+Assets/Editor/  MultiplayerSetupTool · NewMapTool (Tools > FPS Base menu)
+Assets/Resources/Maps/  your custom map prefabs (auto-listed in-game)
 ```
 
 ## Extending
@@ -110,8 +186,9 @@ Assets/Scripts/
 - **Balance:** everything lives in `WeaponDefinition.CreateDefaultLoadout()`.
 - **New mode:** extend `GameMode`, add scoring in `GameModeManager.ReportKill`,
   a button in `MainMenu`.
-- **New map:** add a builder + name in `EnvironmentBuilder` (`MapNames`,
-  `BuildMap`, `GetSpawnPoint`).
+- **New map:** just use **Tools > FPS Base > New Map** (see "Making your own
+  map" above). Built-in maps are code in `EnvironmentBuilder`; the list is
+  assembled in `MapCatalog`.
 - **Real art:** swap the outputs of `HumanoidBuilder` / `WeaponModelBuilder` /
   `SfxSynth` for imported assets (free sources: Mixamo, Kenney, Synty,
   polyhaven.com, poly.pizza — all game-ready).
