@@ -106,8 +106,7 @@ namespace FpsBase
         private string ModeTitle(GameModeManager gameMode)
         {
             string sniper = gameMode.SniperOnly.Value ? " · SNIPERS ONLY" : "";
-            string map = EnvironmentBuilder.MapNames[
-                Mathf.Clamp(gameMode.MapIndex.Value, 0, EnvironmentBuilder.MapNames.Length - 1)];
+            string map = MapCatalog.Name(gameMode.MapIndex.Value);
             switch (gameMode.CurrentMode)
             {
                 case GameMode.Duel: return $"1V1 DUEL · first to {gameMode.ScoreLimit} · {map}{sniper}";

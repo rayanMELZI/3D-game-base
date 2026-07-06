@@ -191,8 +191,8 @@ namespace FpsBase
 
             // Match setup.
             GUILayout.BeginHorizontal();
-            if (MenuWidgets.MenuButton($"MAP: {EnvironmentBuilder.MapNames[selectedMap]}", 32f))
-                selectedMap = (selectedMap + 1) % EnvironmentBuilder.MapNames.Length;
+            if (MenuWidgets.MenuButton($"MAP: {MapCatalog.Name(selectedMap)}", 32f))
+                selectedMap = (selectedMap + 1) % MapCatalog.Count;
             if (MenuWidgets.MenuButton(sniperOnly ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF", 32f))
                 sniperOnly = !sniperOnly;
             GUILayout.EndHorizontal();

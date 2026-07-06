@@ -20,7 +20,7 @@ namespace FpsBase
             Instance = this;
 
             EnvironmentBuilder.SetupLightingAndSky();
-            EnvironmentBuilder.BuildMap(0);
+            MapCatalog.Build(0);
             CurrentMap = 0;
 
             menuCamera = new GameObject("MenuCamera");
@@ -63,7 +63,7 @@ namespace FpsBase
             var old = GameObject.Find(EnvironmentBuilder.MapRootName);
             if (old != null)
                 Destroy(old);
-            EnvironmentBuilder.BuildMap(index);
+            MapCatalog.Build(index);
             CurrentMap = index;
         }
     }
