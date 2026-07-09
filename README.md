@@ -162,6 +162,11 @@ download with an in-game "update available" notice.** In all cases you only
 distribute the contents of the Unity `Build/` output folder, never the whole
 Unity project.
 
+**Deep dive:** [docs/STEAM_DISTRIBUTION.md](docs/STEAM_DISTRIBUTION.md) — what
+"Steam servers" really are (relay, not rented servers), the full SteamPipe
+update workflow with example `.vdf` scripts, beta branches, and how to build
+for **Windows + macOS** (including the signing/notarization truth for Steam).
+
 ## Project structure (key files)
 
 ```
