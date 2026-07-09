@@ -60,6 +60,12 @@ namespace FpsBase
             Team.OnValueChanged += OnTeamChanged;
             IsDead.OnValueChanged += OnDeadChanged;
             PlayerName.OnValueChanged += OnNameChanged;
+
+            // Give each player an imported character skin by join order
+            // (client 0 → skin 1 … client 4 → skin 1, wrapping). Visual only —
+            // hitboxes are unchanged.
+            rig.ApplyCharacterSkin((int)OwnerClientId);
+
             ApplyTeamColor(Team.Value);
 
             if (IsServer)

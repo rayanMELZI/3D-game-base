@@ -84,6 +84,7 @@ namespace FpsBase
             rig.headRenderers = body.headParts;
             rig.allRenderers = body.allRenderers;
             rig.RuntimeInit(); // no-op in the editor prefab-baking path
+            rig.ApplyCharacterSkin(0); // single-player uses the first imported skin (no-op at bake time)
             return rig;
         }
     }
