@@ -15,7 +15,7 @@ namespace FpsBase
     /// </summary>
     public static class MapCatalog
     {
-        private enum Kind { Arena, Backrooms, Custom }
+        private enum Kind { Arena, Backrooms, Nuketown, Custom }
 
         private struct Entry
         {
@@ -55,6 +55,7 @@ namespace FpsBase
             {
                 new Entry { name = "ARENA", kind = Kind.Arena },
                 new Entry { name = "BACKROOMS", kind = Kind.Backrooms },
+                new Entry { name = "NUKETOWN 2025", kind = Kind.Nuketown },
             };
 
             // Custom map prefabs, sorted for a stable cross-client index order.
@@ -81,11 +82,40 @@ namespace FpsBase
                 case Kind.Backrooms:
                     EnvironmentBuilder.BuildBackrooms();
                     break;
+                case Kind.Nuketown:
+                    EnvironmentBuilder.BuildNuketown();
+                    break;
                 default:
                     var root = new GameObject(EnvironmentBuilder.MapRootName);
                     var instance = Object.Instantiate(entry.prefab, root.transform);
                     instance.transform.localPosition = Vector3.zero;
+                    FixMissingMaterials(instance);
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Custom prefabs saved from a play-mode copy lose their code-generated
+        /// materials (they only exist at runtime) and render pink. Swap any
+        /// missing material for a neutral gray so the map is always playable.
+        /// (Tools > FPS Base > Bake Built-in Map saves real materials instead.)
+        /// </summary>
+        private static void FixMissingMaterials(GameObject instance)
+        {
+            foreach (var renderer in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                var mats = renderer.sharedMaterials;
+                bool changed = false;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    if (mats[i] == null)
+                    {
+                        mats[i] = EnvironmentBuilder.SharedMaterial(new Color(0.55f, 0.55f, 0.58f), 0f, 0.4f);
+                        changed = true;
+                    }
+                }
+                if (changed)
+                    renderer.sharedMaterials = mats;
             }
         }
 
@@ -116,16 +146,19 @@ namespace FpsBase
             }
 
             // Built-in maps.
+            Vector3[] ForSide(int s) => entry.kind == Kind.Nuketown
+                ? EnvironmentBuilder.NuketownSpawnCandidates(s)
+                : EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
             if (side < 0)
             {
-                var a = EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, 0);
-                var b = EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, 1);
+                var a = ForSide(0);
+                var b = ForSide(1);
                 var all = new Vector3[a.Length + b.Length];
                 a.CopyTo(all, 0);
                 b.CopyTo(all, a.Length);
                 return all;
             }
-            return EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, side);
+            return ForSide(side);
         }
 
         private static Vector3[] DefaultRing()

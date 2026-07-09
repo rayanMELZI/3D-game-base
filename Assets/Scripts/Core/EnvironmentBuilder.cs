@@ -247,6 +247,174 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // Built-in map: Nuketown 2025 — low-poly homage to the BO2 layout.
+        // Real map: ~3,000 m² playable, two 2-story houses facing a central
+        // street (bus + truck + cars as cover), a garage beside each house,
+        // backyard spawns behind each, low vaultable yard fences, side lanes
+        // along the borders, 180° rotational symmetry.
+        // Here: 44 x 68 m envelope, symmetric via a rotated per-side container.
+        // ------------------------------------------------------------------
+
+        public static void BuildNuketown()
+        {
+            var root = new GameObject(MapRootName).transform;
+            const float halfX = 22f, halfZ = 34f;
+
+            // Suburban grass lot + central asphalt street.
+            Ground(root, halfX * 2f, halfZ * 2f, new Color(0.36f, 0.42f, 0.23f), new Color(0.33f, 0.39f, 0.21f));
+            var asphalt = MakeMaterial(new Color(0.16f, 0.16f, 0.17f), 0f, 0.25f);
+            Box(root, "Street", new Vector3(0, 0.02f, 0), Vector3.zero, new Vector3(20f, 0.04f, 26f), asphalt);
+            var sidewalk = MakeMaterial(new Color(0.55f, 0.53f, 0.5f), 0f, 0.3f);
+            Box(root, "Sidewalk", new Vector3(-10.6f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 26f), sidewalk);
+            Box(root, "Sidewalk", new Vector3(10.6f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 26f), sidewalk);
+
+            // Perimeter fence.
+            var fenceMat = MakeMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
+            PerimeterWalls(root, halfX, halfZ, 3f, fenceMat);
+
+            // --- The two sides (house + garage + yard), 180° rotational twins ---
+            var yellowWall = MakeMaterial(new Color(0.85f, 0.68f, 0.22f), 0f, 0.35f);
+            var tealWall = MakeMaterial(new Color(0.3f, 0.52f, 0.46f), 0f, 0.35f);
+            BuildNuketownSide(root, north: true, tealWall);    // +Z: team 1, teal house
+            BuildNuketownSide(root, north: false, yellowWall); // -Z: team 0, yellow house
+
+            // --- Center street cover ---
+            // School bus: THE central cover, slightly angled like the original.
+            var busMat = MakeMaterial(new Color(0.22f, 0.5f, 0.5f), 0.1f, 0.45f);
+            var busTrim = MakeMaterial(new Color(0.45f, 0.28f, 0.18f), 0.05f, 0.3f);
+            Box(root, "Bus", new Vector3(-2.2f, 1.55f, 0f), new Vector3(0, 8f, 0), new Vector3(2.5f, 2.9f, 10.5f), busMat);
+            Box(root, "BusStripe", new Vector3(-2.2f, 1.1f, 0f), new Vector3(0, 8f, 0), new Vector3(2.6f, 0.5f, 10.6f), busTrim);
+            // Moving truck north of the bus; two cars on the south half balance it.
+            var truckMat = MakeMaterial(new Color(0.72f, 0.7f, 0.66f), 0.1f, 0.4f);
+            Box(root, "TruckBox", new Vector3(4.4f, 1.5f, 4.2f), new Vector3(0, -6f, 0), new Vector3(2.3f, 2.6f, 6.2f), truckMat);
+            Box(root, "TruckCab", new Vector3(4.9f, 0.9f, 8.1f), new Vector3(0, -6f, 0), new Vector3(2.2f, 1.6f, 1.8f), busTrim);
+            var carRed = MakeMaterial(new Color(0.55f, 0.15f, 0.12f), 0.2f, 0.5f);
+            var carBlue = MakeMaterial(new Color(0.4f, 0.5f, 0.6f), 0.2f, 0.5f);
+            Box(root, "Car", new Vector3(5.2f, 0.7f, -8f), new Vector3(0, 12f, 0), new Vector3(1.8f, 1.3f, 4.2f), carRed);
+            Box(root, "Car", new Vector3(-6.4f, 0.7f, -9.5f), new Vector3(0, -20f, 0), new Vector3(1.8f, 1.3f, 4.2f), carBlue);
+
+            // NUKETOWN welcome sign near the south cul-de-sac end.
+            var signPost = MakeMaterial(new Color(0.35f, 0.35f, 0.38f), 0.4f, 0.5f);
+            var signFace = MakeMaterial(new Color(0.9f, 0.88f, 0.8f), 0f, 0.4f);
+            Box(root, "SignPost", new Vector3(-13.4f, 1.1f, -12.5f), Vector3.zero, new Vector3(0.18f, 2.2f, 0.18f), signPost);
+            Box(root, "SignPost", new Vector3(-15.6f, 1.1f, -12.5f), Vector3.zero, new Vector3(0.18f, 2.2f, 0.18f), signPost);
+            Box(root, "SignPanel", new Vector3(-14.5f, 2.6f, -12.5f), Vector3.zero, new Vector3(3.2f, 1.6f, 0.15f), signFace);
+            Box(root, "SignMeter", new Vector3(-14.5f, 3.55f, -12.5f), Vector3.zero, new Vector3(1.4f, 0.3f, 0.18f),
+                MakeEmissiveMaterial(new Color(1f, 0.8f, 0.2f), 2f));
+
+            SpawnStrips(root, 29.5f, 10f);
+        }
+
+        /// <summary>
+        /// One Nuketown side, built in +Z coordinates inside a container that is
+        /// rotated 180° for the south side — exact rotational symmetry for free.
+        /// House spans x -10..-1, garage x 3..8.5, both at z 16.5..23.5; the
+        /// backyard (spawns) is behind them, z 23.5..33.
+        /// </summary>
+        private static void BuildNuketownSide(Transform mapRoot, bool north, Material wallMat)
+        {
+            var side = new GameObject(north ? "SideNorth" : "SideSouth").transform;
+            side.SetParent(mapRoot);
+
+            var trimMat = MakeMaterial(new Color(0.25f, 0.23f, 0.21f), 0.1f, 0.4f);   // roofs / dark trim
+            var floorMat = MakeMaterial(new Color(0.45f, 0.31f, 0.18f), 0f, 0.35f);   // interior wood
+            var fenceMat = MakeMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
+            var shedMat = MakeMaterial(new Color(0.42f, 0.33f, 0.22f), 0f, 0.3f);
+
+            // Local helper: wall piece from x0..x1, y0..y1 at depth z (thickness 0.25).
+            void WallX(float x0, float x1, float y0, float y1, float z) =>
+                Box(side, "HouseWall", new Vector3((x0 + x1) / 2f, (y0 + y1) / 2f, z), Vector3.zero,
+                    new Vector3(x1 - x0, y1 - y0, 0.25f), wallMat);
+            void WallZ(float z0, float z1, float y0, float y1, float x) =>
+                Box(side, "HouseWall", new Vector3(x, (y0 + y1) / 2f, (z0 + z1) / 2f), Vector3.zero,
+                    new Vector3(0.25f, y1 - y0, z1 - z0), wallMat);
+
+            // ---------------- House (two floors) ----------------
+            // Front wall (faces the street, z = 16.5).
+            // Ground: window x -8.5..-6 (sill 0.9-2.2), door x -4..-2.8.
+            WallX(-10f, -8.5f, 0f, 2.7f, 16.5f);
+            WallX(-8.5f, -6f, 0f, 0.9f, 16.5f);   // under window
+            WallX(-8.5f, -6f, 2.2f, 2.7f, 16.5f); // above window
+            WallX(-6f, -4f, 0f, 2.7f, 16.5f);
+            WallX(-4f, -2.8f, 2.2f, 2.7f, 16.5f); // above door
+            WallX(-2.8f, -1f, 0f, 2.7f, 16.5f);
+            // Upstairs: the iconic street-facing window x -8..-4.5 (sill 3.6-4.8).
+            WallX(-10f, -8f, 2.7f, 5.4f, 16.5f);
+            WallX(-8f, -4.5f, 2.7f, 3.6f, 16.5f);  // under window
+            WallX(-8f, -4.5f, 4.8f, 5.4f, 16.5f);  // above window
+            WallX(-4.5f, -1f, 2.7f, 5.4f, 16.5f);
+
+            // Back wall (z = 23.5): yard door x -6.2..-5, small upstairs window.
+            WallX(-10f, -6.2f, 0f, 2.7f, 23.5f);
+            WallX(-6.2f, -5f, 2.2f, 2.7f, 23.5f); // above door
+            WallX(-5f, -1f, 0f, 2.7f, 23.5f);
+            WallX(-10f, -8.5f, 2.7f, 5.4f, 23.5f);
+            WallX(-8.5f, -7f, 2.7f, 3.6f, 23.5f);
+            WallX(-8.5f, -7f, 4.8f, 5.4f, 23.5f);
+            WallX(-7f, -1f, 2.7f, 5.4f, 23.5f);
+
+            // Outer side wall (x = -10) solid; inner (x = -1) with a side door.
+            WallZ(16.5f, 23.5f, 0f, 5.4f, -10f);
+            WallZ(16.5f, 19f, 0f, 5.4f, -1f);
+            WallZ(19f, 20.2f, 2.2f, 5.4f, -1f);   // above side door
+            WallZ(20.2f, 23.5f, 0f, 5.4f, -1f);
+
+            // Interior: wood ground floor, divider stub, stairs, upper slab, roof.
+            Box(side, "HouseFloor", new Vector3(-5.5f, 0.06f, 20f), Vector3.zero, new Vector3(9f, 0.12f, 7f), floorMat);
+            Box(side, "Divider", new Vector3(-6f, 1.35f, 22f), Vector3.zero, new Vector3(0.25f, 2.7f, 3f), wallMat);
+            // Stairs along the inner wall, up from the back (z 23.4) to the front
+            // (z 18), landing flush with the slab top; the whole stair column
+            // (x -3..-1) stays open so a climbing player's head never hits slab.
+            Box(side, "Stairs", new Vector3(-2f, 1.48f, 20.7f), new Vector3(28.6f, 0, 0), new Vector3(1.8f, 0.25f, 6.15f), floorMat);
+            Box(side, "UpperFloor", new Vector3(-6.5f, 2.82f, 20f), Vector3.zero, new Vector3(7f, 0.25f, 7f), floorMat);
+            Box(side, "Roof", new Vector3(-5.5f, 5.52f, 20f), Vector3.zero, new Vector3(9.4f, 0.25f, 7.4f), trimMat);
+
+            // ---------------- Garage (drive-through cover) ----------------
+            // Open street face; back door to the yard; flat roof.
+            WallZ(17.5f, 23.5f, 0f, 2.9f, 3f);     // inner garage wall
+            WallZ(17.5f, 23.5f, 0f, 2.9f, 8.5f);   // outer garage wall
+            WallX(3f, 4.6f, 0f, 2.9f, 23.5f);      // back wall left of door
+            WallX(4.6f, 5.8f, 2.2f, 2.9f, 23.5f);  // above back door
+            WallX(5.8f, 8.5f, 0f, 2.9f, 23.5f);
+            Box(side, "GarageRoof", new Vector3(5.75f, 3f, 20.5f), Vector3.zero, new Vector3(5.9f, 0.25f, 6.4f), trimMat);
+
+            // ---------------- Yard & side lanes ----------------
+            // Low vaultable fences sealing the yard from the side lanes (jump over).
+            Box(side, "YardFence", new Vector3(-16f, 0.5f, 24.5f), Vector3.zero, new Vector3(12f, 1f, 0.15f), fenceMat);
+            Box(side, "YardFence", new Vector3(15.25f, 0.5f, 24.5f), Vector3.zero, new Vector3(13.5f, 1f, 0.15f), fenceMat);
+            // Backyard shed (spawn cover).
+            Box(side, "Shed", new Vector3(-8f, 1.1f, 28.5f), new Vector3(0, 6f, 0), new Vector3(2.5f, 2.2f, 2f), shedMat);
+            // Side-lane barriers (mid-lane cover on the long border paths).
+            Box(side, "LaneCover", new Vector3(-13f, 0.7f, 7f), new Vector3(0, 14f, 0), new Vector3(2.4f, 1.4f, 0.4f), fenceMat);
+            Box(side, "LaneCover", new Vector3(13.5f, 0.7f, 9f), new Vector3(0, -10f, 0), new Vector3(2.4f, 1.4f, 0.4f), fenceMat);
+
+            // Mailbox at the driveway edge (Mason / Woods in the original).
+            Box(side, "MailPost", new Vector3(-3.5f, 0.5f, 15.9f), Vector3.zero, new Vector3(0.12f, 1f, 0.12f), trimMat);
+            Box(side, "MailBox", new Vector3(-3.5f, 1.1f, 15.9f), Vector3.zero, new Vector3(0.5f, 0.35f, 0.35f),
+                MakeMaterial(new Color(0.7f, 0.12f, 0.1f), 0.1f, 0.5f));
+
+            if (!north)
+                side.localRotation = Quaternion.Euler(0f, 180f, 0f); // exact rotational twin
+        }
+
+        /// <summary>Nuketown spawn candidates: the backyard behind each side's house/garage.</summary>
+        public static Vector3[] NuketownSpawnCandidates(int side)
+        {
+            float s = side == 0 ? -1f : 1f; // side 0 = south (-Z), matching the other built-ins
+            // Positions authored for the north side, mirrored through the origin
+            // for the south side (matches the rotated side container).
+            return new[]
+            {
+                new Vector3(-5.5f * s, 0.3f, 29.5f * s),  // behind the house door
+                new Vector3(-8.5f * s, 0.3f, 26.5f * s),  // beside the shed
+                new Vector3(-2.5f * s, 0.3f, 27f * s),    // house/garage gap
+                new Vector3(5.2f * s, 0.3f, 28.5f * s),   // behind the garage
+                new Vector3(7.5f * s, 0.3f, 26f * s),     // garage back door
+                new Vector3(-1f * s, 0.3f, 31.5f * s),    // deep yard center
+            };
+        }
+
+        // ------------------------------------------------------------------
         // Shared pieces
         // ------------------------------------------------------------------
 
