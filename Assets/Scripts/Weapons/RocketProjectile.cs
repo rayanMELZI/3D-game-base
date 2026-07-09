@@ -15,6 +15,7 @@ namespace FpsBase
         private float radius;
         private Transform ignoreRoot;
         private float life = 6f;
+        private Transform spinVisual; // the flying launcher, rolling for comedy
 
         public static void Launch(Vector3 origin, Vector3 direction, float speed, float damage, float radius, Transform ignoreRoot)
         {
@@ -22,21 +23,45 @@ namespace FpsBase
             go.transform.position = origin;
             go.transform.rotation = Quaternion.LookRotation(direction);
 
-            // Visual: small cylinder body + glowing tip + light.
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Destroy(body.GetComponent<Collider>());
-            body.transform.SetParent(go.transform, false);
-            body.transform.localRotation = Quaternion.Euler(90, 0, 0);
-            body.transform.localScale = new Vector3(0.07f, 0.16f, 0.07f);
-            body.GetComponent<Renderer>().material =
-                EnvironmentBuilder.SharedMaterial(new Color(0.35f, 0.3f, 0.25f), 0.4f, 0.5f);
+            var rocket = go.AddComponent<RocketProjectile>();
 
-            var tip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(tip.GetComponent<Collider>());
-            tip.transform.SetParent(go.transform, false);
-            tip.transform.localPosition = new Vector3(0, 0, 0.18f);
-            tip.transform.localScale = Vector3.one * 0.09f;
-            tip.GetComponent<Renderer>().material =
+            // The joke: the RPG launches... RPGs. Fly a mini launcher barrel-first.
+            var launcherPrefab = Resources.Load<GameObject>("Weapons/Launcher_G");
+            if (launcherPrefab != null)
+            {
+                var launcher = Instantiate(launcherPrefab, go.transform, false);
+                launcher.transform.localScale = Vector3.one * 0.55f;
+                foreach (var col in launcher.GetComponentsInChildren<Collider>())
+                    Destroy(col);
+                rocket.spinVisual = launcher.transform;
+            }
+            else
+            {
+                // Fallback: the original cylinder + glowing tip.
+                var body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Destroy(body.GetComponent<Collider>());
+                body.transform.SetParent(go.transform, false);
+                body.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                body.transform.localScale = new Vector3(0.07f, 0.16f, 0.07f);
+                body.GetComponent<Renderer>().material =
+                    EnvironmentBuilder.SharedMaterial(new Color(0.35f, 0.3f, 0.25f), 0.4f, 0.5f);
+
+                var tip = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(tip.GetComponent<Collider>());
+                tip.transform.SetParent(go.transform, false);
+                tip.transform.localPosition = new Vector3(0, 0, 0.18f);
+                tip.transform.localScale = Vector3.one * 0.09f;
+                tip.GetComponent<Renderer>().material =
+                    EnvironmentBuilder.SharedMaterial(new Color(1f, 0.6f, 0.2f), emission: 2.5f);
+            }
+
+            // Exhaust glow: a small emissive flame at the back + light.
+            var flame = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Destroy(flame.GetComponent<Collider>());
+            flame.transform.SetParent(go.transform, false);
+            flame.transform.localPosition = new Vector3(0, 0, -0.22f);
+            flame.transform.localScale = new Vector3(0.08f, 0.08f, 0.14f);
+            flame.GetComponent<Renderer>().material =
                 EnvironmentBuilder.SharedMaterial(new Color(1f, 0.6f, 0.2f), emission: 2.5f);
 
             var light = go.AddComponent<Light>();
@@ -45,7 +70,6 @@ namespace FpsBase
             light.intensity = 2.5f;
             light.range = 6f;
 
-            var rocket = go.AddComponent<RocketProjectile>();
             rocket.speed = speed;
             rocket.damage = damage;
             rocket.radius = radius;
@@ -60,6 +84,10 @@ namespace FpsBase
                 Explode(transform.position);
                 return;
             }
+
+            // Slow barrel-roll so the flying launcher reads as the gag it is.
+            if (spinVisual != null)
+                spinVisual.Rotate(0f, 0f, 320f * Time.deltaTime, Space.Self);
 
             float stepLength = speed * Time.deltaTime;
 
