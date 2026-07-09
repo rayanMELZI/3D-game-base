@@ -150,7 +150,9 @@ namespace FpsBase
             if (reloadPending)
                 return;
 
-            bool firePressed = weapon.automatic ? Input.GetButton("Fire1") : Input.GetButtonDown("Fire1");
+            // Left mouse only — the legacy "Fire1" axis also maps Left Ctrl,
+            // which made crouching fire the weapon.
+            bool firePressed = weapon.automatic ? Input.GetMouseButton(0) : Input.GetMouseButtonDown(0);
             if (firePressed && Time.time >= nextFireTime)
             {
                 if (weapon.magazineSize <= 0 || ammo[CurrentIndex] > 0)
