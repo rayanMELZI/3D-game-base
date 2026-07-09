@@ -62,9 +62,17 @@ namespace FpsBase
                 return;
             var old = GameObject.Find(EnvironmentBuilder.MapRootName);
             if (old != null)
+            {
+                // Deactivate before the deferred Destroy so this frame's spawn
+                // raycasts can't hit the outgoing map's colliders.
+                old.SetActive(false);
                 Destroy(old);
+            }
             MapCatalog.Build(index);
             CurrentMap = index;
+            // Register the new map's colliders with physics immediately — the
+            // server picks (raycasts) spawn points in this same frame.
+            Physics.SyncTransforms();
         }
     }
 }

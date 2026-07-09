@@ -124,6 +124,13 @@ namespace FpsBase
         {
             if (MultiplayerBootstrap.Instance != null)
                 MultiplayerBootstrap.Instance.SetMap(index);
+
+            // Changing map pulls the ground out from under everyone standing on
+            // the old one (old spawns can be outside the new map's bounds) —
+            // respawn all players onto the new map so nobody is left falling
+            // into the void in a kill-Y loop.
+            if (IsServer && previous != index)
+                ForEachPlayer(p => p.ServerRespawn());
         }
 
         // ------------------------------------------------------------------
@@ -241,7 +248,14 @@ namespace FpsBase
         /// <summary>Raycast down onto real geometry so the spawn is never floating over a hole.</summary>
         private static Vector3 SnapToGround(Vector3 pos)
         {
-            if (Physics.Raycast(pos + Vector3.up * 30f, Vector3.down, out var hit, 60f,
+            // Cast from just above the candidate — NOT from high up, or indoor
+            // maps snap the spawn onto their own ceiling/rooftops (this put
+            // everyone on the Backrooms roof).
+            if (Physics.Raycast(pos + Vector3.up * 1.5f, Vector3.down, out var hit, 40f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                return hit.point + Vector3.up * 0.3f;
+            // Candidate authored below its floor? Try the tall cast as a fallback.
+            if (Physics.Raycast(pos + Vector3.up * 30f, Vector3.down, out hit, 60f,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
                 return hit.point + Vector3.up * 0.3f;
             return pos + Vector3.up * 0.3f;
