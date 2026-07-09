@@ -11,8 +11,11 @@ namespace FpsBase
     }
 
     /// <summary>
-    /// Builds the three weapon models (pistol / assault rifle / sniper) out of
-    /// Unity primitives, so the project needs no imported 3D assets.
+    /// Builds each weapon model. Matched weapon types (pistol / SMG / shotgun /
+    /// rifle / sniper / RPG) use the imported low-poly Asset Store models loaded
+    /// from Resources/Weapons; the knife (no imported match) and any failed load
+    /// fall back to the original Unity-primitive models, so the project still
+    /// runs even if the imported prefabs are missing.
     /// Used both for the first-person viewmodel and the third-person model
     /// other players see in multiplayer.
     /// </summary>
@@ -24,42 +27,9 @@ namespace FpsBase
             root.transform.SetParent(parent, false);
             root.transform.localPosition = localPosition;
 
-            var metal = MakeMat(new Color(0.14f, 0.14f, 0.15f), 0.65f, 0.72f);
-            var grip = MakeMat(new Color(0.09f, 0.09f, 0.1f), 0.1f, 0.35f);
-            var accent = MakeMat(new Color(0.32f, 0.34f, 0.38f), 0.8f, 0.6f);
-
             Vector3 muzzlePos;
-            switch (def.model)
-            {
-                case WeaponModelType.Knife:
-                    BuildKnife(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0, 0.22f);
-                    break;
-                case WeaponModelType.Pistol:
-                    BuildPistol(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.03f, 0.18f);
-                    break;
-                case WeaponModelType.Smg:
-                    BuildSmg(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.015f, 0.3f);
-                    break;
-                case WeaponModelType.Shotgun:
-                    BuildShotgun(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.02f, 0.52f);
-                    break;
-                case WeaponModelType.Sniper:
-                    BuildSniper(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.02f, 0.74f);
-                    break;
-                case WeaponModelType.Rpg:
-                    BuildRpg(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.04f, 0.55f);
-                    break;
-                default:
-                    BuildRifle(root.transform, metal, grip, accent);
-                    muzzlePos = new Vector3(0, 0.02f, 0.48f);
-                    break;
-            }
+            if (!TryBuildImported(def.model, root.transform, out muzzlePos))
+                muzzlePos = BuildProcedural(def.model, root.transform);
 
             foreach (var r in root.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = castShadows
@@ -82,17 +52,142 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // Imported Asset Store models (Resources/Weapons/*)
+        // ------------------------------------------------------------------
+
+        /// <summary>
+        /// Per-weapon placement of the imported model inside its holder.
+        /// The imported prefabs are meter-scale with +Z as the barrel, matching
+        /// the primitive convention, so these are small nudges. If a model sits
+        /// wrong in-game, tweak the numbers here (one row per weapon) — that is
+        /// the single place to fine-tune fit.
+        /// </summary>
+        private struct ModelFit
+        {
+            public string resource;   // path under Resources (null = no imported model)
+            public Vector3 scale;
+            public Vector3 euler;     // extra rotation to align the barrel to +Z
+            public Vector3 offset;    // local position of the model within the holder
+            public Vector3 muzzle;    // muzzle/flash local position within the holder
+        }
+
+        private static ModelFit FitFor(WeaponModelType type)
+        {
+            switch (type)
+            {
+                case WeaponModelType.Pistol:
+                    return new ModelFit { resource = "Weapons/Pistol_P", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.02f), muzzle = new Vector3(0, 0.03f, 0.2f) };
+                case WeaponModelType.Smg:
+                    return new ModelFit { resource = "Weapons/SMG_P", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.02f, 0.32f) };
+                case WeaponModelType.Shotgun:
+                    return new ModelFit { resource = "Weapons/ShotGun_P", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.55f) };
+                case WeaponModelType.Rifle:
+                    return new ModelFit { resource = "Weapons/AR_T", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.5f) };
+                case WeaponModelType.Sniper:
+                    return new ModelFit { resource = "Weapons/Recon_P", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.15f), muzzle = new Vector3(0, 0.02f, 0.75f) };
+                case WeaponModelType.Rpg:
+                    return new ModelFit { resource = "Weapons/Launcher_G", scale = Vector3.one,
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.04f, 0.55f) };
+                default: // Knife has no imported match — always procedural.
+                    return new ModelFit { resource = null };
+            }
+        }
+
+        private static bool TryBuildImported(WeaponModelType type, Transform holder, out Vector3 muzzlePos)
+        {
+            muzzlePos = Vector3.zero;
+            var fit = FitFor(type);
+            if (string.IsNullOrEmpty(fit.resource))
+                return false;
+
+            var prefab = Resources.Load<GameObject>(fit.resource);
+            if (prefab == null)
+                return false; // not imported yet — fall back to primitives
+
+            var model = Object.Instantiate(prefab, holder, false);
+            model.transform.localPosition = fit.offset;
+            model.transform.localRotation = Quaternion.Euler(fit.euler);
+            model.transform.localScale = fit.scale;
+
+            // Weapon models are purely cosmetic; strip any colliders/rigidbodies.
+            foreach (var col in model.GetComponentsInChildren<Collider>())
+                Object.Destroy(col);
+            foreach (var rb in model.GetComponentsInChildren<Rigidbody>())
+                Object.Destroy(rb);
+
+            muzzlePos = fit.muzzle;
+            return true;
+        }
+
+        // ------------------------------------------------------------------
+        // Procedural fallback models (all sized in meters, +Z is the barrel)
+        // ------------------------------------------------------------------
+
+        private static Vector3 BuildProcedural(WeaponModelType type, Transform t)
+        {
+            var metal = MakeMat(new Color(0.14f, 0.14f, 0.15f), 0.65f, 0.72f);
+            var grip = MakeMat(new Color(0.09f, 0.09f, 0.1f), 0.1f, 0.35f);
+            var accent = MakeMat(new Color(0.32f, 0.34f, 0.38f), 0.8f, 0.6f);
+
+            switch (type)
+            {
+                case WeaponModelType.Knife:
+                    BuildKnife(t, metal, grip, accent);
+                    return new Vector3(0, 0, 0.22f);
+                case WeaponModelType.Pistol:
+                    BuildPistol(t, metal, grip, accent);
+                    return new Vector3(0, 0.03f, 0.18f);
+                case WeaponModelType.Smg:
+                    BuildSmg(t, metal, grip, accent);
+                    return new Vector3(0, 0.015f, 0.3f);
+                case WeaponModelType.Shotgun:
+                    BuildShotgun(t, metal, grip, accent);
+                    return new Vector3(0, 0.02f, 0.52f);
+                case WeaponModelType.Sniper:
+                    BuildSniper(t, metal, grip, accent);
+                    return new Vector3(0, 0.02f, 0.74f);
+                case WeaponModelType.Rpg:
+                    BuildRpg(t, metal, grip, accent);
+                    return new Vector3(0, 0.04f, 0.55f);
+                default:
+                    BuildRifle(t, metal, grip, accent);
+                    return new Vector3(0, 0.02f, 0.48f);
+            }
+        }
+
+        // ------------------------------------------------------------------
         // Models (all sized in meters, +Z is the barrel direction)
         // ------------------------------------------------------------------
 
         private static void BuildKnife(Transform t, Material metal, Material grip, Material accent)
         {
-            // Bright steel blade + dark handle with a guard.
-            var blade = MakeMat(new Color(0.75f, 0.78f, 0.82f), 0.9f, 0.9f);
-            Part(t, PrimitiveType.Cube, new Vector3(0, 0, 0.12f), new Vector3(0, 0, 0), new Vector3(0.008f, 0.035f, 0.2f), blade);   // blade
-            Part(t, PrimitiveType.Cube, new Vector3(0, 0.028f, 0.16f), new Vector3(12, 0, 0), new Vector3(0.006f, 0.02f, 0.1f), blade); // edge taper
-            Part(t, PrimitiveType.Cube, new Vector3(0, 0, 0.01f), Vector3.zero, new Vector3(0.02f, 0.06f, 0.015f), metal);           // guard
-            Part(t, PrimitiveType.Cube, new Vector3(0, -0.01f, -0.05f), new Vector3(-8, 0, 0), new Vector3(0.028f, 0.035f, 0.11f), grip); // handle
+            // Polished tactical knife: tapered clip-point blade with a dark spine
+            // and fuller groove, brass crossguard, ringed wrap handle + pommel.
+            var steel = MakeMat(new Color(0.8f, 0.84f, 0.9f), 0.95f, 0.92f);
+            var darkSteel = MakeMat(new Color(0.22f, 0.24f, 0.28f), 0.8f, 0.7f);
+            var brass = MakeMat(new Color(0.62f, 0.5f, 0.24f), 0.9f, 0.75f);
+            var wrap = MakeMat(new Color(0.08f, 0.08f, 0.09f), 0.05f, 0.3f);
+
+            // Blade.
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.004f, 0.13f), Vector3.zero, new Vector3(0.01f, 0.042f, 0.22f), steel);        // body
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.002f, 0.255f), new Vector3(7f, 0, 0), new Vector3(0.008f, 0.028f, 0.06f), steel); // clip-point taper
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.026f, 0.11f), Vector3.zero, new Vector3(0.012f, 0.007f, 0.18f), darkSteel);   // spine
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.018f, 0.13f), new Vector3(0, 0, 45f), new Vector3(0.007f, 0.007f, 0.21f), steel); // edge bevel glint
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.008f, 0.12f), Vector3.zero, new Vector3(0.011f, 0.005f, 0.16f), darkSteel);   // fuller groove
+
+            // Brass crossguard, slightly swept.
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0, 0.015f), new Vector3(0, 0, 4f), new Vector3(0.018f, 0.075f, 0.014f), brass);
+
+            // Handle: wrapped grip angled down, brass rings and pommel.
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.008f, -0.045f), new Vector3(-7f, 0, 0), new Vector3(0.024f, 0.036f, 0.105f), wrap);
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.006f, -0.02f), new Vector3(-7f, 0, 0), new Vector3(0.026f, 0.038f, 0.012f), brass);
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.011f, -0.07f), new Vector3(-7f, 0, 0), new Vector3(0.026f, 0.038f, 0.012f), brass);
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.016f, -0.103f), new Vector3(-7f, 0, 0), new Vector3(0.026f, 0.042f, 0.02f), brass);
         }
 
         private static void BuildSmg(Transform t, Material metal, Material grip, Material accent)
