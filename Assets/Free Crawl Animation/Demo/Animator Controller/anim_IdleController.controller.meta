@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 89d3551a51f6d014696ad8f8b46d1d5d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352218
+  packageName: Free Crawl Animation
+  packageVersion: 1.0
+  assetPath: Assets/Free Crawl Animation/Demo/Animator Controller/anim_IdleController.controller
+  uploadId: 839496

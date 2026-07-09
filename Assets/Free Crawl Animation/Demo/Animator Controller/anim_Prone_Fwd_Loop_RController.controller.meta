@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bbce530422b608e4da82b6e65a83d978
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352218
+  packageName: Free Crawl Animation
+  packageVersion: 1.0
+  assetPath: Assets/Free Crawl Animation/Demo/Animator Controller/anim_Prone_Fwd_Loop_RController.controller
+  uploadId: 839496

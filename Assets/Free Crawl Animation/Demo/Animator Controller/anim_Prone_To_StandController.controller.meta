@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 99acc50f6b0ae494589bfc73826f0f2d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 352218
+  packageName: Free Crawl Animation
+  packageVersion: 1.0
+  assetPath: Assets/Free Crawl Animation/Demo/Animator Controller/anim_Prone_To_StandController.controller
+  uploadId: 839496
