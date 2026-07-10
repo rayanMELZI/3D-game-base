@@ -67,7 +67,7 @@ namespace FpsBase
                     displayName = "KNIFE",
                     model = WeaponModelType.Knife,
                     isMelee = true, magazineSize = 0,
-                    damage = 55f, fireRate = 1.8f, range = 2.4f,
+                    damage = 100f, fireRate = 1.8f, range = 2.4f, // one-shot, like the sniper
                     automatic = false, recoil = 0.2f, zoomFov = 0f,
                     viewOffset = new Vector3(0.28f, -0.24f, 0.45f),
                 },
@@ -75,7 +75,8 @@ namespace FpsBase
                 {
                     displayName = "PISTOL",
                     model = WeaponModelType.Pistol,
-                    damage = 20f, fireRate = 5f, range = 120f,
+                    // Semi-auto, near click-speed cap: fast trigger fingers win.
+                    damage = 20f, fireRate = 15f, range = 120f,
                     magazineSize = 12, reloadTime = 1.1f,
                     automatic = false, recoil = 1.1f,
                     zoomFov = 48f,
