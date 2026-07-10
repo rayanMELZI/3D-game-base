@@ -38,12 +38,15 @@ namespace FpsBase
             lobbyEntered = Callback<LobbyEnter_t>.Create(OnLobbyEntered);
         }
 
-        public static void HostLobby(GameMode mode, int map, bool sniperOnly)
+        /// <summary>Create the lobby. False = Steam isn't initialized (no SteamManager
+        /// in the scene, Steam not running, or missing steam_appid.txt).</summary>
+        public static bool HostLobby(GameMode mode, int map, bool sniperOnly)
         {
             if (!SteamManager.Initialized)
             {
-                Debug.LogWarning("Steam is not running.");
-                return;
+                Debug.LogWarning("[Steam] Not initialized — SteamManager missing from the scene, " +
+                                 "Steam not running, or steam_appid.txt not found.");
+                return false;
             }
             EnsureCallbacks();
             GameModeManager.PendingHostMode = mode;
@@ -51,6 +54,7 @@ namespace FpsBase
             GameModeManager.PendingSniperOnly = sniperOnly;
             SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypeFriendsOnly,
                 GameModeManager.MaxPlayersFor(mode));
+            return true;
         }
 
         private static void OnLobbyCreated(LobbyCreated_t data)
@@ -59,7 +63,26 @@ namespace FpsBase
                 return;
             currentLobby = new CSteamID(data.m_ulSteamIDLobby);
             SteamMatchmaking.SetLobbyData(currentLobby, HostIdKey, SteamUser.GetSteamID().ToString());
+
+            // Host must listen on the Steam transport too (the default is the
+            // LAN UnityTransport — friends join via Steam relay, not by IP).
+            if (!UseSteamTransport())
+                return;
             NetworkManager.Singleton.StartHost();
+        }
+
+        /// <summary>Switch Netcode onto the Steam transport; false if it isn't on the NetworkManager.</summary>
+        private static bool UseSteamTransport()
+        {
+            var transport = NetworkManager.Singleton
+                .GetComponent<Netcode.Transports.SteamNetworkingSocketsTransport>();
+            if (transport == null)
+            {
+                Debug.LogError("[Steam] Add a SteamNetworkingSocketsTransport component to the NetworkManager.");
+                return false;
+            }
+            NetworkManager.Singleton.NetworkConfig.NetworkTransport = transport;
+            return true;
         }
 
         // A friend clicked "Join Game" in the Steam overlay.
@@ -77,10 +100,11 @@ namespace FpsBase
 
             // Point the Steam transport at the host and connect.
             // (Component from the Netcode community contributions repo.)
-            var transport = NetworkManager.Singleton
-                .GetComponent<Netcode.Transports.SteamNetworkingSocketsTransport>();
+            if (!UseSteamTransport())
+                return;
+            var transport = (Netcode.Transports.SteamNetworkingSocketsTransport)
+                NetworkManager.Singleton.NetworkConfig.NetworkTransport;
             transport.ConnectToSteamID = ulong.Parse(hostId);
-            NetworkManager.Singleton.NetworkConfig.NetworkTransport = transport;
             NetworkManager.Singleton.StartClient();
         }
 

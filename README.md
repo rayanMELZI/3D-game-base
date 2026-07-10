@@ -106,11 +106,20 @@ The menu's LOCAL/LAN section works out of the box. Steam play is scaffolded in
    STEAM button in the menu.
 4. **Scene setup** — in `Assets/Scenes/Multiplayer.unity`, select the
    `NetworkManager` object and:
-   - Add a **`SteamManager`** component (it ships inside Steamworks.NET).
+   - Add the **`SteamManager`** component. **It's included in this project**
+     (`Assets/Scripts/Network/SteamManager.cs`, active once the define from
+     step 3 is set) — do NOT import the "SteamManager" sample from the
+     Steamworks.NET package; it isn't needed and would be a duplicate.
    - Add a **`SteamNetworkingSocketsTransport`** component (from the package in
-     step 2), and set it as the NetworkManager's *Network Transport* (the field
-     currently pointing at UnityTransport). Keep UnityTransport too if you want
-     LAN as a fallback; the code swaps to the Steam one when hosting via Steam.
+     step 2). Leave the NetworkManager's *Network Transport* field on
+     UnityTransport — LAN keeps working, and the code switches to the Steam
+     transport automatically when hosting or joining via Steam.
+
+   **Can't find the components in Add Component?** They only appear once the
+   project compiles with **zero errors** (check the Console). Any compile error
+   hides ALL new components, including the ones from the packages. Fix the
+   errors (and make sure step 3's define is applied), let Unity finish
+   compiling, then search again.
 5. **App ID for testing** — create a text file `steam_appid.txt` containing just
    `480` in the project root (and next to the built `.exe`). 480 is Valve's
    public test app "Spacewar". Steam must be **running and logged in**. Ship
@@ -122,8 +131,9 @@ The menu's LOCAL/LAN section works out of the box. Steam play is scaffolded in
    meaning Steam's relay, not a dedicated server you rent.)
 
 If any Steam type names differ in your package version, the two things the code
-needs are: a `SteamManager.Initialized` check and a transport component with a
-`ConnectToSteamID` field — both are what the current package provides.
+needs are: the included `SteamManager` (just checks `SteamAPI.Init`) and a
+transport component with a `ConnectToSteamID` field — the latter is what the
+community transport package provides.
 
 For non-Steam internet play, Unity **Relay + Lobby** is the alternative (swap
 `SetConnectionData` in `MainMenu` for a Relay allocation).
