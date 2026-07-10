@@ -51,11 +51,13 @@ namespace FpsBase
             if (entries != null)
                 return;
 
+            // Nuketown lives as a custom prefab now (Resources/Maps/Nuketown) so
+            // it can be edited visually; the code builder remains available to
+            // the bake tool (Tools > FPS Base > Bake Built-in Map).
             entries = new List<Entry>
             {
                 new Entry { name = "ARENA", kind = Kind.Arena },
                 new Entry { name = "BACKROOMS", kind = Kind.Backrooms },
-                new Entry { name = "NUKETOWN 2025", kind = Kind.Nuketown },
             };
 
             // Custom map prefabs, sorted for a stable cross-client index order.
