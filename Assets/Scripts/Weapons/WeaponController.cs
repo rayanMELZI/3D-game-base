@@ -31,6 +31,15 @@ namespace FpsBase
         [NonSerialized]
         public bool lockSwitching;
 
+        /// <summary>
+        /// The player's class loadout as loadout indexes (knife, secondary,
+        /// primary). Keys 1/2/3 map to these; other weapons can't be selected.
+        /// Global weapon indexes stay untouched so network replication and Gun
+        /// Game (which uses ForceWeapon) are unaffected.
+        /// </summary>
+        [NonSerialized]
+        public int[] classSlots;
+
         /// <summary>Raised after every local shot with the end point (for network replication).</summary>
         public event Action<Vector3> ShotFired;
         /// <summary>Raised when a shot damaged something; true = headshot (HUD hit marker + sound).</summary>
@@ -70,6 +79,23 @@ namespace FpsBase
                 models[i].root.SetActive(i == CurrentIndex);
             }
             RebuildShadowModel();
+            ApplySelectedClass();
+        }
+
+        /// <summary>
+        /// Restrict switching to the selected class (knife + secondary + primary)
+        /// and draw the primary. Called on spawn/respawn; Gun Game / sniper-only
+        /// still override via ForceWeapon + lockSwitching.
+        /// </summary>
+        public void ApplySelectedClass()
+        {
+            int c = Mathf.Clamp(GameSettings.SelectedClass, 0, GameSettings.ClassCount - 1);
+            int primary = Mathf.Clamp(GameSettings.ClassPrimary[c], 0, weapons.Length - 1);
+            int secondary = Mathf.Clamp(GameSettings.ClassSecondary[c], 0, weapons.Length - 1);
+            classSlots = new[] { 0, secondary, primary }; // knife always in slot 1
+
+            if (models != null && !lockSwitching && CurrentIndex != primary)
+                SwitchTo(primary);
         }
 
         /// <summary>Refill every magazine (called on respawn).</summary>
@@ -98,14 +124,22 @@ namespace FpsBase
         {
             SetZoom(false);
             reloadPending = false;
-            if (models != null && models[CurrentIndex].muzzleFlash != null)
-                models[CurrentIndex].muzzleFlash.enabled = false;
+            if (models != null && models[CurrentIndex].root != null)
+            {
+                if (models[CurrentIndex].muzzleFlash != null)
+                    models[CurrentIndex].muzzleFlash.enabled = false;
+                // Hide the viewmodel too — while dead the camera belongs to the
+                // kill cam, and a floating first-person gun ruins the replay.
+                models[CurrentIndex].root.SetActive(false);
+            }
             if (hasShadowModel)
                 shadowModel.root.SetActive(false); // no floating gun shadow while dead
         }
 
         private void OnEnable()
         {
+            if (models != null && models[CurrentIndex].root != null)
+                models[CurrentIndex].root.SetActive(true);
             if (hasShadowModel)
                 shadowModel.root.SetActive(true);
         }
@@ -196,16 +230,36 @@ namespace FpsBase
 
         private void HandleSwitching()
         {
+            // With a class: keys 1/2/3 = knife/secondary/primary, scroll cycles
+            // the class slots. Without one (safety fallback): the full arsenal.
+            var slots = classSlots;
+            int slotCount = slots != null ? slots.Length : weapons.Length;
+            int currentSlot = 0;
+            if (slots != null)
+            {
+                for (int i = 0; i < slots.Length; i++)
+                    if (slots[i] == CurrentIndex)
+                        currentSlot = i;
+            }
+
             int target = -1;
-            for (int i = 0; i < weapons.Length && i < 9; i++)
+            for (int i = 0; i < slotCount && i < 9; i++)
             {
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i))
-                    target = i;
+                    target = slots != null ? slots[i] : i;
             }
 
             float scroll = Input.GetAxis("Mouse ScrollWheel");
-            if (scroll > 0.01f) target = (CurrentIndex + 1) % weapons.Length;
-            if (scroll < -0.01f) target = (CurrentIndex - 1 + weapons.Length) % weapons.Length;
+            if (slots != null)
+            {
+                if (scroll > 0.01f) target = slots[(currentSlot + 1) % slots.Length];
+                if (scroll < -0.01f) target = slots[(currentSlot - 1 + slots.Length) % slots.Length];
+            }
+            else
+            {
+                if (scroll > 0.01f) target = (CurrentIndex + 1) % weapons.Length;
+                if (scroll < -0.01f) target = (CurrentIndex - 1 + weapons.Length) % weapons.Length;
+            }
 
             if (target >= 0 && target < weapons.Length && target != CurrentIndex)
                 SwitchTo(target);

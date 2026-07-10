@@ -14,6 +14,9 @@ namespace FpsBase
         public NetworkVariable<int> WeaponIndex = new NetworkVariable<int>(
             WeaponDefinition.DefaultIndex, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        /// <summary>Time.time of this player's last shot on THIS client (radar "on fire" mode).</summary>
+        public float LastShotTime { get; private set; } = -999f;
+
         private PlayerRigRefs rig;
         private WeaponModelInstance thirdPersonModel;
         private bool hasThirdPersonModel;
@@ -89,12 +92,19 @@ namespace FpsBase
         [ServerRpc]
         private void FireServerRpc(Vector3 endPoint)
         {
+            // Shooting ends your own spawn protection — no protected campers.
+            var player = GetComponent<NetworkPlayer>();
+            if (player != null)
+                player.ServerClearSpawnProtection();
+
             FireClientRpc(endPoint);
         }
 
         [ClientRpc]
         private void FireClientRpc(Vector3 endPoint)
         {
+            LastShotTime = Time.time; // radar ping on every client
+
             if (IsOwner)
                 return; // the owner already played its local effects
 

@@ -58,6 +58,12 @@ namespace FpsBase
                     return;
             }
 
+            // Anti-spawnkill: freshly spawned players are briefly immune
+            // (protection drops as soon as they fire a shot themselves).
+            var victimPlayer = GetComponent<NetworkPlayer>();
+            if (victimPlayer != null && victimPlayer.IsSpawnProtected && attackerId != OwnerClientId)
+                return;
+
             if (headshot)
                 amount = maxHealth; // headshots are always lethal
 

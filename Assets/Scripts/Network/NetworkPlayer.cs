@@ -29,6 +29,11 @@ namespace FpsBase
             default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public NetworkVariable<bool> Crouched = new NetworkVariable<bool>(
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        /// <summary>View pitch in degrees so remote players see vertical aim.</summary>
+        public NetworkVariable<float> Pitch = new NetworkVariable<float>(
+            0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public NetworkVariable<bool> Sliding = new NetworkVariable<bool>(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         public float respawnDelay = 3f;
 
@@ -118,17 +123,32 @@ namespace FpsBase
             if (!IsSpawned)
                 return;
 
+            RecordKillcamSample();
+
             if (!IsOwner)
             {
                 // Replicate the crouch squash on remote players.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
                 PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend);
+
+                // Feed replicated aim pitch + slide into the body pose.
+                if (rig.characterPose != null)
+                {
+                    rig.characterPose.remoteDriven = true;
+                    rig.characterPose.remotePitch = Pitch.Value;
+                    rig.characterPose.remoteSlide = Sliding.Value ? 1f : 0f;
+                }
                 return;
             }
 
-            // Publish crouch state.
+            // Publish crouch / slide / aim pitch.
             if (Crouched.Value != rig.movement.IsCrouching)
                 Crouched.Value = rig.movement.IsCrouching;
+            if (Sliding.Value != rig.movement.IsSliding)
+                Sliding.Value = rig.movement.IsSliding;
+            float pitch = rig.mouseLook != null ? rig.mouseLook.CurrentPitch : 0f;
+            if (Mathf.Abs(Pitch.Value - pitch) > 0.5f)
+                Pitch.Value = pitch;
 
             var gameMode = GameModeManager.Instance;
 
@@ -140,10 +160,11 @@ namespace FpsBase
             if (rig.weaponController.enabled != canPlay)
                 rig.weaponController.enabled = canPlay;
 
-            // Per-mode weapon locking: sniper-only beats everything, then Gun Game.
+            // Per-mode weapon locking. Gun Game's whole point is its weapon
+            // ladder, so it wins over the sniper-only toggle.
             if (gameMode != null && gameMode.IsSpawned)
             {
-                if (gameMode.SniperOnly.Value)
+                if (gameMode.SniperOnly.Value && gameMode.CurrentMode != GameMode.GunGame)
                 {
                     rig.weaponController.lockSwitching = true;
                     rig.weaponController.ForceWeapon(5); // sniper
@@ -160,6 +181,46 @@ namespace FpsBase
                 }
             }
         }
+
+        // ------------------------------------------------------------------
+        // Killcam recording — every client buffers every player's recent pose
+        // (position is already replicated; pitch via the Pitch variable), so the
+        // victim can replay its killer's last seconds from the killer's eyes.
+        // ------------------------------------------------------------------
+
+        public struct KillcamSample
+        {
+            public float time;
+            public Vector3 position;
+            public float yaw;
+            public float pitch;
+        }
+
+        private const float KillcamKeep = 6f;      // seconds of history
+        private const float KillcamInterval = 0.05f; // 20 Hz
+        private readonly System.Collections.Generic.List<KillcamSample> killcamBuffer
+            = new System.Collections.Generic.List<KillcamSample>(160);
+        private float nextKillcamSample;
+
+        private void RecordKillcamSample()
+        {
+            if (Time.time < nextKillcamSample || IsDead.Value)
+                return;
+            nextKillcamSample = Time.time + KillcamInterval;
+
+            killcamBuffer.Add(new KillcamSample
+            {
+                time = Time.time,
+                position = transform.position,
+                yaw = transform.eulerAngles.y,
+                pitch = IsOwner && rig.mouseLook != null ? rig.mouseLook.CurrentPitch : Pitch.Value,
+            });
+            while (killcamBuffer.Count > 0 && killcamBuffer[0].time < Time.time - KillcamKeep)
+                killcamBuffer.RemoveAt(0);
+        }
+
+        /// <summary>Snapshot of this player's recent movement (for the victim's killcam).</summary>
+        public KillcamSample[] GetKillcamHistory() => killcamBuffer.ToArray();
 
         // ------------------------------------------------------------------
         // Team
@@ -242,7 +303,10 @@ namespace FpsBase
                 {
                     string killerName = player.PlayerName.Value.IsEmpty
                         ? $"Player {killerId + 1}" : player.PlayerName.Value.ToString();
-                    DeathCam.Begin(player.transform, $"KILLED BY  {killerName}");
+                    // Replay the killer's last seconds from their eyes (skippable),
+                    // then fall back to the orbiting spectate until respawn.
+                    DeathCam.BeginReplay(player.GetKillcamHistory(), player.transform,
+                        $"KILLCAM  —  {killerName}");
                     return;
                 }
             }
@@ -254,6 +318,13 @@ namespace FpsBase
             ServerRespawn();
         }
 
+        /// <summary>Server-side anti-spawnkill: brief immunity after spawning, ends when you shoot.</summary>
+        public bool IsSpawnProtected => Time.time < spawnProtectedUntil;
+        private float spawnProtectedUntil;
+        private const float SpawnProtectionSeconds = 3f;
+
+        public void ServerClearSpawnProtection() => spawnProtectedUntil = 0f;
+
         public void ServerRespawn()
         {
             if (!IsServer)
@@ -261,6 +332,7 @@ namespace FpsBase
 
             health.ServerResetHealth();
             IsDead.Value = false;
+            spawnProtectedUntil = Time.time + SpawnProtectionSeconds;
 
             Vector3 pos = GameModeManager.Instance != null
                 ? GameModeManager.Instance.GetSpawnPoint(Team.Value)
@@ -310,6 +382,7 @@ namespace FpsBase
             characterController.enabled = true;
             rig.movement.spawnPoint = position; // fall-out-of-world safety respawn
             rig.weaponController.ResetAmmo();    // fresh magazines every life
+            rig.weaponController.ApplySelectedClass(); // spawn with the chosen class
             respawning = false;
         }
 

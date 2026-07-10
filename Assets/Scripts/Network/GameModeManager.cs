@@ -28,6 +28,8 @@ namespace FpsBase
         public static GameMode PendingHostMode = GameMode.Duel;
         public static int PendingHostMap = 0;
         public static bool PendingSniperOnly = false;
+        /// <summary>0 = off, 1 = players always visible, 2 = visible while firing.</summary>
+        public static int PendingRadarMode = 2;
 
         /// <summary>Gun Game weapon order by loadout index (knife last).</summary>
         public static readonly int[] GunGameOrder = { 1, 2, 3, 4, 5, 6, 0 };
@@ -38,6 +40,9 @@ namespace FpsBase
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> SniperOnly = new NetworkVariable<bool>(
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>Minimap radar: 0 = off, 1 = always show players, 2 = show while firing.</summary>
+        public NetworkVariable<int> RadarMode = new NetworkVariable<int>(
+            2, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam0 = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam1 = new NetworkVariable<int>(
@@ -102,6 +107,7 @@ namespace FpsBase
                 Mode.Value = (int)PendingHostMode;
                 MapIndex.Value = PendingHostMap;
                 SniperOnly.Value = PendingSniperOnly;
+                RadarMode.Value = PendingRadarMode;
                 ScoreTeam0.Value = 0;
                 ScoreTeam1.Value = 0;
                 WinnerTeam.Value = -1;

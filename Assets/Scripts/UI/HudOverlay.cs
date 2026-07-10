@@ -60,6 +60,12 @@ namespace FpsBase
                 leftNumber = new GUIStyle(bigNumber) { alignment = TextAnchor.MiddleLeft };
             }
 
+            // While the kill cam / replay owns the camera, the combat HUD would
+            // just float over someone else's view — draw nothing (NetworkGameHud
+            // still shows the KILLCAM label and kill feed).
+            if (DeathCam.CurrentLabel != null)
+                return;
+
             bool zoomed = weaponController != null && weaponController.IsZoomed
                 && weaponController.CurrentWeapon.hideWhenZoomed;
             if (zoomed)
@@ -70,6 +76,79 @@ namespace FpsBase
             DrawHitMarker();
             DrawAmmoPanel();
             DrawHealthPanel();
+            DrawRadar();
+        }
+
+        // ------------------------------------------------------------------
+        // Minimap radar (top-left): teammates always, enemies per host setting
+        // (always visible, or pinged for a few seconds when they fire).
+        // ------------------------------------------------------------------
+
+        private const float RadarSize = 150f;   // pixels
+        private const float RadarRange = 42f;   // meters covered edge to edge/2
+        private const float FirePingSeconds = 3f;
+
+        private NetworkPlayer[] radarPlayers = System.Array.Empty<NetworkPlayer>();
+        private NetworkPlayer radarSelf;
+        private float nextRadarScan;
+
+        private void DrawRadar()
+        {
+            var gameMode = GameModeManager.Instance;
+            if (gameMode == null || !gameMode.IsSpawned || gameMode.RadarMode.Value == 0)
+                return;
+            bool alwaysShow = gameMode.RadarMode.Value == 1;
+
+            // Throttled player scan (FindObjectsByType every frame is wasteful).
+            if (Time.time >= nextRadarScan)
+            {
+                nextRadarScan = Time.time + 0.5f;
+                radarPlayers = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+                radarSelf = GetComponent<NetworkPlayer>();
+            }
+            if (radarSelf == null)
+                return;
+
+            var rect = new Rect(16f, 16f, RadarSize, RadarSize);
+            Panel(rect);
+
+            // Rotate the world into radar space so "up" is where I'm looking.
+            float myYaw = transform.eulerAngles.y;
+            Vector3 myPos = transform.position;
+            Vector2 center = new Vector2(rect.x + RadarSize / 2f, rect.y + RadarSize / 2f);
+
+            foreach (var player in radarPlayers)
+            {
+                if (player == null || player == radarSelf || !player.IsSpawned || player.IsDead.Value)
+                    continue;
+
+                bool teammate = gameMode.IsTeamMode && player.Team.Value == radarSelf.Team.Value;
+                if (!teammate && !alwaysShow)
+                {
+                    // "On fire" mode: enemies only ping for a few seconds after shooting.
+                    var weapon = player.GetComponent<NetworkWeapon>();
+                    if (weapon == null || Time.time - weapon.LastShotTime > FirePingSeconds)
+                        continue;
+                }
+
+                Vector3 delta = player.transform.position - myPos;
+                var local = Quaternion.Euler(0f, -myYaw, 0f) * delta;
+                var blip = new Vector2(local.x, -local.z) * (RadarSize / 2f / RadarRange);
+                blip = Vector2.ClampMagnitude(blip, RadarSize / 2f - 6f);
+
+                GUI.color = teammate
+                    ? new Color(0.35f, 0.65f, 1f)
+                    : new Color(1f, 0.25f, 0.2f);
+                GUI.DrawTexture(new Rect(center.x + blip.x - 4f, center.y + blip.y - 4f, 8f, 8f), whiteTex);
+            }
+
+            // Me: white arrowhead in the center (always pointing up = my facing).
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(center.x - 3f, center.y - 5f, 6f, 10f), whiteTex);
+            GUI.color = new Color(1f, 1f, 1f, 0.25f);
+            GUI.DrawTexture(new Rect(center.x - RadarSize / 2f + 6f, center.y - 0.5f, RadarSize - 12f, 1f), whiteTex);
+            GUI.DrawTexture(new Rect(center.x - 0.5f, center.y - RadarSize / 2f + 6f, 1f, RadarSize - 12f), whiteTex);
+            GUI.color = Color.white;
         }
 
         private void Panel(Rect rect)
