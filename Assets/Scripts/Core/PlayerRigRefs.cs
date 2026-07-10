@@ -46,6 +46,8 @@ namespace FpsBase
         // Once an imported skin is applied, visibility/first-person target these
         // (the visible mesh) instead of the now-hidden primitive renderers.
         private Renderer[] characterRenderers;
+        /// <summary>Aim/hold/slide pose driver on the skin (null until a skin is applied).</summary>
+        [System.NonSerialized] public CharacterAimPose characterPose;
 
         private bool initialized;
 
@@ -108,6 +110,11 @@ namespace FpsBase
                     animator.runtimeAnimatorController = ctrl;
                 animator.applyRootMotion = false; // movement is driven by the controller, not the clip
                 instance.AddComponent<CharacterAnimatorDriver>().animator = animator;
+
+                // Hold the weapon + aim with the view pitch + slide lean.
+                characterPose = instance.AddComponent<CharacterAimPose>();
+                characterPose.rig = this;
+                characterPose.weaponAnchor = thirdPersonWeaponAnchor;
             }
 
             // Hide the primitive body meshes (their hitbox colliders remain).

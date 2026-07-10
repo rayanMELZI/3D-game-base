@@ -25,6 +25,9 @@ namespace FpsBase
         [Header("Recoil")]
         public float recoilRecoverySpeed = 8f;
 
+        /// <summary>Current view pitch in degrees (up = negative). Replicated for remote aim pose.</summary>
+        public float CurrentPitch => pitch;
+
         private float pitch;
         private float recoil;  // extra upward kick from shooting, recovers over time
         private float zoomFov; // 0 = not zoomed
