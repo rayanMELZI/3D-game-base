@@ -86,5 +86,7 @@ is the onboarding brief for AI assistants working on the repo.
 
 ## Docs
 
+- **`ROADMAP.md` — READ FIRST: the user's complete feature list + batch order.
+  Nothing on it may be dropped; only the user checks items off.**
 - `README.md` — setup, controls, maps, Steam setup, update shipping.
 - `docs/STEAM_DISTRIBUTION.md` — SteamPipe/depots/branches, Win+macOS builds.
