@@ -10,7 +10,9 @@ namespace FpsBase
     {
         /// <summary>Shown on the main menu — rename your game here.</summary>
         public const string GameTitle = "SUNDOWN ARENA";
-        public const string Version = "v4.0";
+        /// <summary>0.MINOR.PATCH — bump MINOR for features, PATCH for fixes.
+        /// Git tags follow the same number (v0.5.0 style).</summary>
+        public const string Version = "0.5.0";
 
         /// <summary>
         /// URL of a plain-text file containing the latest version string
@@ -25,6 +27,14 @@ namespace FpsBase
         public static float Volume;           // 0–1
         public static int QualityLevel;
 
+        // Weapon classes (CoD-style loadouts): 3 slots, each = primary +
+        // secondary weapon index into the default loadout; the knife is always
+        // carried. Applied on every (re)spawn; Gun Game / snipers-only override.
+        public const int ClassCount = 3;
+        public static int SelectedClass;
+        public static readonly int[] ClassPrimary = new int[ClassCount];
+        public static readonly int[] ClassSecondary = new int[ClassCount];
+
         static GameSettings()
         {
             PlayerName = PlayerPrefs.GetString("playerName", "Player" + Random.Range(100, 999));
@@ -34,6 +44,16 @@ namespace FpsBase
             QualityLevel = Mathf.Clamp(
                 PlayerPrefs.GetInt("quality", QualitySettings.GetQualityLevel()),
                 0, QualitySettings.names.Length - 1);
+
+            // Default classes: assault, close-quarters, long-range.
+            int[] defaultPrimary = { 4, 2, 5 };   // rifle, smg, sniper
+            int[] defaultSecondary = { 1, 3, 1 }; // pistol, shotgun, pistol
+            SelectedClass = Mathf.Clamp(PlayerPrefs.GetInt("selectedClass", 0), 0, ClassCount - 1);
+            for (int i = 0; i < ClassCount; i++)
+            {
+                ClassPrimary[i] = PlayerPrefs.GetInt($"class{i}Primary", defaultPrimary[i]);
+                ClassSecondary[i] = PlayerPrefs.GetInt($"class{i}Secondary", defaultSecondary[i]);
+            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -54,6 +74,12 @@ namespace FpsBase
             PlayerPrefs.SetFloat("fov", Fov);
             PlayerPrefs.SetFloat("volume", Volume);
             PlayerPrefs.SetInt("quality", QualityLevel);
+            PlayerPrefs.SetInt("selectedClass", SelectedClass);
+            for (int i = 0; i < ClassCount; i++)
+            {
+                PlayerPrefs.SetInt($"class{i}Primary", ClassPrimary[i]);
+                PlayerPrefs.SetInt($"class{i}Secondary", ClassSecondary[i]);
+            }
             PlayerPrefs.Save();
         }
     }

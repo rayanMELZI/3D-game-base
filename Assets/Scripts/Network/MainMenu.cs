@@ -17,7 +17,7 @@ namespace FpsBase
         public const ushort Port = 7777;
         private const float JoinTimeout = 10f;
 
-        private enum MenuScreen { Root, Play, Settings }
+        private enum MenuScreen { Root, Play, Settings, Classes }
 
         private MenuScreen screen = MenuScreen.Root;
         private string ipInput = "127.0.0.1";
@@ -25,8 +25,14 @@ namespace FpsBase
         private int selectedMap;
         private GameMode selectedMode = GameMode.TeamDeathmatch;
         private bool sniperOnly;
+        private int radarMode = 2; // 0 off, 1 always, 2 on fire
         private bool connecting;
         private float connectStart;
+
+        // Weapon names for the class builder (display only).
+        private static readonly WeaponDefinition[] LoadoutInfo = WeaponDefinition.CreateDefaultLoadout();
+        private static readonly int[] PrimaryOptions = { 2, 3, 4, 5, 6 };  // smg shotgun rifle sniper rpg
+        private static readonly int[] SecondaryOptions = { 1, 2, 3, 6 };   // pistol smg shotgun rpg
 
         private bool NetworkRunning =>
             NetworkManager.Singleton != null
@@ -128,7 +134,7 @@ namespace FpsBase
 
         private void DrawMainMenu()
         {
-            float w = 460f, h = screen == MenuScreen.Play ? 600f : 470f;
+            float w = 460f, h = screen == MenuScreen.Play ? 640f : 470f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -143,6 +149,7 @@ namespace FpsBase
                 case MenuScreen.Root: DrawRoot(); break;
                 case MenuScreen.Play: DrawPlay(); break;
                 case MenuScreen.Settings: DrawSettings(showBack: true); break;
+                case MenuScreen.Classes: DrawClasses(); break;
             }
 
             GUILayout.FlexibleSpace();
@@ -159,6 +166,9 @@ namespace FpsBase
 
             if (MenuWidgets.MenuButton("PLAY"))
                 screen = MenuScreen.Play;
+            GUILayout.Space(8);
+            if (MenuWidgets.MenuButton("CLASSES"))
+                screen = MenuScreen.Classes;
             GUILayout.Space(8);
             if (MenuWidgets.MenuButton("PRACTICE RANGE"))
                 SceneManager.LoadScene("Main");
@@ -197,6 +207,11 @@ namespace FpsBase
                 sniperOnly = !sniperOnly;
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
+            string radarLabel = radarMode == 0 ? "MINIMAP: OFF"
+                : radarMode == 1 ? "MINIMAP: ALWAYS ON" : "MINIMAP: PING ON FIRE";
+            if (MenuWidgets.MenuButton(radarLabel, 32f))
+                radarMode = (radarMode + 1) % 3;
+            GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             foreach (var mode in new[] { GameMode.Duel, GameMode.TeamDeathmatch, GameMode.FreeForAll, GameMode.GunGame })
             {
@@ -229,7 +244,12 @@ namespace FpsBase
             GUILayout.Label("STEAM", MenuWidgets.Subtitle);
 #if FPSBASE_STEAM
             if (MenuWidgets.MenuButton("HOST STEAM GAME (friends can join via overlay)"))
-                SteamLobbyService.HostLobby(selectedMode, selectedMap, sniperOnly);
+            {
+                GameModeManager.PendingRadarMode = radarMode;
+                if (!SteamLobbyService.HostLobby(selectedMode, selectedMap, sniperOnly))
+                    status = "Steam not ready: check Steam is running, steam_appid.txt exists, and " +
+                             "SteamManager + SteamNetworkingSocketsTransport are on the NetworkManager.";
+            }
             GUILayout.Label("Friends: right-click you in the Steam friends list → Join Game.", MenuWidgets.Small);
 #else
             GUILayout.Label("Not enabled — install Steamworks + the Steam transport and add the\nFPSBASE_STEAM define. Full steps in the README.", MenuWidgets.Small);
@@ -244,6 +264,53 @@ namespace FpsBase
             GUILayout.Space(8);
             if (MenuWidgets.MenuButton("BACK", 32f))
                 screen = MenuScreen.Root;
+        }
+
+        /// <summary>
+        /// CoD-style class builder: 3 classes, each = primary + secondary (the
+        /// knife always rides along). The selected class is what you spawn with;
+        /// keys 1/2/3 in-game = knife / secondary / primary.
+        /// </summary>
+        private void DrawClasses()
+        {
+            GUILayout.Label("Pick a class to spawn with — click the weapons to change them.", MenuWidgets.Label);
+            GUILayout.Space(6);
+
+            for (int i = 0; i < GameSettings.ClassCount; i++)
+            {
+                GUILayout.BeginHorizontal();
+
+                var prev = GUI.backgroundColor;
+                if (GameSettings.SelectedClass == i)
+                    GUI.backgroundColor = MenuWidgets.Accent;
+                if (MenuWidgets.MenuButton($"CLASS {i + 1}", 34f))
+                    GameSettings.SelectedClass = i;
+                GUI.backgroundColor = prev;
+
+                if (MenuWidgets.MenuButton(LoadoutInfo[GameSettings.ClassPrimary[i]].displayName, 34f))
+                    GameSettings.ClassPrimary[i] = NextOption(PrimaryOptions, GameSettings.ClassPrimary[i]);
+                if (MenuWidgets.MenuButton(LoadoutInfo[GameSettings.ClassSecondary[i]].displayName, 34f))
+                    GameSettings.ClassSecondary[i] = NextOption(SecondaryOptions, GameSettings.ClassSecondary[i]);
+
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
+            }
+
+            GUILayout.Label("primary · secondary — the knife is always with you (1 = knife, 2 = secondary, 3 = primary)",
+                MenuWidgets.Small);
+
+            GUILayout.Space(10);
+            if (MenuWidgets.MenuButton("BACK", 32f))
+            {
+                GameSettings.Save();
+                screen = MenuScreen.Root;
+            }
+        }
+
+        private static int NextOption(int[] options, int current)
+        {
+            int at = System.Array.IndexOf(options, current);
+            return options[(at + 1) % options.Length];
         }
 
         private void DrawSettings(bool showBack)
@@ -331,6 +398,7 @@ namespace FpsBase
             GameModeManager.PendingHostMode = selectedMode;
             GameModeManager.PendingHostMap = selectedMap;
             GameModeManager.PendingSniperOnly = sniperOnly;
+            GameModeManager.PendingRadarMode = radarMode;
             ConfigureTransport("127.0.0.1");
 
             nm.NetworkConfig.ConnectionApproval = true;

@@ -32,7 +32,9 @@ namespace FpsBase
 
             Title = new GUIStyle(GUI.skin.label)
             {
-                fontSize = 44, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+                fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+                clipping = TextClipping.Overflow, // never crop the game title
+                wordWrap = false,
             };
             Title.normal.textColor = Accent;
 
