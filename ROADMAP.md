@@ -64,12 +64,10 @@ check items off (move to Shipped) only when the user confirms they work.
 
 ## Shipped (0.5.0) — pending user confirmation in multiplayer
 
-Killcam replay (skippable) · radar minimap (host toggle) · classes menu ·
-IK weapon-hold + aim pitch + slide lean replication · spawn protection 3s ·
-knife one-shot · click-speed pistol · Nuketown = editable custom prefab with
+Killcam replay (skippable) · classes menu ·
+IK weapon-hold + aim pitch + slide lean replication · spawn protection 3s · click-speed pistol · Nuketown = editable custom prefab with
 injected spawn markers · Steam fixes (own SteamManager, transport switch,
-visible errors) · death-display cleanup · title crop fix · version scheme
-0.X.X with matching git tags.
+visible errors) · death-display cleanup.
 
 ## Implemented in 0.6.0–0.11.0 — awaiting Rayan's multiplayer confirmation
 
