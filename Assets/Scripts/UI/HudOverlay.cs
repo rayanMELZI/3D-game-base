@@ -10,6 +10,7 @@ namespace FpsBase
     /// </summary>
     public class HudOverlay : MonoBehaviour
     {
+        public static HudOverlay Local { get; private set; }
         public WeaponController weaponController;
 
         /// <summary>Health readout (offline Health or multiplayer NetworkHealth). Set from code.</summary>
@@ -25,10 +26,50 @@ namespace FpsBase
         private float lastHitTime = -10f;
         private bool lastHitWasHeadshot;
         private bool subscribed;
+        private float damageIndicatorUntil;
+        private float damageAngle;
+        private float lastHealth = -1f;
+        private float breathingUntil;
+        private AudioSource breathingSource;
+        private float flashUntil;
+        private float flashStrength;
 
         private void Awake()
         {
+            Local = this;
             whiteTex = Texture2D.whiteTexture;
+        }
+
+        private void OnDestroy()
+        {
+            if (Local == this) Local = null;
+        }
+
+        public void NotifyDamage(Vector3 sourcePosition)
+        {
+            Vector3 direction = sourcePosition - transform.position;
+            direction.y = 0f;
+            damageAngle = Vector3.SignedAngle(transform.forward, direction, Vector3.up);
+            damageIndicatorUntil = Time.time + 1.15f;
+            breathingUntil = Time.time + 5f;
+            EnsureBreathing();
+        }
+
+        public void NotifyFlash(float strength)
+        {
+            flashStrength = Mathf.Max(flashStrength, strength);
+            flashUntil = Time.time + 2.8f * strength;
+        }
+
+        private void EnsureBreathing()
+        {
+            if (breathingSource != null) return;
+            breathingSource = gameObject.AddComponent<AudioSource>();
+            breathingSource.clip = SfxSynth.HeavyBreathing();
+            breathingSource.loop = true;
+            breathingSource.spatialBlend = 0f;
+            breathingSource.volume = 0f;
+            breathingSource.Play();
         }
 
         private void Update()
@@ -41,6 +82,21 @@ namespace FpsBase
                     lastHitWasHeadshot = headshot;
                 };
                 subscribed = true;
+            }
+            if (HealthSource != null)
+            {
+                float hp = HealthSource.CurrentHealth;
+                if (lastHealth >= 0f && hp < lastHealth)
+                {
+                    breathingUntil = Time.time + 5f;
+                    EnsureBreathing();
+                }
+                lastHealth = hp;
+                if (breathingSource != null)
+                {
+                    float low = hp < HealthSource.MaxHealth * 0.35f && Time.time < breathingUntil ? 1f : 0f;
+                    breathingSource.volume = Mathf.MoveTowards(breathingSource.volume, low * 0.42f, Time.deltaTime * 0.8f);
+                }
             }
         }
 
@@ -74,9 +130,30 @@ namespace FpsBase
                 DrawCrosshair();
 
             DrawHitMarker();
+            DrawDamageDirection();
             DrawAmmoPanel();
             DrawHealthPanel();
             DrawRadar();
+            if (Time.time < flashUntil)
+            {
+                GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01((flashUntil - Time.time) * flashStrength));
+                GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), whiteTex);
+                GUI.color = Color.white;
+            }
+        }
+
+        private void DrawDamageDirection()
+        {
+            if (Time.time >= damageIndicatorUntil) return;
+            float alpha = Mathf.Clamp01((damageIndicatorUntil - Time.time) / 0.45f);
+            Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            var old = GUI.matrix;
+            GUIUtility.RotateAroundPivot(damageAngle, center);
+            GUI.color = new Color(1f, 0.12f, 0.08f, alpha);
+            GUI.DrawTexture(new Rect(center.x - 28f, center.y - 170f, 56f, 7f), whiteTex);
+            GUI.DrawTexture(new Rect(center.x - 16f, center.y - 163f, 32f, 4f), whiteTex);
+            GUI.matrix = old;
+            GUI.color = Color.white;
         }
 
         // ------------------------------------------------------------------
@@ -103,7 +180,7 @@ namespace FpsBase
             if (Time.time >= nextRadarScan)
             {
                 nextRadarScan = Time.time + 0.5f;
-                radarPlayers = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+                radarPlayers = FindObjectsByType<NetworkPlayer>();
                 radarSelf = GetComponent<NetworkPlayer>();
             }
             if (radarSelf == null)
@@ -241,7 +318,7 @@ namespace FpsBase
                     ? new Color(1f, 0.35f, 0.3f) : Color.white);
             GUI.Label(new Rect(panel.x + 100, panel.y + 18, 130, 50), ammoText, bigNumber);
             if (weapon.magazineSize > 0)
-                GUI.Label(new Rect(panel.x + 236, panel.y + 40, 70, 26), $"/ {weapon.magazineSize}", mediumText);
+                GUI.Label(new Rect(panel.x + 236, panel.y + 40, 70, 26), $"/ {weaponController.CurrentMagSize}", mediumText);
 
             // Reload progress bar.
             if (weaponController.IsReloading)

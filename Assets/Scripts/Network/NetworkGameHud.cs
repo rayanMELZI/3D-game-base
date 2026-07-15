@@ -31,7 +31,7 @@ namespace FpsBase
         {
             if (Time.unscaledTime >= nextPlayerRefresh || cachedPlayers.Length == 0)
             {
-                cachedPlayers = FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None);
+                cachedPlayers = FindObjectsByType<NetworkPlayer>();
                 nextPlayerRefresh = Time.unscaledTime + 0.4f;
             }
             return cachedPlayers;
@@ -42,6 +42,8 @@ namespace FpsBase
             var gameMode = GameModeManager.Instance;
             if (gameMode == null || !gameMode.IsSpawned)
                 return;
+            if (gameMode.LobbyOpen.Value)
+                MouseLook.LockCursor(false);
 
             // Win jingle + final kill cam (BO2 style: everyone watches the last killer).
             int winner = gameMode.WinnerTeam.Value;
@@ -72,11 +74,43 @@ namespace FpsBase
                 return;
 
             EnsureStyles();
+            if (gameMode.LobbyOpen.Value)
+            {
+                DrawLobby(nm, gameMode);
+                return;
+            }
             DrawScores(gameMode);
             DrawKillFeed(gameMode);
             if (Input.GetKey(KeyCode.Tab))
                 DrawScoreboard(gameMode);
             DrawBanners(nm, gameMode);
+        }
+
+        private void DrawLobby(NetworkManager nm, GameModeManager gameMode)
+        {
+            float w = 620f, h = 360f;
+            var panel = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h);
+            GUI.color = new Color(0f, 0f, 0f, 0.88f);
+            GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            bannerStyle.normal.textColor = MenuWidgets.Accent;
+            GUI.Label(new Rect(panel.x, panel.y + 20, w, 55), "PRE-GAME LOBBY", bannerStyle);
+            subStyle.normal.textColor = Color.white;
+            GUI.Label(new Rect(panel.x + 30, panel.y + 88, w - 60, 28), ModeTitle(gameMode), subStyle);
+            GUI.Label(new Rect(panel.x + 30, panel.y + 122, w - 60, 28),
+                $"{Players().Length} player(s)  ·  level {GameSettings.Level}  ·  classes and attachments are ready", subStyle);
+
+            if (nm.IsHost)
+            {
+                if (GUI.Button(new Rect(panel.x + 60, panel.y + 175, 150, 38), "PREV MAP")) gameMode.HostCycleMap(-1);
+                if (GUI.Button(new Rect(panel.x + 235, panel.y + 175, 150, 38), "CHANGE MODE")) gameMode.HostCycleMode();
+                if (GUI.Button(new Rect(panel.x + 410, panel.y + 175, 150, 38), "NEXT MAP")) gameMode.HostCycleMap(1);
+                if (GUI.Button(new Rect(panel.x + 60, panel.y + 230, 190, 42),
+                    gameMode.BotsEnabled.Value ? "BOTS: ON" : "BOTS: OFF")) gameMode.HostToggleBots();
+                if (GUI.Button(new Rect(panel.x + 275, panel.y + 230, 285, 52), "START MATCH")) gameMode.HostStartMatch();
+            }
+            else
+                GUI.Label(new Rect(panel.x + 30, panel.y + 205, w - 60, 40), "Waiting for the host…", subStyle);
         }
 
         private void EnsureStyles()
@@ -112,6 +146,7 @@ namespace FpsBase
                 case GameMode.Duel: return $"1V1 DUEL · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.TeamDeathmatch: return $"TEAM DEATHMATCH · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.FreeForAll: return $"FREE-FOR-ALL · first to {gameMode.ScoreLimit} · {map}{sniper}";
+                case GameMode.ZombieSurvival: return $"ZOMBIE SURVIVAL · {map}";
                 default: return $"GUN GAME · {GameModeManager.GunGameOrder.Length} weapons · {map}{sniper}";
             }
         }
@@ -196,8 +231,7 @@ namespace FpsBase
             headerStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
             GUI.Label(new Rect(panel.x + 20, panel.y + 12, w - 40, 20), ModeTitle(gameMode), headerStyle);
             GUI.Label(new Rect(panel.x + 20, panel.y + 40, 300, 20), "PLAYER", headerStyle);
-            GUI.Label(new Rect(panel.x + w - 170, panel.y + 40, 60, 20),
-                gameMode.CurrentMode == GameMode.GunGame ? "LVL" : "", headerStyle);
+            GUI.Label(new Rect(panel.x + w - 170, panel.y + 40, 60, 20), "LVL", headerStyle);
             GUI.Label(new Rect(panel.x + w - 110, panel.y + 40, 40, 20), "K", headerStyle);
             GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 40, 20), "D", headerStyle);
 
@@ -215,8 +249,7 @@ namespace FpsBase
                 if (player.IsDead.Value)
                     name += "  (dead)";
                 GUI.Label(new Rect(panel.x + 42, y, 300, 24), name, rowStyle);
-                if (gameMode.CurrentMode == GameMode.GunGame)
-                    GUI.Label(new Rect(panel.x + w - 170, y, 60, 24), (player.GunGameLevel.Value + 1).ToString(), rowStyle);
+                GUI.Label(new Rect(panel.x + w - 170, y, 60, 24), player.CareerLevel.Value.ToString(), rowStyle);
                 GUI.Label(new Rect(panel.x + w - 110, y, 40, 24), player.Kills.Value.ToString(), rowStyle);
                 GUI.Label(new Rect(panel.x + w - 60, y, 40, 24), player.Deaths.Value.ToString(), rowStyle);
                 y += 30f;

@@ -14,6 +14,13 @@ namespace FpsBase
         public NetworkVariable<int> WeaponIndex = new NetworkVariable<int>(
             WeaponDefinition.DefaultIndex, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        /// <summary>Add-on bitmask of the currently held weapon, so others see it and a
+        /// suppressor keeps you off their radar. See AttachmentType.</summary>
+        public NetworkVariable<int> AttachmentMask = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public NetworkVariable<int> ColorIndex = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
         /// <summary>Time.time of this player's last shot on THIS client (radar "on fire" mode).</summary>
         public float LastShotTime { get; private set; } = -999f;
 
@@ -30,6 +37,8 @@ namespace FpsBase
         public override void OnNetworkSpawn()
         {
             WeaponIndex.OnValueChanged += OnWeaponChanged;
+            AttachmentMask.OnValueChanged += OnWeaponChanged;
+            ColorIndex.OnValueChanged += OnWeaponChanged;
             RebuildThirdPersonModel();
 
             if (IsOwner)
@@ -39,15 +48,28 @@ namespace FpsBase
         public override void OnNetworkDespawn()
         {
             WeaponIndex.OnValueChanged -= OnWeaponChanged;
+            AttachmentMask.OnValueChanged -= OnWeaponChanged;
+            ColorIndex.OnValueChanged -= OnWeaponChanged;
             if (IsOwner && rig.weaponController != null)
                 rig.weaponController.ShotFired -= OnLocalShotFired;
         }
 
         private void Update()
         {
-            // Owner publishes its current weapon selection.
-            if (IsSpawned && IsOwner && WeaponIndex.Value != rig.weaponController.CurrentIndex)
-                WeaponIndex.Value = rig.weaponController.CurrentIndex;
+            // Owner publishes its current weapon selection and that weapon's add-ons.
+            if (IsSpawned && IsOwner)
+            {
+                int index = rig.weaponController.CurrentIndex;
+                if (WeaponIndex.Value != index)
+                    WeaponIndex.Value = index;
+
+                int mask = index >= 0 && index < GameSettings.WeaponAttachments.Length
+                    ? GameSettings.WeaponAttachments[index] : 0;
+                if (AttachmentMask.Value != mask)
+                    AttachmentMask.Value = mask;
+                int color = index >= 0 && index < GameSettings.WeaponColors.Length ? GameSettings.WeaponColors[index] : 0;
+                if (ColorIndex.Value != color) ColorIndex.Value = color;
+            }
         }
 
         // ------------------------------------------------------------------
@@ -70,7 +92,7 @@ namespace FpsBase
             var weapons = rig.weaponController.weapons;
             int index = Mathf.Clamp(WeaponIndex.Value, 0, weapons.Length - 1);
             thirdPersonModel = WeaponModelBuilder.Build(
-                weapons[index], rig.thirdPersonWeaponAnchor, Vector3.zero, castShadows: true);
+                weapons[index], rig.thirdPersonWeaponAnchor, Vector3.zero, castShadows: true, AttachmentMask.Value, ColorIndex.Value);
             hasThirdPersonModel = true;
             thirdPersonModel.root.SetActive(visible);
         }
@@ -103,7 +125,9 @@ namespace FpsBase
         [ClientRpc]
         private void FireClientRpc(Vector3 endPoint)
         {
-            LastShotTime = Time.time; // radar ping on every client
+            // Radar ping on every client — unless a suppressor keeps you hidden.
+            if (!Attachments.SuppressesRadar(AttachmentMask.Value))
+                LastShotTime = Time.time;
 
             if (IsOwner)
                 return; // the owner already played its local effects
@@ -119,8 +143,9 @@ namespace FpsBase
             if (!weapon.isMelee)
                 WeaponController.SpawnTracerLine(from, endPoint);
 
-            // Positional gunshot so you can hear where enemies are firing from.
-            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), from, 0.8f);
+            // Positional gunshot so you can hear where enemies are firing from
+            // (a suppressor makes their shots much quieter).
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), from, 0.8f * Attachments.ShotVolumeMultiplier(AttachmentMask.Value));
 
             // Remote rocket: explosion at the predicted impact after the flight time.
             if (weapon.isProjectile)

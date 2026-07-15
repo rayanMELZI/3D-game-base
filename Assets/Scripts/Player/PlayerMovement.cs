@@ -29,6 +29,9 @@ namespace FpsBase
         public float crouchHeight = 1.05f;
         public float standEyeHeight = 1.62f;
         public float crouchEyeHeight = 1.12f;
+        public float proneHeight = 0.55f;
+        public float proneEyeHeight = 0.58f;
+        public float proneSpeed = 1.45f;
 
         [Header("References (wired by PlayerFactory)")]
         public Transform cameraTransform;
@@ -41,6 +44,7 @@ namespace FpsBase
         public bool IsSprinting { get; private set; }
         public bool IsCrouching { get; private set; }
         public bool IsSliding => slideTimer > 0f;
+        public bool IsProne { get; private set; }
         /// <summary>0 = standing, 1 = fully crouched — also drives the body squash.</summary>
         public float CrouchBlend { get; private set; }
         /// <summary>0..1 while sliding, for camera roll.</summary>
@@ -50,6 +54,7 @@ namespace FpsBase
         private float verticalVelocity;
         private float slideTimer;
         private Vector3 slideDirection;
+        private bool proneToggle;
 
         private void Awake()
         {
@@ -67,12 +72,18 @@ namespace FpsBase
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
-            bool wantCrouch = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
-            IsSprinting = Input.GetKey(KeyCode.LeftShift) && moving && !wantCrouch && !IsSliding;
+            if (Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.JoystickButton8))
+                proneToggle = !proneToggle;
+            if (Input.GetButtonDown("Jump")) proneToggle = false;
+            IsProne = proneToggle;
+            bool wantCrouch = !IsProne && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C)
+                || Input.GetKey(KeyCode.JoystickButton1));
+            IsSprinting = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9))
+                && moving && !wantCrouch && !IsProne && !IsSliding;
 
             // --- Slide: press crouch while sprinting on the ground ---
             if (grounded && slideTimer <= 0f
-                && Input.GetKey(KeyCode.LeftShift) && moving
+                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9)) && moving
                 && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C)))
             {
                 slideTimer = slideDuration;
@@ -86,7 +97,7 @@ namespace FpsBase
             }
             SlideBlend = Mathf.Clamp01(slideTimer / (slideDuration * 0.5f));
 
-            IsCrouching = wantCrouch || IsSliding;
+            IsCrouching = wantCrouch || IsSliding || IsProne;
 
             // --- Speed ---
             float speed;
@@ -100,22 +111,23 @@ namespace FpsBase
             }
             else
             {
-                speed = IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed);
+                speed = IsProne ? proneSpeed : (IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed));
                 horizontal = moveDirection * speed;
             }
 
             // --- Crouch dimensions (controller + camera + visual squash) ---
             CrouchBlend = Mathf.MoveTowards(CrouchBlend, IsCrouching ? 1f : 0f, 8f * Time.deltaTime);
-            float height = Mathf.Lerp(standHeight, crouchHeight, CrouchBlend);
+            float targetHeight = IsProne ? proneHeight : crouchHeight;
+            float height = Mathf.Lerp(standHeight, targetHeight, CrouchBlend);
             controller.height = height;
             controller.center = new Vector3(0, height / 2f, 0);
             if (cameraTransform != null)
             {
                 var camPos = cameraTransform.localPosition;
-                camPos.y = Mathf.Lerp(standEyeHeight, crouchEyeHeight, CrouchBlend);
+                camPos.y = Mathf.Lerp(standEyeHeight, IsProne ? proneEyeHeight : crouchEyeHeight, CrouchBlend);
                 cameraTransform.localPosition = camPos;
             }
-            ApplyCrouchVisual(bodyVisual, CrouchBlend);
+            ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
 
             // --- Jump (hold Space to bunny hop) + gravity ---
             if (grounded && verticalVelocity < 0f)
@@ -136,10 +148,13 @@ namespace FpsBase
         }
 
         /// <summary>Squash the visual body when crouching (also used for remote players).</summary>
-        public static void ApplyCrouchVisual(Transform body, float blend)
+        public static void ApplyCrouchVisual(Transform body, float blend, bool prone = false)
         {
             if (body != null)
-                body.localScale = new Vector3(1f, Mathf.Lerp(1f, 0.68f, blend), 1f);
+            {
+                body.localScale = new Vector3(1f, Mathf.Lerp(1f, prone ? 0.38f : 0.68f, blend), 1f);
+                body.localRotation = Quaternion.Euler(Mathf.Lerp(0f, prone ? 78f : 0f, blend), 0f, 0f);
+            }
         }
 
         public void Respawn()

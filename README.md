@@ -10,14 +10,14 @@ from code. Rename the game in `GameSettings.GameTitle`.
 ## Features
 
 - **Modes:** 1v1 Duel · Team Deathmatch · Free-For-All · **Gun Game** (race
-  through all 7 weapons, knife kill wins) — plus a **Snipers Only** toggle for
-  any mode
+  through all 9 weapons, knife kill wins) — plus a **Snipers Only** toggle for
+  any mode · **Zombie Survival** with escalating waves on Nightfall
 - **Maps:** Arena · **Nuketown-style** (two houses, street, bus) ·
   **Backrooms** (yellow maze, humming light panels) — picked when hosting,
   synced to everyone
-- **Weapons (1–7):** Knife · Pistol · SMG · Shotgun (8 pellets) · Rifle ·
+- **Weapons (1–9):** Knife · Pistol · SMG · Shotgun (8 pellets) · Rifle ·
   Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
-  jumps) — **aim-down-sights on right-click** for all, one-shot **headshots**,
+  jumps) · LMG · grenade launcher — **aim-down-sights on right-click** for all, one-shot **headshots**,
   reload animation + bar, fresh ammo every respawn
 - **Movement:** sprint, crouch (Ctrl), **slide** (sprint+Ctrl), **bunny hop**
   (hold Space), synced to other players
@@ -48,6 +48,8 @@ from code. Rename the game in `GameSettings.GameTitle`.
 | Left Mouse / Right Mouse | Shoot / aim (sniper scopes) |
 | 1–7 or scroll | Weapons |
 | R | Reload |
+| G / F / V / X | Grenade / flashbang / sticky bomb / throwing knife |
+| Z | Toggle prone/crawl |
 | Tab (hold) | Scoreboard |
 | Escape | Pause (resume · switch team · settings · leave) |
 

@@ -12,6 +12,8 @@ namespace FpsBase
         Rifle,
         Sniper,
         Rpg,
+        Lmg,
+        GrenadeLauncher,
     }
 
     /// <summary>
@@ -138,6 +140,21 @@ namespace FpsBase
                     zoomFov = 50f,
                     viewOffset = new Vector3(0.3f, -0.26f, 0.4f),
                     adsOffset = new Vector3(0f, -0.2f, 0.42f),
+                },
+                new WeaponDefinition
+                {
+                    displayName = "LMG", model = WeaponModelType.Lmg,
+                    damage = 19f, fireRate = 10.5f, range = 230f, magazineSize = 75,
+                    reloadTime = 4.2f, automatic = true, recoil = 0.82f, zoomFov = 48f,
+                    viewOffset = new Vector3(0.29f, -0.27f, 0.44f), adsOffset = new Vector3(0f, -0.18f, 0.48f),
+                },
+                new WeaponDefinition
+                {
+                    displayName = "GRENADE LAUNCHER", model = WeaponModelType.GrenadeLauncher,
+                    damage = 95f, fireRate = 0.75f, range = 180f, magazineSize = 1,
+                    reloadTime = 2.8f, automatic = false, recoil = 2.1f, zoomFov = 50f,
+                    isProjectile = true, explosionRadius = 3.8f, projectileSpeed = 20f,
+                    viewOffset = new Vector3(0.28f, -0.25f, 0.42f), adsOffset = new Vector3(0f, -0.18f, 0.45f),
                 },
             };
         }

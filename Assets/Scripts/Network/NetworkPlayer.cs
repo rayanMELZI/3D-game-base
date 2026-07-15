@@ -25,6 +25,10 @@ namespace FpsBase
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> GunGameLevel = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<int> KillStreak = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<int> CareerLevel = new NetworkVariable<int>(
+            1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public NetworkVariable<FixedString64Bytes> PlayerName = new NetworkVariable<FixedString64Bytes>(
             default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public NetworkVariable<bool> Crouched = new NetworkVariable<bool>(
@@ -34,6 +38,10 @@ namespace FpsBase
             0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public NetworkVariable<bool> Sliding = new NetworkVariable<bool>(
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public NetworkVariable<bool> Prone = new NetworkVariable<bool>(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public NetworkVariable<bool> Spectating = new NetworkVariable<bool>(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public float respawnDelay = 3f;
 
@@ -53,6 +61,12 @@ namespace FpsBase
             networkWeapon = GetComponent<NetworkWeapon>();
             netTransform = GetComponent<NetworkTransform>();
             characterController = GetComponent<CharacterController>();
+            if (GetComponent<ThrowableController>() == null)
+            {
+                var throwables = gameObject.AddComponent<ThrowableController>();
+                throwables.viewCamera = rig.playerCamera;
+                throwables.ownerRoot = transform;
+            }
 
             // Everything input/camera related stays off until we know the owner.
             rig.movement.enabled = false;
@@ -88,6 +102,7 @@ namespace FpsBase
             if (IsOwner)
             {
                 PlayerName.Value = GameSettings.PlayerName;
+                CareerLevel.Value = GameSettings.Level;
                 rig.cameraObject.SetActive(true);
                 rig.movement.enabled = true;
                 rig.weaponController.enabled = true;
@@ -129,7 +144,7 @@ namespace FpsBase
             {
                 // Replicate the crouch squash on remote players.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
-                PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend);
+                PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);
 
                 // Feed replicated aim pitch + slide into the body pose.
                 if (rig.characterPose != null)
@@ -146,6 +161,8 @@ namespace FpsBase
                 Crouched.Value = rig.movement.IsCrouching;
             if (Sliding.Value != rig.movement.IsSliding)
                 Sliding.Value = rig.movement.IsSliding;
+            if (Prone.Value != rig.movement.IsProne)
+                Prone.Value = rig.movement.IsProne;
             float pitch = rig.mouseLook != null ? rig.mouseLook.CurrentPitch : 0f;
             if (Mathf.Abs(Pitch.Value - pitch) > 0.5f)
                 Pitch.Value = pitch;
@@ -154,7 +171,7 @@ namespace FpsBase
 
             // Freeze input while dead, between matches, or during a respawn teleport
             // (the respawn coroutine holds control until the map is built locally).
-            bool canPlay = !IsDead.Value && !respawning && (gameMode == null || gameMode.IsMatchActive);
+            bool canPlay = !Spectating.Value && !IsDead.Value && !respawning && (gameMode == null || gameMode.IsMatchActive);
             if (rig.movement.enabled != canPlay)
                 rig.movement.enabled = canPlay;
             if (rig.weaponController.enabled != canPlay)
@@ -246,6 +263,26 @@ namespace FpsBase
         /// <summary>Called from the pause menu (team modes only; server validates balance).</summary>
         public void RequestTeamChange() => ChangeTeamServerRpc();
 
+        public void RequestSpectatorToggle() => SpectatorServerRpc(!Spectating.Value);
+
+        [ServerRpc]
+        private void SpectatorServerRpc(bool spectate)
+        {
+            Spectating.Value = spectate;
+            if (spectate) IsDead.Value = true;
+            else ServerRespawn();
+        }
+
+        [ClientRpc]
+        public void AwardXpClientRpc(int amount, bool playStreakSound, int streak,
+            ClientRpcParams rpcParams = default)
+        {
+            if (!IsOwner) return;
+            GameSettings.AwardExperience(amount);
+            CareerLevel.Value = GameSettings.Level;
+            if (playStreakSound) SfxSynth.Play2D(SfxSynth.Killstreak(streak), 0.9f);
+        }
+
         [ServerRpc]
         private void ChangeTeamServerRpc()
         {
@@ -275,14 +312,14 @@ namespace FpsBase
         }
 
         /// <summary>Called by NetworkHealth on the server when HP hits zero.</summary>
-        public void ServerDie(ulong attackerId, bool headshot)
+        public void ServerDie(ulong attackerId, bool headshot, bool noScope = false)
         {
             if (!IsServer || IsDead.Value)
                 return;
 
             IsDead.Value = true;
             if (GameModeManager.Instance != null)
-                GameModeManager.Instance.ReportKill(attackerId, OwnerClientId, headshot);
+                GameModeManager.Instance.ReportKill(attackerId, OwnerClientId, headshot, noScope);
 
             DeathCamClientRpc(attackerId, new ClientRpcParams
             {
@@ -297,7 +334,7 @@ namespace FpsBase
             if (killerId == OwnerClientId)
                 return; // no cam for suicides
 
-            foreach (var player in FindObjectsByType<NetworkPlayer>(FindObjectsSortMode.None))
+            foreach (var player in FindObjectsByType<NetworkPlayer>())
             {
                 if (player.OwnerClientId == killerId)
                 {

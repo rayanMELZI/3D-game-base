@@ -123,6 +123,20 @@ namespace FpsBase
                 Mathf.Sin(Tau * (110f - 120f * t) * t) * Mathf.Exp(-t * 7f) * 0.75f
                 + Noise() * Mathf.Exp(-t * 22f) * 0.4f);
 
+        public static AudioClip HeavyBreathing() =>
+            Make("heavy_breathing", 2.4f, t =>
+            {
+                float cycle = t % 1.2f;
+                float envelope = Mathf.Sin(Mathf.Clamp01(cycle / 0.75f) * Mathf.PI);
+                return Noise() * envelope * 0.18f + Mathf.Sin(Tau * 95f * t) * envelope * 0.035f;
+            });
+
+        public static AudioClip Killstreak(int milestone) =>
+            Make("streak_" + milestone, 0.8f, t =>
+                (Mathf.Sin(Tau * (360f + milestone * 7f) * t)
+                 + 0.55f * Mathf.Sin(Tau * (540f + milestone * 9f) * t))
+                * Mathf.Exp(-t * 3.8f) * 0.32f);
+
         public static AudioClip UiClick() =>
             Make("click", 0.06f, t => Mathf.Sin(Tau * 900f * t) * Mathf.Exp(-t * 90f) * 0.4f);
 

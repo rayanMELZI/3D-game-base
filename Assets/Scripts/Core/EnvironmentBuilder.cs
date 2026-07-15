@@ -246,6 +246,41 @@ namespace FpsBase
             SpawnStrips(root, half - 2f, 8f);
         }
 
+        public static void BuildThemeArena(string theme, Color baseColor, Color accentColor, bool dark)
+        {
+            var root = new GameObject(MapRootName).transform;
+            Ground(root, 58f, 58f, baseColor * 0.75f, baseColor);
+            var wall = SharedMaterial(baseColor, theme == "FlyingPlane" ? 0.75f : 0.05f, 0.42f);
+            var accent = SharedMaterial(accentColor, 0.15f, 0.55f, dark ? 2.2f : 0.25f);
+            PerimeterWalls(root, 29f, 29f, theme == "FlyingPlane" ? 5f : 4f, wall);
+            SpawnStrips(root, 24f, 18f);
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                Box(root, theme + "Base", new Vector3(-12f, 1.5f, side * 17f), Vector3.zero, new Vector3(10f, 3f, 7f), wall);
+                Box(root, theme + "Base", new Vector3(12f, 1.5f, side * 17f), Vector3.zero, new Vector3(10f, 3f, 7f), wall);
+                Box(root, "Accent", new Vector3(0f, 1f, side * 11f), new Vector3(0, side * 18f, 0), new Vector3(8f, 2f, 1f), accent);
+            }
+            Box(root, theme == "Western" ? "Saloon" : theme == "Underwater" ? "ResearchDome" : theme == "FlyingPlane" ? "CargoBay" : "RuinedChapel",
+                new Vector3(0f, 2f, 0f), Vector3.zero, new Vector3(12f, 4f, 9f), wall);
+            for (int i = -2; i <= 2; i++)
+                Box(root, "Cover", new Vector3(i * 8f, 0.85f, (i % 2) * 8f), new Vector3(0, i * 13f, 0), new Vector3(3f, 1.7f, 2f), accent);
+
+            if (dark)
+            {
+                RenderSettings.ambientLight = new Color(0.025f, 0.025f, 0.04f);
+                RenderSettings.fog = true;
+                RenderSettings.fogColor = new Color(0.015f, 0.015f, 0.025f);
+                RenderSettings.fogDensity = 0.025f;
+            }
+            else if (theme == "Underwater")
+            {
+                RenderSettings.fog = true;
+                RenderSettings.fogColor = new Color(0.02f, 0.2f, 0.25f);
+                RenderSettings.fogDensity = 0.018f;
+            }
+        }
+
         // ------------------------------------------------------------------
         // Built-in map: Nuketown 2025 — low-poly homage to the BO2 layout.
         // Real map: ~3,000 m² playable, two 2-story houses facing a central

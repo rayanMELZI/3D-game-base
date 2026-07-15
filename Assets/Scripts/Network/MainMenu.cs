@@ -31,8 +31,12 @@ namespace FpsBase
 
         // Weapon names for the class builder (display only).
         private static readonly WeaponDefinition[] LoadoutInfo = WeaponDefinition.CreateDefaultLoadout();
-        private static readonly int[] PrimaryOptions = { 2, 3, 4, 5, 6 };  // smg shotgun rifle sniper rpg
-        private static readonly int[] SecondaryOptions = { 1, 2, 3, 6 };   // pistol smg shotgun rpg
+        private static readonly int[] PrimaryOptions = { 2, 3, 4, 5, 6, 7, 8 };
+        private static readonly int[] SecondaryOptions = { 1, 2, 3, 6, 8 };
+
+        // Gunsmith: which weapons can be customised (knife & RPG stay bare).
+        private static readonly int[] GunsmithWeapons = { 1, 2, 3, 4, 5, 7, 8 };
+        private int gunsmithWeapon = 4; // rifle
 
         private bool NetworkRunning =>
             NetworkManager.Singleton != null
@@ -134,7 +138,9 @@ namespace FpsBase
 
         private void DrawMainMenu()
         {
-            float w = 460f, h = screen == MenuScreen.Play ? 640f : 470f;
+            float w = 460f;
+            float h = screen == MenuScreen.Play ? 640f
+                : screen == MenuScreen.Classes ? 660f : 470f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -273,6 +279,20 @@ namespace FpsBase
         /// </summary>
         private void DrawClasses()
         {
+            var previousBackground = GUI.backgroundColor;
+            if (GameSettings.UseClassLoadout)
+                GUI.backgroundColor = MenuWidgets.Accent;
+            if (MenuWidgets.MenuButton(GameSettings.UseClassLoadout
+                    ? "LOADOUT: 2 WEAPONS + KNIFE"
+                    : "LOADOUT: FULL ARSENAL", 34f))
+                GameSettings.UseClassLoadout = !GameSettings.UseClassLoadout;
+            GUI.backgroundColor = previousBackground;
+            GUILayout.Label(GameSettings.UseClassLoadout
+                    ? "Spawn with the selected class; keys 1/2/3 select knife, secondary, primary."
+                    : "Carry all seven weapons; number keys and scroll use the global arsenal order.",
+                MenuWidgets.Small);
+            GUILayout.Space(6);
+
             GUILayout.Label("Pick a class to spawn with — click the weapons to change them.", MenuWidgets.Label);
             GUILayout.Space(6);
 
@@ -299,7 +319,9 @@ namespace FpsBase
             GUILayout.Label("primary · secondary — the knife is always with you (1 = knife, 2 = secondary, 3 = primary)",
                 MenuWidgets.Small);
 
-            GUILayout.Space(10);
+            DrawGunsmith();
+
+            GUILayout.Space(8);
             if (MenuWidgets.MenuButton("BACK", 32f))
             {
                 GameSettings.Save();
@@ -307,10 +329,68 @@ namespace FpsBase
             }
         }
 
+        /// <summary>
+        /// Per-weapon add-ons, chosen once and shared by every class. Pick a
+        /// weapon, then toggle its four add-ons (illegal ones show as "—").
+        /// </summary>
+        private void DrawGunsmith()
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("GUNSMITH — add-ons stick to this weapon in every class:", MenuWidgets.Small);
+
+            GUILayout.BeginHorizontal();
+            if (MenuWidgets.MenuButton("◀", 34f)) gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, -1);
+            if (MenuWidgets.MenuButton(LoadoutInfo[gunsmithWeapon].displayName, 34f))
+                gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, +1);
+            if (MenuWidgets.MenuButton("▶", 34f)) gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, +1);
+            GUILayout.EndHorizontal();
+            GUILayout.Space(4);
+
+            var model = LoadoutInfo[gunsmithWeapon].model;
+            GUILayout.BeginHorizontal();
+            DrawAddonToggle(AttachmentType.Optic, model);
+            DrawAddonToggle(AttachmentType.Suppressor, model);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            DrawAddonToggle(AttachmentType.Foregrip, model);
+            DrawAddonToggle(AttachmentType.ExtendedMag, model);
+            GUILayout.EndHorizontal();
+            if (MenuWidgets.MenuButton($"COLOR: {WeaponModelBuilder.ColorName(GameSettings.WeaponColors[gunsmithWeapon])}", 30f))
+                GameSettings.WeaponColors[gunsmithWeapon] = (GameSettings.WeaponColors[gunsmithWeapon] + 1) % 6;
+        }
+
+        private void DrawAddonToggle(AttachmentType type, WeaponModelType model)
+        {
+            bool allowed = Attachments.IsAllowed(model, type);
+            int mask = GameSettings.WeaponAttachments[gunsmithWeapon];
+            bool on = Attachments.Has(mask, type);
+
+            var prevBg = GUI.backgroundColor;
+            bool prevEnabled = GUI.enabled;
+            if (on) GUI.backgroundColor = MenuWidgets.Accent;
+            GUI.enabled = allowed;
+
+            string label = allowed
+                ? $"{Attachments.Names[(int)type]}: {(on ? "ON" : "OFF")}"
+                : $"{Attachments.Names[(int)type]}: —";
+            if (MenuWidgets.MenuButton(label, 30f) && allowed)
+                GameSettings.WeaponAttachments[gunsmithWeapon] = Attachments.Toggle(mask, type);
+
+            GUI.enabled = prevEnabled;
+            GUI.backgroundColor = prevBg;
+        }
+
         private static int NextOption(int[] options, int current)
         {
             int at = System.Array.IndexOf(options, current);
             return options[(at + 1) % options.Length];
+        }
+
+        private static int Cycle(int[] options, int current, int dir)
+        {
+            int at = System.Array.IndexOf(options, current);
+            if (at < 0) at = 0;
+            return options[(at + dir + options.Length) % options.Length];
         }
 
         private void DrawSettings(bool showBack)
@@ -375,6 +455,17 @@ namespace FpsBase
                         var player = playerObject != null ? playerObject.GetComponent<NetworkPlayer>() : null;
                         if (player != null)
                             player.RequestTeamChange();
+                    }
+                    GUILayout.Space(8);
+                }
+
+                if (gameMode != null && gameMode.IsSpawned)
+                {
+                    if (MenuWidgets.MenuButton("TOGGLE SPECTATOR"))
+                    {
+                        var local = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+                        local?.GetComponent<NetworkPlayer>()?.RequestSpectatorToggle();
+                        MouseLook.LockCursor(true);
                     }
                     GUILayout.Space(8);
                 }

@@ -71,6 +71,8 @@ namespace FpsBase
             float effective = sensitivity * GameSettings.MouseSensitivity * Mathf.Min(zoomFactor, 1f);
             float mouseX = Input.GetAxis("Mouse X") * effective;
             float mouseY = Input.GetAxis("Mouse Y") * effective;
+            mouseX += Input.GetAxis("Controller Look X") * effective * 1.4f;
+            mouseY += Input.GetAxis("Controller Look Y") * effective * 1.4f;
 
             // Yaw rotates the whole body so movement direction follows the view.
             if (playerBody != null)

@@ -66,6 +66,9 @@ namespace FpsBase
             weaponController.viewmodelHolder = weaponHolder.transform;
             weaponController.selfRoot = root.transform;
             weaponController.thirdPersonAnchor = tpAnchor.transform;
+            var throwables = root.AddComponent<ThrowableController>();
+            throwables.viewCamera = cam;
+            throwables.ownerRoot = root.transform;
 
             // --- Reference hub ---
             var rig = root.AddComponent<PlayerRigRefs>();

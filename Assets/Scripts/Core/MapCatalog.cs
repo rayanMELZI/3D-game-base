@@ -15,7 +15,7 @@ namespace FpsBase
     /// </summary>
     public static class MapCatalog
     {
-        private enum Kind { Arena, Backrooms, Nuketown, Custom }
+        private enum Kind { Arena, Backrooms, Western, Underwater, FlyingPlane, Dark, Custom }
 
         private struct Entry
         {
@@ -58,6 +58,10 @@ namespace FpsBase
             {
                 new Entry { name = "ARENA", kind = Kind.Arena },
                 new Entry { name = "BACKROOMS", kind = Kind.Backrooms },
+                new Entry { name = "DUSTBOWL WEST", kind = Kind.Western },
+                new Entry { name = "ABYSS", kind = Kind.Underwater },
+                new Entry { name = "SKYFREIGHT", kind = Kind.FlyingPlane },
+                new Entry { name = "NIGHTFALL", kind = Kind.Dark },
             };
 
             // Custom map prefabs, sorted for a stable cross-client index order.
@@ -84,9 +88,10 @@ namespace FpsBase
                 case Kind.Backrooms:
                     EnvironmentBuilder.BuildBackrooms();
                     break;
-                case Kind.Nuketown:
-                    EnvironmentBuilder.BuildNuketown();
-                    break;
+                case Kind.Western: EnvironmentBuilder.BuildThemeArena("Western", new Color(0.58f, 0.3f, 0.12f), new Color(0.9f, 0.68f, 0.3f), false); break;
+                case Kind.Underwater: EnvironmentBuilder.BuildThemeArena("Underwater", new Color(0.02f, 0.18f, 0.24f), new Color(0.1f, 0.75f, 0.8f), false); break;
+                case Kind.FlyingPlane: EnvironmentBuilder.BuildThemeArena("FlyingPlane", new Color(0.18f, 0.2f, 0.24f), new Color(0.75f, 0.78f, 0.82f), false); break;
+                case Kind.Dark: EnvironmentBuilder.BuildThemeArena("Dark", new Color(0.025f, 0.025f, 0.035f), new Color(0.55f, 0.05f, 0.03f), true); break;
                 default:
                     var root = new GameObject(EnvironmentBuilder.MapRootName);
                     var instance = Object.Instantiate(entry.prefab, root.transform);
@@ -148,9 +153,7 @@ namespace FpsBase
             }
 
             // Built-in maps.
-            Vector3[] ForSide(int s) => entry.kind == Kind.Nuketown
-                ? EnvironmentBuilder.NuketownSpawnCandidates(s)
-                : EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
+            Vector3[] ForSide(int s) => EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
             if (side < 0)
             {
                 var a = ForSide(0);

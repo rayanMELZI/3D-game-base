@@ -12,6 +12,7 @@ namespace FpsBase
         TeamDeathmatch = 1, // teams, first team to 30 kills
         FreeForAll = 2,     // everyone for themselves, first to 20 kills
         GunGame = 3,        // race through the arsenal, knife kill wins
+        ZombieSurvival = 4,
     }
 
     /// <summary>
@@ -32,7 +33,7 @@ namespace FpsBase
         public static int PendingRadarMode = 2;
 
         /// <summary>Gun Game weapon order by loadout index (knife last).</summary>
-        public static readonly int[] GunGameOrder = { 1, 2, 3, 4, 5, 6, 0 };
+        public static readonly int[] GunGameOrder = { 1, 2, 3, 4, 7, 5, 8, 6, 0 };
 
         public NetworkVariable<int> Mode = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -49,6 +50,10 @@ namespace FpsBase
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> MatchActive = new NetworkVariable<bool>(
             true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> LobbyOpen = new NetworkVariable<bool>(
+            true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> BotsEnabled = new NetworkVariable<bool>(
+            true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> WinnerTeam = new NetworkVariable<int>(
             -1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString64Bytes> WinnerName = new NetworkVariable<FixedString64Bytes>(
@@ -59,7 +64,7 @@ namespace FpsBase
         public float restartDelay = 8f;
 
         public GameMode CurrentMode => (GameMode)Mode.Value;
-        public bool IsMatchActive => MatchActive.Value;
+        public bool IsMatchActive => MatchActive.Value && !LobbyOpen.Value;
         public bool IsTeamMode => CurrentMode == GameMode.Duel || CurrentMode == GameMode.TeamDeathmatch;
 
         public int ScoreLimit
@@ -93,6 +98,16 @@ namespace FpsBase
             Instance = this;
         }
 
+        private void Update()
+        {
+            if (IsServer && IsSpawned && CurrentMode == GameMode.ZombieSurvival && !LobbyOpen.Value
+                && GetComponent<ZombieDirector>() == null)
+                gameObject.AddComponent<ZombieDirector>();
+            if (IsServer && IsSpawned && CurrentMode != GameMode.ZombieSurvival && !LobbyOpen.Value && BotsEnabled.Value
+                && GetComponent<BotDirector>() == null)
+                gameObject.AddComponent<BotDirector>();
+        }
+
         public override void OnDestroy()
         {
             if (Instance == this)
@@ -113,12 +128,41 @@ namespace FpsBase
                 WinnerTeam.Value = -1;
                 WinnerName.Value = default;
                 MatchActive.Value = true;
+                LobbyOpen.Value = true;
             }
             KillFeed.Clear();
 
             // Everyone (host + clients) builds the selected map.
             ApplyMap(0, MapIndex.Value);
             MapIndex.OnValueChanged += ApplyMap;
+        }
+
+        public void HostStartMatch()
+        {
+            if (!IsServer || !LobbyOpen.Value) return;
+            if (CurrentMode == GameMode.ZombieSurvival)
+                MapIndex.Value = Mathf.Min(5, MapCatalog.Count - 1);
+            LobbyOpen.Value = false;
+            if (CurrentMode == GameMode.ZombieSurvival && GetComponent<ZombieDirector>() == null)
+                gameObject.AddComponent<ZombieDirector>();
+            ForEachPlayer(p => { if (!p.Spectating.Value) p.ServerRespawn(); });
+        }
+
+        public void HostCycleMap(int direction)
+        {
+            if (!IsServer || !LobbyOpen.Value) return;
+            MapIndex.Value = (MapIndex.Value + direction + MapCatalog.Count) % MapCatalog.Count;
+        }
+
+        public void HostCycleMode()
+        {
+            if (!IsServer || !LobbyOpen.Value) return;
+            Mode.Value = (Mode.Value + 1) % 5;
+        }
+
+        public void HostToggleBots()
+        {
+            if (IsServer && LobbyOpen.Value) BotsEnabled.Value = !BotsEnabled.Value;
         }
 
         public override void OnNetworkDespawn()
@@ -271,20 +315,30 @@ namespace FpsBase
         // Scoring (server)
         // ------------------------------------------------------------------
 
-        public void ReportKill(ulong attackerId, ulong victimId, bool headshot)
+        public void ReportKill(ulong attackerId, ulong victimId, bool headshot, bool noScope = false)
         {
             if (!IsServer || !MatchActive.Value)
                 return;
 
             var victim = PlayerOf(victimId);
             if (victim != null)
+            {
                 victim.Deaths.Value++;
+                victim.KillStreak.Value = 0;
+            }
 
             var attacker = PlayerOf(attackerId);
             if (attackerId != victimId && attacker != null)
             {
                 attacker.Kills.Value++;
+                attacker.KillStreak.Value++;
                 LastKillerId.Value = attackerId;
+                int streak = attacker.KillStreak.Value;
+                bool milestone = streak >= 5 && streak % 5 == 0;
+                attacker.AwardXpClientRpc(headshot ? 140 : 100, milestone, streak,
+                    new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { attackerId } } });
+                if (milestone)
+                    KillFeedClientRpc($"{NameOf(attackerId)}  KILLSTREAK  {streak}");
 
                 switch (CurrentMode)
                 {
@@ -310,7 +364,7 @@ namespace FpsBase
                 }
             }
 
-            string verb = headshot ? "HEADSHOT" : "eliminated";
+            string verb = noScope ? "NO-SCOPE" : (headshot ? "HEADSHOT" : "eliminated");
             KillFeedClientRpc($"{NameOf(attackerId)}  {verb}  {NameOf(victimId)}");
         }
 
@@ -345,6 +399,7 @@ namespace FpsBase
                 player.Kills.Value = 0;
                 player.Deaths.Value = 0;
                 player.GunGameLevel.Value = 0;
+                player.KillStreak.Value = 0;
                 player.ServerRespawn();
             });
         }

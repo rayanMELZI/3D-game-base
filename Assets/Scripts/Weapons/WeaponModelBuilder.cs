@@ -21,7 +21,7 @@ namespace FpsBase
     /// </summary>
     public static class WeaponModelBuilder
     {
-        public static WeaponModelInstance Build(WeaponDefinition def, Transform parent, Vector3 localPosition, bool castShadows)
+        public static WeaponModelInstance Build(WeaponDefinition def, Transform parent, Vector3 localPosition, bool castShadows, int attachmentMask = 0, int colorIndex = 0)
         {
             var root = new GameObject(def.displayName + "Model");
             root.transform.SetParent(parent, false);
@@ -30,6 +30,13 @@ namespace FpsBase
             Vector3 muzzlePos;
             if (!TryBuildImported(def.model, root.transform, out muzzlePos))
                 muzzlePos = BuildProcedural(def.model, root.transform);
+
+            // Bolt on the chosen add-ons (may push the muzzle forward: suppressor).
+            attachmentMask = Attachments.Sanitize(attachmentMask, def.model);
+            if (attachmentMask != 0)
+                AddAttachments(root.transform, attachmentMask, ref muzzlePos);
+
+            ApplyColor(root, colorIndex);
 
             foreach (var r in root.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = castShadows
@@ -44,11 +51,88 @@ namespace FpsBase
             var flash = muzzle.AddComponent<Light>();
             flash.type = LightType.Point;
             flash.color = new Color(1f, 0.82f, 0.45f);
-            flash.intensity = 4f;
+            // A suppressor swallows most of the flash.
+            flash.intensity = Attachments.Has(attachmentMask, AttachmentType.Suppressor) ? 1.6f : 4f;
             flash.range = 4f;
             flash.enabled = false;
 
             return new WeaponModelInstance { root = root, muzzle = muzzle.transform, muzzleFlash = flash };
+        }
+
+        private static readonly Color[] SkinColors =
+        {
+            Color.white, new Color(0.78f, 0.12f, 0.08f), new Color(0.08f, 0.35f, 0.82f),
+            new Color(0.12f, 0.65f, 0.24f), new Color(0.72f, 0.48f, 0.08f), new Color(0.4f, 0.12f, 0.58f),
+        };
+        private static readonly string[] SkinNames = { "DEFAULT", "CRIMSON", "COBALT", "FOREST", "GOLD", "VIOLET" };
+        public static string ColorName(int index) => SkinNames[Mathf.Clamp(index, 0, SkinNames.Length - 1)];
+        private static void ApplyColor(GameObject root, int index)
+        {
+            index = Mathf.Clamp(index, 0, SkinColors.Length - 1);
+            if (index == 0) return;
+            var block = new MaterialPropertyBlock();
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                renderer.GetPropertyBlock(block);
+                block.SetColor("_Color", SkinColors[index]);
+                block.SetColor("_BaseColor", SkinColors[index]);
+                renderer.SetPropertyBlock(block);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Add-on models (procedural, positioned relative to the muzzle/holder).
+        // First pass — good enough to read at a glance; exact per-weapon fit is
+        // best nudged visually in Unity if any piece clips the base model.
+        // ------------------------------------------------------------------
+
+        private static void AddAttachments(Transform holder, int mask, ref Vector3 muzzlePos)
+        {
+            var black = MakeMat(new Color(0.06f, 0.06f, 0.07f), 0.3f, 0.4f);
+            var metal = MakeMat(new Color(0.14f, 0.14f, 0.15f), 0.65f, 0.72f);
+            var dot = MakeMat(new Color(0.95f, 0.12f, 0.08f), 0.2f, 0.9f);
+
+            if (Attachments.Has(mask, AttachmentType.Suppressor))
+            {
+                const float len = 0.13f;
+                var centre = muzzlePos + new Vector3(0, 0, len * 0.5f - 0.01f);
+                if (!ImportedAttachment("Suppressor", holder, centre, new Vector3(0.32f, 0.32f, 0.32f)))
+                    Part(holder, PrimitiveType.Cylinder, centre, new Vector3(90, 0, 0), new Vector3(0.05f, len * 0.5f, 0.05f), black);
+                muzzlePos += new Vector3(0, 0, len); // the flash now exits the can
+            }
+            if (Attachments.Has(mask, AttachmentType.Optic))
+            {
+                float z = Mathf.Min(0.02f, muzzlePos.z - 0.3f); // sit over the receiver, behind the muzzle
+                ImportedAttachment("Optic", holder, new Vector3(0, 0.085f, z), new Vector3(0.3f, 0.3f, 0.3f));
+                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.085f, z), Vector3.zero, new Vector3(0.05f, 0.03f, 0.06f), black); // mount
+                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.108f, z), Vector3.zero, new Vector3(0.046f, 0.016f, 0.05f), black); // hood
+                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.097f, z + 0.006f), Vector3.zero, new Vector3(0.008f, 0.008f, 0.006f), dot); // red dot
+            }
+            if (Attachments.Has(mask, AttachmentType.Foregrip))
+            {
+                float z = Mathf.Max(0.12f, muzzlePos.z - 0.2f);
+                if (!ImportedAttachment("Foregrip", holder, new Vector3(0, -0.085f, z), new Vector3(0.3f, 0.3f, 0.3f)))
+                    Part(holder, PrimitiveType.Cube, new Vector3(0, -0.085f, z), new Vector3(6, 0, 0), new Vector3(0.028f, 0.09f, 0.032f), black);
+            }
+            if (Attachments.Has(mask, AttachmentType.ExtendedMag))
+            {
+                // A longer mag hanging below the normal magazine well.
+                if (!ImportedAttachment("ExtendedMag", holder, new Vector3(0, -0.185f, 0.02f), new Vector3(0.28f, 0.28f, 0.28f)))
+                    Part(holder, PrimitiveType.Cube, new Vector3(0, -0.185f, 0.02f), new Vector3(10, 0, 0), new Vector3(0.036f, 0.11f, 0.052f), metal);
+            }
+        }
+
+        private static bool ImportedAttachment(string name, Transform holder, Vector3 position, Vector3 scale)
+        {
+            var prefab = Resources.Load<GameObject>("Weapons/Attachments/" + name);
+            if (prefab == null) return false;
+            var instance = Object.Instantiate(prefab, holder, false);
+            instance.name = name;
+            instance.transform.localPosition = position;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = scale;
+            foreach (var collider in instance.GetComponentsInChildren<Collider>()) Object.Destroy(collider);
+            return true;
         }
 
         // ------------------------------------------------------------------
@@ -93,6 +177,12 @@ namespace FpsBase
                 case WeaponModelType.Rpg:
                     return new ModelFit { resource = "Weapons/Launcher_G", scale = Vector3.one,
                         euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.04f, 0.55f) };
+                case WeaponModelType.Lmg:
+                    return new ModelFit { resource = "Weapons/AR_T", scale = new Vector3(1.08f, 1.08f, 1.16f),
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.58f) };
+                case WeaponModelType.GrenadeLauncher:
+                    return new ModelFit { resource = "Weapons/Launcher_G", scale = new Vector3(0.82f, 0.82f, 0.78f),
+                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.04f, 0.43f) };
                 default: // Knife has no imported match — always procedural.
                     return new ModelFit { resource = null };
             }

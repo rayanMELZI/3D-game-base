@@ -71,6 +71,12 @@ injected spawn markers · Steam fixes (own SteamManager, transport switch,
 visible errors) · death-display cleanup · title crop fix · version scheme
 0.X.X with matching git tags.
 
+## Implemented in 0.6.0–0.11.0 — awaiting Rayan's multiplayer confirmation
+
+All six roadmap batches are implemented in the working tree. Per the rule at
+the top of this file, their checkboxes remain unchecked until Rayan verifies
+them in Unity and multiplayer. Attachments are global per weapon.
+
 ## Platform / tooling notes
 
 - Steam: friend must have `steam_appid.txt` (480) next to the exe — if his

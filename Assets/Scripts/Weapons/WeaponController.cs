@@ -48,6 +48,8 @@ namespace FpsBase
         public int CurrentIndex { get; private set; } = WeaponDefinition.DefaultIndex;
         public WeaponDefinition CurrentWeapon => weapons[CurrentIndex];
         public int CurrentAmmo => ammo[CurrentIndex];
+        /// <summary>Magazine size of the held weapon including its extended-mag add-on.</summary>
+        public int CurrentMagSize => MagSize(CurrentIndex);
         public bool IsReloading => reloadPending;
         /// <summary>0..1 while reloading (drives the HUD bar and viewmodel animation).</summary>
         public float ReloadProgress =>
@@ -61,6 +63,8 @@ namespace FpsBase
         private float nextFireTime;
         private float reloadEndTime;
         private bool reloadPending;
+        private bool shellReload;
+        private float reloadStepDuration;
         private float flashOffTime;
         private float adsBlend;
         private Vector3 currentKick; // viewmodel kickback offset
@@ -68,14 +72,19 @@ namespace FpsBase
         private static Material tracerMaterial;
         private static Material impactMaterial;
 
+        // Add-on helpers — the mask is chosen per weapon and lives in GameSettings.
+        private int MaskFor(int index) =>
+            index >= 0 && index < GameSettings.WeaponAttachments.Length ? GameSettings.WeaponAttachments[index] : 0;
+        private int MagSize(int index) => Attachments.MagazineSize(weapons[index].magazineSize, MaskFor(index));
+
         private void Start()
         {
             ammo = new int[weapons.Length];
             models = new WeaponModelInstance[weapons.Length];
             for (int i = 0; i < weapons.Length; i++)
             {
-                ammo[i] = weapons[i].magazineSize;
-                models[i] = WeaponModelBuilder.Build(weapons[i], viewmodelHolder, weapons[i].viewOffset, castShadows: false);
+                ammo[i] = MagSize(i);
+                models[i] = WeaponModelBuilder.Build(weapons[i], viewmodelHolder, weapons[i].viewOffset, castShadows: false, MaskFor(i), GameSettings.WeaponColors[i]);
                 models[i].root.SetActive(i == CurrentIndex);
             }
             RebuildShadowModel();
@@ -89,6 +98,14 @@ namespace FpsBase
         /// </summary>
         public void ApplySelectedClass()
         {
+            if (!GameSettings.UseClassLoadout)
+            {
+                classSlots = null;
+                if (models != null && !lockSwitching && CurrentIndex != WeaponDefinition.DefaultIndex)
+                    SwitchTo(WeaponDefinition.DefaultIndex);
+                return;
+            }
+
             int c = Mathf.Clamp(GameSettings.SelectedClass, 0, GameSettings.ClassCount - 1);
             int primary = Mathf.Clamp(GameSettings.ClassPrimary[c], 0, weapons.Length - 1);
             int secondary = Mathf.Clamp(GameSettings.ClassSecondary[c], 0, weapons.Length - 1);
@@ -104,7 +121,7 @@ namespace FpsBase
             if (ammo == null)
                 return;
             for (int i = 0; i < weapons.Length; i++)
-                ammo[i] = weapons[i].magazineSize;
+                ammo[i] = MagSize(i);
             reloadPending = false;
         }
 
@@ -132,7 +149,7 @@ namespace FpsBase
                 // kill cam, and a floating first-person gun ruins the replay.
                 models[CurrentIndex].root.SetActive(false);
             }
-            if (hasShadowModel)
+            if (hasShadowModel && shadowModel.root != null)
                 shadowModel.root.SetActive(false); // no floating gun shadow while dead
         }
 
@@ -140,7 +157,7 @@ namespace FpsBase
         {
             if (models != null && models[CurrentIndex].root != null)
                 models[CurrentIndex].root.SetActive(true);
-            if (hasShadowModel)
+            if (hasShadowModel && shadowModel.root != null)
                 shadowModel.root.SetActive(true);
         }
 
@@ -158,8 +175,13 @@ namespace FpsBase
             // Finish a pending reload.
             if (reloadPending && Time.time >= reloadEndTime)
             {
-                ammo[CurrentIndex] = weapon.magazineSize;
-                reloadPending = false;
+                if (shellReload)
+                {
+                    ammo[CurrentIndex]++;
+                    if (ammo[CurrentIndex] < MagSize(CurrentIndex)) reloadEndTime = Time.time + reloadStepDuration;
+                    else { reloadPending = false; shellReload = false; }
+                }
+                else { ammo[CurrentIndex] = MagSize(CurrentIndex); reloadPending = false; }
             }
 
             AnimateViewmodel(weapon, model);
@@ -175,18 +197,30 @@ namespace FpsBase
             weapon = CurrentWeapon; // may have changed
 
             // Aim down sights (every weapon; sniper scopes).
-            SetZoom(Input.GetMouseButton(1) && weapon.zoomFov > 0f && !reloadPending);
+            SetZoom((Input.GetMouseButton(1) || Input.GetKey(KeyCode.JoystickButton4))
+                && weapon.zoomFov > 0f && !reloadPending);
 
             // Manual reload.
-            if (Input.GetKeyDown(KeyCode.R) && CanReload(weapon))
+            if ((Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.JoystickButton2)) && CanReload(weapon))
                 StartReload();
 
             if (reloadPending)
+            {
+                if (shellReload && ammo[CurrentIndex] > 0 && Input.GetMouseButtonDown(0))
+                {
+                    reloadPending = false;
+                    shellReload = false;
+                    Shoot();
+                }
                 return;
+            }
 
             // Left mouse only — the legacy "Fire1" axis also maps Left Ctrl,
             // which made crouching fire the weapon.
-            bool firePressed = weapon.automatic ? Input.GetMouseButton(0) : Input.GetMouseButtonDown(0);
+            bool controllerFire = Input.GetKey(KeyCode.JoystickButton5);
+            bool firePressed = weapon.automatic
+                ? (Input.GetMouseButton(0) || controllerFire)
+                : (Input.GetMouseButtonDown(0) || (controllerFire && Time.time >= nextFireTime));
             if (firePressed && Time.time >= nextFireTime)
             {
                 if (weapon.magazineSize <= 0 || ammo[CurrentIndex] > 0)
@@ -197,7 +231,7 @@ namespace FpsBase
         }
 
         private bool CanReload(WeaponDefinition weapon) =>
-            !reloadPending && weapon.magazineSize > 0 && ammo[CurrentIndex] < weapon.magazineSize;
+            !reloadPending && weapon.magazineSize > 0 && ammo[CurrentIndex] < CurrentMagSize;
 
         // ------------------------------------------------------------------
         // Viewmodel motion: ADS blend, kick recovery, reload dip
@@ -280,7 +314,9 @@ namespace FpsBase
         {
             SetZoom(false);
             reloadPending = true;
-            reloadEndTime = Time.time + CurrentWeapon.reloadTime;
+            shellReload = CurrentWeapon.model == WeaponModelType.Shotgun;
+            reloadStepDuration = shellReload ? 0.58f : CurrentWeapon.reloadTime;
+            reloadEndTime = Time.time + reloadStepDuration;
             SfxSynth.Play2D(SfxSynth.Reload(), 0.6f);
         }
 
@@ -292,7 +328,7 @@ namespace FpsBase
 
             var weapon = CurrentWeapon;
             if (mouseLook != null)
-                mouseLook.SetZoom(zoom ? weapon.zoomFov : 0f);
+                mouseLook.SetZoom(zoom ? weapon.zoomFov * Attachments.ZoomFovMultiplier(MaskFor(CurrentIndex)) : 0f);
             if (weapon.hideWhenZoomed && models != null)
                 models[CurrentIndex].root.SetActive(!zoom);
         }
@@ -322,10 +358,11 @@ namespace FpsBase
                 model.muzzleFlash.enabled = true;
                 flashOffTime = Time.time + 0.045f;
             }
-            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), shootCamera.transform.position, 0.85f);
+            int mask = MaskFor(CurrentIndex);
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), shootCamera.transform.position, 0.85f * Attachments.ShotVolumeMultiplier(mask));
             currentKick += weapon.isMelee ? new Vector3(0, 0.01f, 0.12f) : new Vector3(0, 0.01f, -0.07f);
             if (mouseLook != null)
-                mouseLook.AddRecoil(weapon.recoil * (IsZoomed ? 0.6f : 1f));
+                mouseLook.AddRecoil(weapon.recoil * (IsZoomed ? 0.6f : 1f) * Attachments.RecoilMultiplier(mask));
 
             ShotFired?.Invoke(endPoint);
         }
@@ -361,7 +398,11 @@ namespace FpsBase
                     {
                         var hitbox = hit.collider.GetComponent<Hitbox>();
                         bool headshot = hitbox != null && hitbox.isHead;
-                        damageable.TakeDamage(damagePerPellet, headshot);
+                        if (damageable is NetworkHealth networkHealth)
+                            networkHealth.TakeDamageShot(damagePerPellet, headshot,
+                                weapon.model == WeaponModelType.Sniper && !IsZoomed);
+                        else
+                            damageable.TakeDamage(damagePerPellet, headshot);
                         anyHit = true;
                         anyHeadshot |= headshot;
                     }
@@ -436,7 +477,7 @@ namespace FpsBase
             if (thirdPersonAnchor == null)
                 return;
 
-            shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true);
+            shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true, MaskFor(CurrentIndex), GameSettings.WeaponColors[CurrentIndex]);
             foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             hasShadowModel = true;
