@@ -109,8 +109,17 @@ namespace FpsBase
                 if (ctrl != null)
                     animator.runtimeAnimatorController = ctrl;
                 animator.applyRootMotion = false; // movement is driven by the controller, not the clip
-                instance.AddComponent<CharacterAnimatorDriver>().animator = animator;
 
+                
+                // instance.AddComponent<CharacterAnimatorDriver>().animator = animator;
+                var animationDriver =
+                    instance.AddComponent<CharacterAnimatorDriver>();
+
+                animationDriver.animator = animator;
+                animationDriver.movement = movement;
+                animationDriver.weaponController = weaponController;
+                animationDriver.playerRoot = transform;
+                
                 // Hold the weapon + aim with the view pitch + slide lean.
                 characterPose = instance.AddComponent<CharacterAimPose>();
                 characterPose.rig = this;

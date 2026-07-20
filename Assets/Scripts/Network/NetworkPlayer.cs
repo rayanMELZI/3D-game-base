@@ -74,6 +74,36 @@ namespace FpsBase
             rig.cameraObject.SetActive(false);
         }
 
+        
+        private readonly NetworkVariable<Vector2> NetworkMoveInput =
+            new(
+                Vector2.zero,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
+        private readonly NetworkVariable<float> NetworkSpeed =
+            new(
+                0f,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
+        private readonly NetworkVariable<bool> NetworkSprinting =
+            new(
+                false,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
+        private readonly NetworkVariable<bool> NetworkReloading =
+            new(
+                false,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+        
+        
         public override void OnNetworkSpawn()
         {
             Team.OnValueChanged += OnTeamChanged;
@@ -139,9 +169,12 @@ namespace FpsBase
                 return;
 
             RecordKillcamSample();
-
+            
             if (!IsOwner)
             {
+                
+                
+                
                 // Replicate the crouch squash on remote players.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
                 PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);

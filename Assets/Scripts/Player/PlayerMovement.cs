@@ -56,6 +56,8 @@ namespace FpsBase
         private Vector3 slideDirection;
         private bool proneToggle;
 
+
+        
         private void Awake()
         {
             controller = GetComponent<CharacterController>();
