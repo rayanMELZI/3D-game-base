@@ -48,6 +48,7 @@ namespace FpsBase
         private Renderer[] characterRenderers;
         /// <summary>Aim/hold/slide pose driver on the skin (null until a skin is applied).</summary>
         [System.NonSerialized] public CharacterAimPose characterPose;
+        [System.NonSerialized] public CharacterAnimatorDriver characterAnimator;
 
         private bool initialized;
 
@@ -110,15 +111,15 @@ namespace FpsBase
                     animator.runtimeAnimatorController = ctrl;
                 animator.applyRootMotion = false; // movement is driven by the controller, not the clip
 
-                
-                // instance.AddComponent<CharacterAnimatorDriver>().animator = animator;
-                var animationDriver =
-                    instance.AddComponent<CharacterAnimatorDriver>();
+                characterAnimator = instance.GetComponent<CharacterAnimatorDriver>();
+                if (characterAnimator == null)
+                    characterAnimator = instance.AddComponent<CharacterAnimatorDriver>();
 
-                animationDriver.animator = animator;
-                animationDriver.movement = movement;
-                animationDriver.weaponController = weaponController;
-                animationDriver.playerRoot = transform;
+                characterAnimator.animator = animator;
+                characterAnimator.movement = movement;
+                characterAnimator.weaponController = weaponController;
+                characterAnimator.playerRoot = transform;
+                characterAnimator.useNetworkState = false;
                 
                 // Hold the weapon + aim with the view pitch + slide lean.
                 characterPose = instance.AddComponent<CharacterAimPose>();

@@ -82,7 +82,7 @@ namespace FpsBase
                 NetworkVariableWritePermission.Owner
             );
 
-        private readonly NetworkVariable<float> NetworkSpeed =
+        private readonly NetworkVariable<float> NetworkMoveSpeed =
             new(
                 0f,
                 NetworkVariableReadPermission.Everyone,
@@ -172,9 +172,19 @@ namespace FpsBase
             
             if (!IsOwner)
             {
-                
-                
-                
+                if (rig.characterAnimator != null)
+                {
+                    rig.characterAnimator.useNetworkState = true;
+                    rig.characterAnimator.SetNetworkAnimationState(
+                        NetworkMoveInput.Value,
+                        NetworkMoveSpeed.Value,
+                        true,
+                        Crouched.Value,
+                        NetworkSprinting.Value,
+                        Sliding.Value,
+                        NetworkReloading.Value);
+                }
+
                 // Replicate the crouch squash on remote players.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
                 PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);
@@ -188,6 +198,9 @@ namespace FpsBase
                 }
                 return;
             }
+
+            if (rig.characterAnimator != null)
+                rig.characterAnimator.useNetworkState = false;
 
             // Publish crouch / slide / aim pitch.
             if (Crouched.Value != rig.movement.IsCrouching)
@@ -209,6 +222,28 @@ namespace FpsBase
                 rig.movement.enabled = canPlay;
             if (rig.weaponController.enabled != canPlay)
                 rig.weaponController.enabled = canPlay;
+
+            if (rig.movement != null && rig.weaponController != null)
+            {
+                Vector2 moveInput = canPlay ? rig.movement.MoveInput : Vector2.zero;
+                float moveSpeed = canPlay ? rig.movement.CurrentHorizontalSpeed : 0f;
+                bool sprinting = canPlay && rig.movement.IsSprinting;
+                bool reloading = canPlay && rig.weaponController.IsReloading;
+
+                bool stoppedMoving = moveInput == Vector2.zero
+                    && NetworkMoveInput.Value != Vector2.zero;
+                if (stoppedMoving
+                    || Vector2.Distance(NetworkMoveInput.Value, moveInput) > 0.01f)
+                    NetworkMoveInput.Value = moveInput;
+                bool stoppedSpeed = moveSpeed == 0f && NetworkMoveSpeed.Value != 0f;
+                if (stoppedSpeed
+                    || Mathf.Abs(NetworkMoveSpeed.Value - moveSpeed) > 0.05f)
+                    NetworkMoveSpeed.Value = moveSpeed;
+                if (NetworkSprinting.Value != sprinting)
+                    NetworkSprinting.Value = sprinting;
+                if (NetworkReloading.Value != reloading)
+                    NetworkReloading.Value = reloading;
+            }
 
             // Per-mode weapon locking. Gun Game's whole point is its weapon
             // ladder, so it wins over the sniper-only toggle.

@@ -45,6 +45,8 @@ namespace FpsBase
         public bool IsCrouching { get; private set; }
         public bool IsSliding => slideTimer > 0f;
         public bool IsProne { get; private set; }
+        public Vector2 MoveInput => moveInput;
+        public float CurrentHorizontalSpeed => horizontalVelocity.magnitude;
         /// <summary>0 = standing, 1 = fully crouched — also drives the body squash.</summary>
         public float CrouchBlend { get; private set; }
         /// <summary>0..1 while sliding, for camera roll.</summary>
@@ -55,6 +57,8 @@ namespace FpsBase
         private float slideTimer;
         private Vector3 slideDirection;
         private bool proneToggle;
+        private Vector2 moveInput;
+        private Vector3 horizontalVelocity;
 
 
         
@@ -71,6 +75,7 @@ namespace FpsBase
 
             float inputX = Input.GetAxisRaw("Horizontal");
             float inputZ = Input.GetAxisRaw("Vertical");
+            moveInput = new Vector2(inputX, inputZ);
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
@@ -116,6 +121,7 @@ namespace FpsBase
                 speed = IsProne ? proneSpeed : (IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed));
                 horizontal = moveDirection * speed;
             }
+            horizontalVelocity = horizontal;
 
             // --- Crouch dimensions (controller + camera + visual squash) ---
             CrouchBlend = Mathf.MoveTowards(CrouchBlend, IsCrouching ? 1f : 0f, 8f * Time.deltaTime);

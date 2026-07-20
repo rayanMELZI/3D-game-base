@@ -9,6 +9,7 @@ namespace FpsBase
         public PlayerMovement movement;
         public WeaponController weaponController;
         public Transform playerRoot;
+        public bool useNetworkState;
 
         private static readonly int SpeedHash =
             Animator.StringToHash("Speed");
@@ -40,6 +41,18 @@ namespace FpsBase
         private Vector3 lastPosition;
         private float smoothedSpeed;
         private Vector2 smoothedDirection;
+        private CharacterController characterController;
+        
+        [SerializeField] private float networkBlendSpeed = 10f;
+
+        private Vector2 targetNetworkMoveInput;
+        private float targetNetworkSpeed;
+
+        private bool networkGrounded;
+        private bool networkCrouching;
+        private bool networkSprinting;
+        private bool networkSliding;
+        private bool networkReloading;
 
         private void Start()
         {
@@ -49,7 +62,11 @@ namespace FpsBase
             lastPosition = playerRoot != null
                 ? playerRoot.position
                 : transform.position;
+
+            if (movement != null)
+                characterController = movement.GetComponent<CharacterController>();
         }
+
         public void SetNetworkAnimationState(
             Vector2 moveInput,
             float speed,
@@ -57,23 +74,52 @@ namespace FpsBase
             bool crouching,
             bool sprinting,
             bool sliding,
-            bool reloading
-        )
+            bool reloading)
         {
-            animator.SetFloat(MoveXHash, moveInput.x);
-            animator.SetFloat(MoveYHash, moveInput.y);
-            animator.SetFloat(SpeedHash, speed);
+            targetNetworkMoveInput = moveInput;
+            targetNetworkSpeed = speed;
 
-            animator.SetBool(GroundedHash, grounded);
-            animator.SetBool(CrouchingHash, crouching);
-            animator.SetBool(SprintingHash, sprinting);
-            animator.SetBool(SlidingHash, sliding);
-            animator.SetBool(ReloadingHash, reloading);
+            networkGrounded = grounded;
+            networkCrouching = crouching;
+            networkSprinting = sprinting;
+            networkSliding = sliding;
+            networkReloading = reloading;
         }
         private void Update()
         {
             if (animator == null || Time.deltaTime <= 0f)
                 return;
+
+            if (useNetworkState)
+            {
+                float blend = 1f - Mathf.Exp(-networkBlendSpeed * Time.deltaTime);
+
+                smoothedDirection = Vector2.Lerp(
+                    smoothedDirection,
+                    targetNetworkMoveInput,
+                    blend
+                );
+
+                smoothedSpeed = Mathf.Lerp(
+                    smoothedSpeed,
+                    targetNetworkSpeed,
+                    blend
+                );
+
+                animator.SetFloat(MoveXHash, smoothedDirection.x);
+                animator.SetFloat(MoveYHash, smoothedDirection.y);
+                animator.SetFloat(SpeedHash, smoothedSpeed);
+                animator.SetFloat(MotionSpeedHash, 1f);
+
+                animator.SetBool(GroundedHash, networkGrounded);
+                animator.SetBool(CrouchingHash, networkCrouching);
+                animator.SetBool(SprintingHash, networkSprinting);
+                animator.SetBool(SlidingHash, networkSliding);
+                animator.SetBool(ReloadingHash, networkReloading);
+
+                return;
+            }
+
 
             Transform root = playerRoot != null ? playerRoot : transform;
 
@@ -86,19 +132,9 @@ namespace FpsBase
 
             float targetSpeed = worldVelocity.magnitude;
 
-            // smoothedSpeed = Mathf.Lerp(
-            //     smoothedSpeed,
-            //     targetSpeed,
-            //     12f * Time.deltaTime
-            // );
-            // smoothedSpeed = targetSpeed;
-            float smoothing = targetSpeed > smoothedSpeed ? 30f : 18f;
-
-            smoothedSpeed = Mathf.Lerp(
-                smoothedSpeed,
-                targetSpeed,
-                smoothing * Time.deltaTime
-            );
+            float speedResponse = targetSpeed > smoothedSpeed ? 40f : 25f;
+            smoothedSpeed = Mathf.MoveTowards(
+                smoothedSpeed, targetSpeed, speedResponse * Time.deltaTime);
             Vector3 localVelocity = root.InverseTransformDirection(worldVelocity);
 
             Vector2 targetDirection = targetSpeed > 0.05f
@@ -108,27 +144,50 @@ namespace FpsBase
                 )
                 : Vector2.zero;
 
-            // smoothedDirection = Vector2.Lerp(
-            //     smoothedDirection,
-            //     targetDirection,
-            //     12f * Time.deltaTime
-            // );
-            smoothedDirection = targetDirection;
-
+            float directionResponse = targetSpeed > 0.05f ? 30f : 20f;
+            smoothedDirection = Vector2.MoveTowards(
+                smoothedDirection, targetDirection, directionResponse * Time.deltaTime);
             
-            animator.SetFloat(SpeedHash, smoothedSpeed);
-            animator.SetFloat(MoveXHash, smoothedDirection.x);
-            animator.SetFloat(MoveYHash, smoothedDirection.y);
+            float blend2 = 1f - Mathf.Exp(-networkBlendSpeed * Time.deltaTime);
+
+            smoothedDirection = Vector2.Lerp(
+                smoothedDirection,
+                targetNetworkMoveInput,
+                blend2
+            );
+    
+            smoothedSpeed = Mathf.Lerp(
+                smoothedSpeed,
+                targetNetworkSpeed,
+                blend2
+            );
+            animator.SetFloat(
+                SpeedHash,
+                smoothedSpeed,
+                0.12f,
+                Time.deltaTime
+            );
+
+            animator.SetFloat(
+                MoveXHash,
+                smoothedDirection.x,
+                0.12f,
+                Time.deltaTime
+            );
+
+            animator.SetFloat(
+                MoveYHash,
+                smoothedDirection.y,
+                0.12f,
+                Time.deltaTime
+            );
             animator.SetFloat(MotionSpeedHash, 1f);
 
             if (movement != null)
             {
-                CharacterController controller =
-                    movement.GetComponent<CharacterController>();
-
                 animator.SetBool(
                     GroundedHash,
-                    controller != null && controller.isGrounded
+                    characterController != null && characterController.isGrounded
                 );
 
                 animator.SetBool(CrouchingHash, movement.IsCrouching);
