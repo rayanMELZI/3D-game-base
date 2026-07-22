@@ -12,6 +12,15 @@ namespace FpsBase
     /// </summary>
     public class PlayerRigRefs : MonoBehaviour
     {
+		[Header("Locomotion Authored Speeds")]
+        [SerializeField] private float walkForwardAuthoredSpeed = 3.2200f;
+        [SerializeField] private float walkBackwardAuthoredSpeed = 2.7744f;
+        [SerializeField] private float strafeLeftAuthoredSpeed = 2.7998f;
+        [SerializeField] private float strafeRightAuthoredSpeed = 3.4017f;
+        [SerializeField] private float sprintForwardAuthoredSpeed = 5f;
+
+
+
         [Header("Wired by PlayerFactory")]
         public GameObject cameraObject;
         public Camera playerCamera;
@@ -114,7 +123,13 @@ namespace FpsBase
                 characterAnimator = instance.GetComponent<CharacterAnimatorDriver>();
                 if (characterAnimator == null)
                     characterAnimator = instance.AddComponent<CharacterAnimatorDriver>();
-
+                characterAnimator.ConfigureAuthoredSpeeds(
+                    walkForwardAuthoredSpeed,
+                    walkBackwardAuthoredSpeed,
+                    strafeLeftAuthoredSpeed,
+                    strafeRightAuthoredSpeed,
+                    sprintForwardAuthoredSpeed
+                );
                 characterAnimator.animator = animator;
                 characterAnimator.movement = movement;
                 characterAnimator.weaponController = weaponController;

@@ -11,6 +11,18 @@ namespace FpsBase
         public Transform playerRoot;
         public bool useNetworkState;
 
+        [Header("Authored Locomotion Speeds")]
+        [SerializeField, Min(0.01f)] private float walkForwardAuthoredSpeed = 2f;
+        [SerializeField, Min(0.01f)] private float walkBackwardAuthoredSpeed = 1.7f;
+        [SerializeField, Min(0.01f)] private float strafeLeftAuthoredSpeed = 1.8f;
+        [SerializeField, Min(0.01f)] private float strafeRightAuthoredSpeed = 1.8f;
+        [SerializeField, Min(0.01f)] private float sprintForwardAuthoredSpeed = 5.5f;
+
+        [Header("Motion Speed Matching")]
+        [SerializeField, Min(0f)] private float motionSpeedDampTime = 0.08f;
+        [SerializeField] private Vector2 motionSpeedLimits = new Vector2(0.65f, 1.5f);
+        [SerializeField, Min(0f)] private float motionSpeedIdleThreshold = 0.05f;
+
         private static readonly int SpeedHash =
             Animator.StringToHash("Speed");
 
@@ -53,6 +65,22 @@ namespace FpsBase
         private bool networkSprinting;
         private bool networkSliding;
         private bool networkReloading;
+
+
+        public void ConfigureAuthoredSpeeds(
+            float walkForward,
+            float walkBackward,
+            float strafeLeft,
+            float strafeRight,
+            float sprintForward)
+        {
+            walkForwardAuthoredSpeed = walkForward;
+            walkBackwardAuthoredSpeed = walkBackward;
+            strafeLeftAuthoredSpeed = strafeLeft;
+            strafeRightAuthoredSpeed = strafeRight;
+            sprintForwardAuthoredSpeed = sprintForward;
+        }
+
 
         private void Start()
         {
@@ -109,7 +137,15 @@ namespace FpsBase
                 animator.SetFloat(MoveXHash, smoothedDirection.x);
                 animator.SetFloat(MoveYHash, smoothedDirection.y);
                 animator.SetFloat(SpeedHash, smoothedSpeed);
-                animator.SetFloat(MotionSpeedHash, 1f);
+                float networkMotionSpeed = CalculateMotionSpeed(
+                    targetNetworkSpeed,
+                    targetNetworkMoveInput,
+                    networkSprinting);
+                animator.SetFloat(
+                    MotionSpeedHash,
+                    networkMotionSpeed,
+                    motionSpeedDampTime,
+                    Time.deltaTime);
 
                 animator.SetBool(GroundedHash, networkGrounded);
                 animator.SetBool(CrouchingHash, networkCrouching);
@@ -130,37 +166,29 @@ namespace FpsBase
             lastPosition = currentPosition;
             worldVelocity.y = 0f;
 
-            float targetSpeed = worldVelocity.magnitude;
+            float targetSpeed = movement != null
+                ? movement.CurrentHorizontalSpeed
+                : worldVelocity.magnitude;
 
             float speedResponse = targetSpeed > smoothedSpeed ? 40f : 25f;
             smoothedSpeed = Mathf.MoveTowards(
                 smoothedSpeed, targetSpeed, speedResponse * Time.deltaTime);
             Vector3 localVelocity = root.InverseTransformDirection(worldVelocity);
 
-            Vector2 targetDirection = targetSpeed > 0.05f
+            Vector2 calculatedDirection = targetSpeed > 0.05f
                 ? new Vector2(
                     localVelocity.x / Mathf.Max(targetSpeed, 0.01f),
                     localVelocity.z / Mathf.Max(targetSpeed, 0.01f)
                 )
                 : Vector2.zero;
+            Vector2 targetDirection = movement != null
+                ? movement.MoveInput
+                : calculatedDirection;
 
             float directionResponse = targetSpeed > 0.05f ? 30f : 20f;
             smoothedDirection = Vector2.MoveTowards(
                 smoothedDirection, targetDirection, directionResponse * Time.deltaTime);
             
-            float blend2 = 1f - Mathf.Exp(-networkBlendSpeed * Time.deltaTime);
-
-            smoothedDirection = Vector2.Lerp(
-                smoothedDirection,
-                targetNetworkMoveInput,
-                blend2
-            );
-    
-            smoothedSpeed = Mathf.Lerp(
-                smoothedSpeed,
-                targetNetworkSpeed,
-                blend2
-            );
             animator.SetFloat(
                 SpeedHash,
                 smoothedSpeed,
@@ -181,7 +209,15 @@ namespace FpsBase
                 0.12f,
                 Time.deltaTime
             );
-            animator.SetFloat(MotionSpeedHash, 1f);
+            float localMotionSpeed = CalculateMotionSpeed(
+                targetSpeed,
+                targetDirection,
+                movement != null && movement.IsSprinting);
+            animator.SetFloat(
+                MotionSpeedHash,
+                localMotionSpeed,
+                motionSpeedDampTime,
+                Time.deltaTime);
 
             if (movement != null)
             {
@@ -202,6 +238,55 @@ namespace FpsBase
                     weaponController.IsReloading
                 );
             }
+        }
+
+        private float CalculateAuthoredReferenceSpeed(Vector2 moveInput, bool sprinting)
+        {
+            Vector2 input = moveInput.sqrMagnitude > 1f
+                ? moveInput.normalized
+                : moveInput;
+
+            float forwardWeight = Mathf.Max(0f, input.y);
+            float backwardWeight = Mathf.Max(0f, -input.y);
+            float rightWeight = Mathf.Max(0f, input.x);
+            float leftWeight = Mathf.Max(0f, -input.x);
+            float totalWeight = forwardWeight + backwardWeight + rightWeight + leftWeight;
+
+            if (totalWeight <= Mathf.Epsilon)
+                return walkForwardAuthoredSpeed;
+
+            float forwardSpeed = sprinting
+                ? sprintForwardAuthoredSpeed
+                : walkForwardAuthoredSpeed;
+
+            return (
+                forwardWeight * forwardSpeed
+                + backwardWeight * walkBackwardAuthoredSpeed
+                + rightWeight * strafeRightAuthoredSpeed
+                + leftWeight * strafeLeftAuthoredSpeed) / totalWeight;
+        }
+
+        private float CalculateMotionSpeed(
+            float actualHorizontalSpeed,
+            Vector2 moveInput,
+            bool sprinting)
+        {
+            if (actualHorizontalSpeed < motionSpeedIdleThreshold)
+                return 1f;
+
+            float referenceSpeed = CalculateAuthoredReferenceSpeed(moveInput, sprinting);
+            if (referenceSpeed <= Mathf.Epsilon
+                || float.IsNaN(referenceSpeed)
+                || float.IsInfinity(referenceSpeed))
+                return 1f;
+
+            float multiplier = actualHorizontalSpeed / referenceSpeed;
+            if (float.IsNaN(multiplier) || float.IsInfinity(multiplier))
+                return 1f;
+
+            float minimum = Mathf.Min(motionSpeedLimits.x, motionSpeedLimits.y);
+            float maximum = Mathf.Max(motionSpeedLimits.x, motionSpeedLimits.y);
+            return Mathf.Clamp(multiplier, minimum, maximum);
         }
     }
 }
