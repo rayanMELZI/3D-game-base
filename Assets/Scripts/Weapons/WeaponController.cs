@@ -425,21 +425,42 @@ namespace FpsBase
 
         private Vector3 FireRocket(WeaponDefinition weapon)
         {
-            RocketProjectile.Launch(
-                CurrentViewMuzzle(), shootCamera.transform.forward,
-                weapon.projectileSpeed, weapon.damage, weapon.explosionRadius, selfRoot);
+            // Aim from the barrel toward where the crosshair points, not straight
+            // along the camera (which sits behind/above the gun).
+            Vector3 muzzle = CurrentViewMuzzle();
+            Vector3 aimPoint = CameraAimPoint(weapon.range);
+            Vector3 dir = (aimPoint - muzzle).sqrMagnitude > 0.01f
+                ? (aimPoint - muzzle).normalized
+                : shootCamera.transform.forward;
 
-            // Predicted end point for remote tracer/explosion effects.
-            var ray = new Ray(shootCamera.transform.position, shootCamera.transform.forward);
-            if (TryRaycastIgnoringSelf(ray, weapon.range, out RaycastHit hit))
-                return hit.point;
-            return ray.origin + ray.direction * weapon.range;
+            RocketProjectile.Launch(
+                muzzle, dir,
+                weapon.projectileSpeed, weapon.damage, weapon.explosionRadius, selfRoot);
+            return aimPoint;
         }
 
+        /// <summary>Where the crosshair points: first thing the camera ray hits, or a far point.</summary>
+        private Vector3 CameraAimPoint(float range)
+        {
+            var ray = new Ray(shootCamera.transform.position, shootCamera.transform.forward);
+            if (TryRaycastIgnoringSelf(ray, range, out RaycastHit hit))
+                return hit.point;
+            return ray.origin + ray.direction * range;
+        }
+
+        /// <summary>
+        /// The live gun barrel to spawn tracers/rockets from: the first-person
+        /// viewmodel muzzle when it's shown, else the body-held weapon's muzzle
+        /// (third-person / P Story), else the camera as a last resort.
+        /// </summary>
         private Vector3 CurrentViewMuzzle()
         {
             var model = models[CurrentIndex];
-            return model.root.activeSelf ? model.muzzle.position : shootCamera.transform.position;
+            if (model.root != null && model.root.activeSelf && model.muzzle != null)
+                return model.muzzle.position;
+            if (hasShadowModel && shadowModel.muzzle != null)
+                return shadowModel.muzzle.position;
+            return shootCamera.transform.position;
         }
 
         /// <summary>Raycast that skips the shooter's own colliders (triggers included: hitboxes).</summary>
