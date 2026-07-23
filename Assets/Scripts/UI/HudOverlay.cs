@@ -122,8 +122,12 @@ namespace FpsBase
             if (DeathCam.CurrentLabel != null)
                 return;
 
+            // The fullscreen scope overlay is a first-person thing; in the
+            // third-person P Story view, keep the normal crosshair while aiming.
+            bool thirdPerson = GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+                && GameModeManager.Instance.CurrentMode == GameMode.PStory;
             bool zoomed = weaponController != null && weaponController.IsZoomed
-                && weaponController.CurrentWeapon.hideWhenZoomed;
+                && weaponController.CurrentWeapon.hideWhenZoomed && !thirdPerson;
             if (zoomed)
                 DrawScopeOverlay();
             else

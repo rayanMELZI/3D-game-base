@@ -43,6 +43,7 @@ namespace FpsBase
 
         private Vector3 fpLocalPos;      // saved first-person camera position
         private bool thirdPerson;
+        private float aimBlend;          // 0 hip → 1 aiming, for the TPS camera pull-in
         private PlayerRigRefs rig;
         private WeaponController weaponController;
 
@@ -70,12 +71,19 @@ namespace FpsBase
             if (Input.GetKeyDown(KeyCode.Escape))
                 LockCursor(false);
 
+            // Aiming (right-click) blend, used to tighten the third-person camera.
+            aimBlend = Mathf.MoveTowards(aimBlend, zoomFov > 0f ? 1f : 0f, 6f * Time.deltaTime);
+
             // Smoothly move toward the target FOV (zoom, plus a subtle sprint boost).
             if (cam != null)
             {
-                float targetFov = zoomFov > 0f
-                    ? zoomFov
-                    : BaseFovNow * (movement != null && movement.IsSprinting ? 1.07f : 1f);
+                float targetFov;
+                if (zoomFov > 0f)
+                    // In third person a full sniper-scope FOV looks wrong, so aiming
+                    // there is a gentle zoom (the camera pulls in instead).
+                    targetFov = thirdPerson ? Mathf.Max(zoomFov, 46f) : zoomFov;
+                else
+                    targetFov = BaseFovNow * (movement != null && movement.IsSprinting ? 1.07f : 1f);
                 cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, zoomLerpSpeed * Time.deltaTime);
             }
 
@@ -136,10 +144,13 @@ namespace FpsBase
             }
 
             // Over-the-shoulder: orbit a shoulder pivot by pitch, pull in on walls.
+            // Aiming pulls the camera closer and centers it for a precise reticle.
+            float dist = Mathf.Lerp(tpDistance, tpDistance * 0.58f, aimBlend);
+            float shoulder = Mathf.Lerp(tpShoulder, 0.12f, aimBlend);
             Transform root = playerBody != null ? playerBody : transform.parent;
             Vector3 pivotLocal = new Vector3(0f, tpHeight, 0f);
             Vector3 desiredLocal = pivotLocal
-                + Quaternion.Euler(pitchNow, 0f, 0f) * new Vector3(tpShoulder, 0f, -tpDistance);
+                + Quaternion.Euler(pitchNow, 0f, 0f) * new Vector3(shoulder, 0f, -dist);
 
             Vector3 pivotWorld = root.TransformPoint(pivotLocal);
             Vector3 desiredWorld = root.TransformPoint(desiredLocal);
