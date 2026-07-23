@@ -231,37 +231,13 @@ namespace FpsBase
                 GameSettings.Save();
             }
             GUILayout.EndHorizontal();
+            GUILayout.Space(8);
+
+            // Match settings live in the pre-game lobby now (map / mode / snipers /
+            // minimap), so hosting drops you straight there to set everything up.
+            GUILayout.Label("Map, mode and match options are set in the lobby after you host.", MenuWidgets.Small);
+
             GUILayout.Space(10);
-
-            // Match setup.
-            GUILayout.BeginHorizontal();
-            if (MenuWidgets.MenuButton($"MAP: {MapCatalog.Name(selectedMap)}", 32f))
-                selectedMap = (selectedMap + 1) % MapCatalog.Count;
-            if (MenuWidgets.MenuButton(sniperOnly ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF", 32f))
-                sniperOnly = !sniperOnly;
-            GUILayout.EndHorizontal();
-            GUILayout.Space(4);
-            string radarLabel = radarMode == 0 ? "MINIMAP: OFF"
-                : radarMode == 1 ? "MINIMAP: ALWAYS ON" : "MINIMAP: PING ON FIRE";
-            if (MenuWidgets.MenuButton(radarLabel, 32f))
-                radarMode = (radarMode + 1) % 3;
-            GUILayout.Space(4);
-            GUILayout.BeginHorizontal();
-            foreach (var mode in new[] { GameMode.Duel, GameMode.TeamDeathmatch, GameMode.FreeForAll, GameMode.GunGame })
-            {
-                string label = mode == GameMode.Duel ? "1V1"
-                    : mode == GameMode.TeamDeathmatch ? "TDM"
-                    : mode == GameMode.FreeForAll ? "FFA" : "GUN GAME";
-                var prev = GUI.backgroundColor;
-                if (selectedMode == mode)
-                    GUI.backgroundColor = MenuWidgets.Accent;
-                if (MenuWidgets.MenuButton(label, 30f))
-                    selectedMode = mode;
-                GUI.backgroundColor = prev;
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(12);
             GUILayout.Label("LOCAL / LAN", MenuWidgets.Subtitle);
             if (MenuWidgets.MenuButton("HOST GAME"))
                 StartHost();
