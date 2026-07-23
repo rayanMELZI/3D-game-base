@@ -527,13 +527,26 @@ namespace FpsBase
 
         private void ConfigureTransport(string address)
         {
-            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            var nm = NetworkManager.Singleton;
+            var transport = nm.GetComponent<UnityTransport>();
             transport.SetConnectionData(address, Port, "0.0.0.0");
+            // Force LAN back onto UnityTransport. The Steam path permanently
+            // swaps NetworkConfig.NetworkTransport to the Steam transport, and
+            // that swap survives Shutdown (the NetworkManager singleton lives on)
+            // — so without this, any LAN host/join after one Steam session (or
+            // when Steam auto-selects its transport) routes the IP through the
+            // wrong transport and silently fails.
+            nm.NetworkConfig.NetworkTransport = transport;
         }
 
         private void Leave()
         {
             NetworkManager.Singleton.Shutdown();
+#if FPSBASE_STEAM
+            // Drop any Steam lobby so the next host/join starts clean (a stale
+            // lobby was part of why "Steam worked once then stopped").
+            SteamLobbyService.LeaveLobby();
+#endif
             MouseLook.LockCursor(false);
             if (MultiplayerBootstrap.Instance != null)
                 MultiplayerBootstrap.Instance.SetMenuCamera(true);
