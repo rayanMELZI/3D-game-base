@@ -27,7 +27,7 @@ namespace FpsBase
 
         [Header("Third person (P Story mode only)")]
         public float tpDistance = 4.4f;
-        public float tpHeight = 1.55f;
+        public float tpHeight = 2.15f; // eye+ height so the cam looks slightly down, not up at the player
         public float tpShoulder = 0.75f;
 
         /// <summary>Current view pitch in degrees (up = negative). Replicated for remote aim pose.</summary>
