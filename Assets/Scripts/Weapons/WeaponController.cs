@@ -456,7 +456,12 @@ namespace FpsBase
         private Vector3 CurrentViewMuzzle()
         {
             var model = models[CurrentIndex];
-            if (model.root != null && model.root.activeSelf && model.muzzle != null)
+            // activeInHierarchy (not activeSelf): when the viewmodel holder is
+            // disabled for third-person, the model's own activeSelf is still true,
+            // so activeSelf wrongly returned the hidden viewmodel muzzle at the
+            // camera. In hierarchy terms it's inactive, so we fall through to the
+            // body-held weapon's muzzle instead.
+            if (model.root != null && model.root.activeInHierarchy && model.muzzle != null)
                 return model.muzzle.position;
             if (hasShadowModel && shadowModel.muzzle != null)
                 return shadowModel.muzzle.position;
