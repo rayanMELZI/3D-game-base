@@ -478,6 +478,17 @@ namespace FpsBase
             sea.GetComponent<Renderer>().material = MakeMaterial(new Color(0.06f, 0.28f, 0.4f), 0.2f, 0.85f);
 
             var rock = MakeMaterial(new Color(0.32f, 0.3f, 0.28f), 0.1f, 0.35f);       // exposed rock / cliffs
+
+            // THE walkable surface: solid box slabs (reliable BoxColliders) shaped
+            // to the crescent, tops at y ~ 0. Every decorative cylinder below has
+            // its collider stripped (a Unity cylinder's default CapsuleCollider,
+            // scaled flat and wide, becomes a giant invisible dome — that caused
+            // the void spawns and the lurching third-person camera). These boxes
+            // are dark rock and sit just under the biome discs, so you never see
+            // them but you always have solid ground.
+            Box(root, "IslandFloor", new Vector3(-40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
+            Box(root, "IslandFloor", new Vector3(0f, -1.02f, 6f), Vector3.zero, new Vector3(42f, 2f, 38f), rock);
+            Box(root, "IslandFloor", new Vector3(40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
             var greenBiome = MakeMaterial(new Color(0.28f, 0.55f, 0.16f));
             var limeBiome = MakeMaterial(new Color(0.55f, 0.74f, 0.22f));
             var yellowBiome = MakeMaterial(new Color(0.86f, 0.72f, 0.28f));
@@ -528,6 +539,16 @@ namespace FpsBase
             Signpost(root, "AREA 2", new Vector3(-10f, 0, 12f), limeBiome);
             Signpost(root, "AREA 3", new Vector3(10f, 0, 12f), yellowBiome);
             Signpost(root, "AREA 4", new Vector3(30f, 0, 8f), redBiome);
+
+            // Strip every decorative collider so only the IslandFloor boxes and the
+            // teleporter triggers remain — no capsule domes to void-spawn on or snag
+            // the camera. Decorations become visual-only (you can brush past props).
+            foreach (var col in root.GetComponentsInChildren<Collider>())
+            {
+                if (col.isTrigger) continue;                 // teleporter pads
+                if (col.gameObject.name == "IslandFloor") continue; // the walkable floor
+                Object.Destroy(col);
+            }
         }
 
         private static void BuildPStoryHub(Transform root, Material rock)
