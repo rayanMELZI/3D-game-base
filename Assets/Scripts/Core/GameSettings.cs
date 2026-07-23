@@ -12,7 +12,7 @@ namespace FpsBase
         public const string GameTitle = "SUNDOWN ARENA";
         /// <summary>0.MINOR.PATCH — bump MINOR for features, PATCH for fixes.
         /// Git tags follow the same number (v0.5.0 style).</summary>
-        public const string Version = "0.13.0";
+        public const string Version = "0.13.1";
 
         /// <summary>
         /// URL of a plain-text file containing the latest version string
