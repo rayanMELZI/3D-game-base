@@ -333,6 +333,32 @@ namespace FpsBase
 
         public void RequestSpectatorToggle() => SpectatorServerRpc(!Spectating.Value);
 
+        // ------------------------------------------------------------------
+        // Throwable replication — the owner spawns its own damage-dealing copy;
+        // this broadcasts the throw so every OTHER client spawns a visual replica
+        // (same pattern as NetworkWeapon's shot replication).
+        // ------------------------------------------------------------------
+
+        public void SendThrow(int type, Vector3 origin, Vector3 velocity)
+        {
+            if (IsServer)
+                ThrowClientRpc(type, origin, velocity);
+            else
+                ThrowServerRpc(type, origin, velocity);
+        }
+
+        [ServerRpc]
+        private void ThrowServerRpc(int type, Vector3 origin, Vector3 velocity)
+            => ThrowClientRpc(type, origin, velocity);
+
+        [ClientRpc]
+        private void ThrowClientRpc(int type, Vector3 origin, Vector3 velocity)
+        {
+            if (IsOwner)
+                return; // the thrower already has the authoritative copy
+            ThrowableController.Spawn(type, origin, velocity, transform, authoritative: false);
+        }
+
         [ServerRpc]
         private void SpectatorServerRpc(bool spectate)
         {
@@ -408,10 +434,23 @@ namespace FpsBase
                 {
                     string killerName = player.PlayerName.Value.IsEmpty
                         ? $"Player {killerId + 1}" : player.PlayerName.Value.ToString();
+
+                    // The killer's currently-held weapon (replicated index), shown
+                    // as a viewmodel in the replay so you see what killed you.
+                    WeaponDefinition killerWeapon = null;
+                    var killerWep = player.GetComponent<NetworkWeapon>();
+                    var killerRig = player.GetComponent<PlayerRigRefs>();
+                    if (killerWep != null && killerRig != null && killerRig.weaponController != null)
+                    {
+                        var weapons = killerRig.weaponController.weapons;
+                        int idx = Mathf.Clamp(killerWep.WeaponIndex.Value, 0, weapons.Length - 1);
+                        killerWeapon = weapons[idx];
+                    }
+
                     // Replay the killer's last seconds from their eyes (skippable),
                     // then fall back to the orbiting spectate until respawn.
                     DeathCam.BeginReplay(player.GetKillcamHistory(), player.transform,
-                        $"KILLCAM  —  {killerName}");
+                        $"KILLCAM  —  {killerName}", killerWeapon);
                     return;
                 }
             }
