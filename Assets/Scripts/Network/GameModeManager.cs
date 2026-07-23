@@ -103,9 +103,11 @@ namespace FpsBase
             if (IsServer && IsSpawned && CurrentMode == GameMode.ZombieSurvival && !LobbyOpen.Value
                 && GetComponent<ZombieDirector>() == null)
                 gameObject.AddComponent<ZombieDirector>();
-            if (IsServer && IsSpawned && CurrentMode != GameMode.ZombieSurvival && !LobbyOpen.Value && BotsEnabled.Value
-                && GetComponent<BotDirector>() == null)
-                gameObject.AddComponent<BotDirector>();
+            // Bots are disabled for now (buggy) — the toggle stays in the UI but
+            // never spawns a BotDirector. Re-enable by restoring this block.
+            // if (IsServer && IsSpawned && CurrentMode != GameMode.ZombieSurvival && !LobbyOpen.Value && BotsEnabled.Value
+            //     && GetComponent<BotDirector>() == null)
+            //     gameObject.AddComponent<BotDirector>();
         }
 
         public override void OnDestroy()
