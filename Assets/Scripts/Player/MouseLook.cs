@@ -25,6 +25,11 @@ namespace FpsBase
         [Header("Recoil")]
         public float recoilRecoverySpeed = 8f;
 
+        [Header("Third person (P Story mode only)")]
+        public float tpDistance = 4.4f;
+        public float tpHeight = 1.55f;
+        public float tpShoulder = 0.75f;
+
         /// <summary>Current view pitch in degrees (up = negative). Replicated for remote aim pose.</summary>
         public float CurrentPitch => pitch;
 
@@ -33,9 +38,17 @@ namespace FpsBase
         private float zoomFov; // 0 = not zoomed
         private Camera cam;
 
+        private Vector3 fpLocalPos;      // saved first-person camera position
+        private bool thirdPerson;
+        private PlayerRigRefs rig;
+        private WeaponController weaponController;
+
         private void Awake()
         {
             cam = GetComponent<Camera>();
+            fpLocalPos = transform.localPosition;
+            rig = GetComponentInParent<PlayerRigRefs>();
+            weaponController = rig != null ? rig.weaponController : GetComponentInParent<WeaponController>();
         }
 
         // The user-configurable FOV from the settings menu.
@@ -87,7 +100,73 @@ namespace FpsBase
             // Camera rolls a little while sliding.
             float roll = movement != null ? movement.SlideBlend * -7f : 0f;
 
-            transform.localRotation = Quaternion.Euler(pitch - recoil, 0f, roll);
+            ApplyCameraRig(pitch - recoil, roll);
+        }
+
+        /// <summary>
+        /// Places the camera: first person (at the eye) in every normal mode, or
+        /// over-the-shoulder third person in P Story only. Switching also flips the
+        /// owner's body between shadows-only (FPS) and visible (TPS) and swaps the
+        /// viewmodel for the body-held weapon.
+        /// </summary>
+        private void ApplyCameraRig(float pitchNow, float roll)
+        {
+            bool wantThirdPerson = GameModeManager.Instance != null
+                && GameModeManager.Instance.IsSpawned
+                && GameModeManager.Instance.CurrentMode == GameMode.PStory;
+
+            if (wantThirdPerson != thirdPerson)
+            {
+                thirdPerson = wantThirdPerson;
+                if (rig != null)
+                    rig.SetFirstPerson(!thirdPerson);   // TPS → show the body
+                if (weaponController != null)
+                    weaponController.SetThirdPersonView(thirdPerson);
+                if (!thirdPerson)
+                    transform.localPosition = fpLocalPos; // restore the eye position
+            }
+
+            if (!thirdPerson)
+            {
+                transform.localRotation = Quaternion.Euler(pitchNow, 0f, roll);
+                return;
+            }
+
+            // Over-the-shoulder: orbit a shoulder pivot by pitch, pull in on walls.
+            Transform root = playerBody != null ? playerBody : transform.parent;
+            Vector3 pivotLocal = new Vector3(0f, tpHeight, 0f);
+            Vector3 desiredLocal = pivotLocal
+                + Quaternion.Euler(pitchNow, 0f, 0f) * new Vector3(tpShoulder, 0f, -tpDistance);
+
+            Vector3 pivotWorld = root.TransformPoint(pivotLocal);
+            Vector3 desiredWorld = root.TransformPoint(desiredLocal);
+            Vector3 dir = desiredWorld - pivotWorld;
+            float dist = dir.magnitude;
+            if (dist > 0.01f && CameraCastIgnoringSelf(pivotWorld, dir / dist, dist, root, out float hitDist))
+                desiredWorld = pivotWorld + dir / dist * Mathf.Max(0.6f, hitDist - 0.15f);
+
+            transform.position = desiredWorld;
+            transform.localRotation = Quaternion.Euler(pitchNow, 0f, roll);
+        }
+
+        /// <summary>Sphere-cast for the follow camera, skipping the player's own colliders.</summary>
+        private bool CameraCastIgnoringSelf(Vector3 origin, Vector3 dir, float maxDist, Transform self, out float hitDist)
+        {
+            hitDist = maxDist;
+            var hits = Physics.SphereCastAll(origin, 0.25f, dir, maxDist,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            bool found = false;
+            foreach (var h in hits)
+            {
+                if (h.collider.transform.root == self.root)
+                    continue; // never collide with ourselves
+                if (h.distance < hitDist)
+                {
+                    hitDist = h.distance;
+                    found = true;
+                }
+            }
+            return found;
         }
 
         /// <summary>Called by the gun to kick the view upward.</summary>

@@ -137,7 +137,7 @@ namespace FpsBase
                 rig.cameraObject.SetActive(true);
                 rig.movement.enabled = true;
                 rig.weaponController.enabled = true;
-                rig.SetFirstPerson(true);
+                rig.SetFirstPerson(!ThirdPersonMode()); // P Story shows your body (third-person)
 
                 var hud = gameObject.AddComponent<HudOverlay>();
                 hud.weaponController = rig.weaponController;
@@ -398,11 +398,16 @@ namespace FpsBase
         // Death, kill cam & respawn (server-driven)
         // ------------------------------------------------------------------
 
+        /// <summary>True in the P Story mode, where the local camera is third-person and the body is shown.</summary>
+        private static bool ThirdPersonMode() =>
+            GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+            && GameModeManager.Instance.CurrentMode == GameMode.PStory;
+
         private void OnDeadChanged(bool previous, bool dead)
         {
             rig.SetVisible(!dead);
             if (IsOwner && !dead)
-                rig.SetFirstPerson(true); // SetVisible re-enabled the head parts
+                rig.SetFirstPerson(!ThirdPersonMode()); // keep the body visible in P Story
             if (networkWeapon != null)
                 networkWeapon.SetThirdPersonVisible(!dead);
             if (nametag != null)

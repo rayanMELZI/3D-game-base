@@ -467,6 +467,34 @@ namespace FpsBase
         // Shadow model (your shadow holds the current gun)
         // ------------------------------------------------------------------
 
+        private bool thirdPersonView;
+
+        /// <summary>
+        /// Third-person mode (P Story): hide the first-person viewmodel and make
+        /// the body-held weapon fully visible (it's normally shadows-only), so the
+        /// character is seen holding the gun instead of a floating viewmodel.
+        /// </summary>
+        public void SetThirdPersonView(bool on)
+        {
+            if (thirdPersonView == on)
+                return;
+            thirdPersonView = on;
+            if (viewmodelHolder != null)
+                viewmodelHolder.gameObject.SetActive(!on);
+            ApplyShadowModelVisibility();
+        }
+
+        private void ApplyShadowModelVisibility()
+        {
+            if (!hasShadowModel || shadowModel.root == null)
+                return;
+            var mode = thirdPersonView
+                ? UnityEngine.Rendering.ShadowCastingMode.On
+                : UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
+                r.shadowCastingMode = mode;
+        }
+
         private void RebuildShadowModel()
         {
             if (hasShadowModel)
@@ -478,9 +506,8 @@ namespace FpsBase
                 return;
 
             shadowModel = WeaponModelBuilder.Build(CurrentWeapon, thirdPersonAnchor, Vector3.zero, castShadows: true, MaskFor(CurrentIndex), GameSettings.WeaponColors[CurrentIndex]);
-            foreach (var r in shadowModel.root.GetComponentsInChildren<Renderer>())
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
             hasShadowModel = true;
+            ApplyShadowModelVisibility(); // shadows-only normally, fully visible in third-person
         }
 
         // ------------------------------------------------------------------
