@@ -211,6 +211,7 @@ namespace FpsBase
                 case GameMode.TeamDeathmatch: return "TDM";
                 case GameMode.FreeForAll: return "FFA";
                 case GameMode.ZombieSurvival: return "ZOMBIES";
+                case GameMode.PStory: return "P STORY";
                 default: return "GUN GAME";
             }
         }
@@ -252,6 +253,7 @@ namespace FpsBase
                 case GameMode.TeamDeathmatch: return $"TEAM DEATHMATCH · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.FreeForAll: return $"FREE-FOR-ALL · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.ZombieSurvival: return $"ZOMBIE SURVIVAL · {map}";
+                case GameMode.PStory: return $"P STORY · third-person free-roam · {map}";
                 default: return $"GUN GAME · {GameModeManager.GunGameOrder.Length} weapons · {map}{sniper}";
             }
         }
