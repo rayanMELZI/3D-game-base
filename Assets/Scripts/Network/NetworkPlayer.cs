@@ -53,6 +53,7 @@ namespace FpsBase
         private CharacterController characterController;
         private float remoteCrouchBlend;
         private bool respawning;
+        private bool wasInLobby;
 
         private void Awake()
         {
@@ -214,6 +215,15 @@ namespace FpsBase
                 Pitch.Value = pitch;
 
             var gameMode = GameModeManager.Instance;
+
+            // Pre-game lobby: free the cursor so the player can use the lobby UI
+            // (classes, settings); re-lock the moment the match starts.
+            bool inLobby = gameMode != null && gameMode.IsSpawned && gameMode.LobbyOpen.Value;
+            if (inLobby != wasInLobby)
+            {
+                wasInLobby = inLobby;
+                MouseLook.LockCursor(!inLobby);
+            }
 
             // Freeze input while dead, between matches, or during a respawn teleport
             // (the respawn coroutine holds control until the map is built locally).

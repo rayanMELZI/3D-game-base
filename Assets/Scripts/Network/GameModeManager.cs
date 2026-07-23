@@ -167,6 +167,16 @@ namespace FpsBase
             if (IsServer && LobbyOpen.Value) BotsEnabled.Value = !BotsEnabled.Value;
         }
 
+        public void HostToggleSniper()
+        {
+            if (IsServer && LobbyOpen.Value) SniperOnly.Value = !SniperOnly.Value;
+        }
+
+        public void HostCycleRadar()
+        {
+            if (IsServer && LobbyOpen.Value) RadarMode.Value = (RadarMode.Value + 1) % 3;
+        }
+
         public override void OnNetworkDespawn()
         {
             MapIndex.OnValueChanged -= ApplyMap;

@@ -110,10 +110,38 @@ namespace FpsBase
                 return;
             }
 
+            // Class editor opened from the pre-game lobby — reuses the full menu
+            // class/gunsmith UI as an overlay during a running game.
+            if (ShowClassesOverlay)
+            {
+                DrawClassesOverlayWindow();
+                return;
+            }
+
             if (!NetworkRunning)
                 DrawMainMenu();
-            else if (Cursor.lockState != CursorLockMode.Locked)
+            else if (Cursor.lockState != CursorLockMode.Locked && !InLobby)
                 DrawPauseMenu();
+        }
+
+        /// <summary>Set by the lobby to open the class editor over a running game.</summary>
+        public static bool ShowClassesOverlay;
+
+        private static bool InLobby =>
+            GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+            && GameModeManager.Instance.LobbyOpen.Value;
+
+        private void DrawClassesOverlayWindow()
+        {
+            screen = MenuScreen.Classes;
+            float w = 480f, h = 700f;
+            var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+            MenuWidgets.Panel(panel);
+            GUILayout.BeginArea(new Rect(panel.x + 30, panel.y + 20, w - 60, h - 40));
+            GUILayout.Label("CLASSES", MenuWidgets.Title, GUILayout.Height(48));
+            GUILayout.Space(6);
+            DrawClasses(); // its BACK button clears ShowClassesOverlay
+            GUILayout.EndArea();
         }
 
         private void DrawConnectingWindow()
@@ -322,9 +350,10 @@ namespace FpsBase
             DrawGunsmith();
 
             GUILayout.Space(8);
-            if (MenuWidgets.MenuButton("BACK", 32f))
+            if (MenuWidgets.MenuButton(ShowClassesOverlay ? "BACK TO LOBBY" : "BACK", 32f))
             {
                 GameSettings.Save();
+                ShowClassesOverlay = false; // close the lobby overlay if that's how we got here
                 screen = MenuScreen.Root;
             }
         }
