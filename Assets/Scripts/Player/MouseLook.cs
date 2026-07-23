@@ -25,10 +25,13 @@ namespace FpsBase
         [Header("Recoil")]
         public float recoilRecoverySpeed = 8f;
 
-        [Header("Third person (P Story mode only)")]
+        [Header("Third person (P Story mode only) — tweak these live in the Inspector")]
+        [Tooltip("How far behind the player the camera sits.")]
         public float tpDistance = 4.4f;
-        public float tpHeight = 2.15f; // eye+ height so the cam looks slightly down, not up at the player
-        public float tpShoulder = 0.75f;
+        [Tooltip("Camera height above the player's feet (higher = looks down more).")]
+        public float tpHeight = 2.15f;
+        [Tooltip("Sideways shoulder offset. 0 = centered behind the head (crosshair tracks like FPS); higher = more over-the-shoulder.")]
+        public float tpShoulder = 0.35f;
 
         /// <summary>Current view pitch in degrees (up = negative). Replicated for remote aim pose.</summary>
         public float CurrentPitch => pitch;
