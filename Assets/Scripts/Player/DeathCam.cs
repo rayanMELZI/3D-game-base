@@ -33,6 +33,7 @@ namespace FpsBase
         private NetworkPlayer.KillcamSample[] replay;
         private bool replaying;
         private float replayClock;    // current playback time (in the samples' timebase)
+        private GameObject weaponModel; // the killer's gun, shown as a viewmodel
         private const float ReplayLength = 3.2f; // seconds of the killer's past to show
         private const float EyeHeight = 1.62f;
 
@@ -46,7 +47,8 @@ namespace FpsBase
         }
 
         /// <summary>Killcam: replay the killer's buffered last seconds from their eyes, then orbit.</summary>
-        public static void BeginReplay(NetworkPlayer.KillcamSample[] history, Transform target, string label)
+        public static void BeginReplay(NetworkPlayer.KillcamSample[] history, Transform target, string label,
+            WeaponDefinition killerWeapon = null)
         {
             if (Camera.main == null)
                 return;
@@ -60,7 +62,26 @@ namespace FpsBase
                 instance.replaying = true;
                 float end = history[history.Length - 1].time;
                 instance.replayClock = Mathf.Max(history[0].time, end - ReplayLength);
+                instance.BuildWeaponViewmodel(killerWeapon);
             }
+        }
+
+        // The enemy's weapon, mounted to the replay camera like a first-person
+        // viewmodel so you see what they killed you with.
+        private void BuildWeaponViewmodel(WeaponDefinition weapon)
+        {
+            DestroyWeaponModel();
+            if (weapon == null || cam == null)
+                return;
+            var built = WeaponModelBuilder.Build(weapon, cam.transform, weapon.viewOffset, castShadows: false);
+            weaponModel = built.root;
+        }
+
+        private void DestroyWeaponModel()
+        {
+            if (weaponModel != null)
+                Destroy(weaponModel);
+            weaponModel = null;
         }
 
         public static void End()
@@ -90,6 +111,7 @@ namespace FpsBase
             active = false;
             replaying = false;
             replay = null;
+            DestroyWeaponModel();
             if (cam != null)
             {
                 cam.transform.localPosition = savedLocalPos;
@@ -135,6 +157,7 @@ namespace FpsBase
             {
                 replaying = false;
                 replay = null;
+                DestroyWeaponModel();
                 startTime = Time.time; // restart the orbit angle from behind
                 return;
             }
