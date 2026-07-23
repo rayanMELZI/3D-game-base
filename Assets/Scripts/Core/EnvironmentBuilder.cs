@@ -450,6 +450,160 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // P Story — a big crescent island of four biome wedges around a central
+        // transition hub, with a teleporter linking the left tip to the hub.
+        // Used only by the P Story game mode (third-person).
+        // ------------------------------------------------------------------
+
+        public static void BuildPStoryIsland()
+        {
+            var root = new GameObject(MapRootName).transform;
+
+            // A calm "sea" plane far below so the island reads as floating land.
+            var sea = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            sea.name = "Sea";
+            sea.transform.SetParent(root);
+            sea.transform.position = new Vector3(0, -6f, 8f);
+            sea.transform.localScale = new Vector3(40f, 1f, 40f);
+            sea.GetComponent<Renderer>().material = MakeMaterial(new Color(0.08f, 0.24f, 0.34f), 0.1f, 0.7f);
+
+            // Solid bedrock spanning the whole island footprint, just below the
+            // biome tops — guarantees no gaps between wedges to fall through.
+            Box(root, "Bedrock", new Vector3(0f, -1.05f, 12f), Vector3.zero,
+                new Vector3(130f, 2f, 46f), MakeMaterial(new Color(0.4f, 0.36f, 0.3f)));
+
+            // Biome colors from the layout drawing.
+            var greenBiome = MakeMaterial(new Color(0.33f, 0.6f, 0.16f));   // Area 1
+            var limeBiome = MakeMaterial(new Color(0.62f, 0.8f, 0.2f));     // Area 2
+            var yellowBiome = MakeMaterial(new Color(0.92f, 0.78f, 0.18f)); // Area 3
+            var redBiome = MakeMaterial(new Color(0.72f, 0.16f, 0.14f));    // Area 4
+            var sandHub = MakeMaterial(new Color(0.85f, 0.78f, 0.58f));     // transition
+
+            // Wedge slabs, tops flush at y = 0 (players stand at y ~ 1).
+            void Slab(string name, Vector3 center, Vector3 size, Material mat) =>
+                Box(root, name, center + Vector3.up * (-size.y * 0.5f), Vector3.zero, size, mat);
+
+            Slab("Area1_Ground", new Vector3(-40f, 0, 10f), new Vector3(30f, 1.4f, 26f), greenBiome);
+            Slab("Area1_Tip", new Vector3(-55f, 0, 15f), new Vector3(16f, 1.4f, 14f), greenBiome);
+            Slab("Area2_Ground", new Vector3(-19f, 0, 21f), new Vector3(28f, 1.4f, 24f), limeBiome);
+            Slab("Area3_Ground", new Vector3(19f, 0, 21f), new Vector3(28f, 1.4f, 24f), yellowBiome);
+            Slab("Area4_Ground", new Vector3(40f, 0, 10f), new Vector3(30f, 1.4f, 26f), redBiome);
+            Slab("Area4_Tip", new Vector3(55f, 0, 15f), new Vector3(16f, 1.4f, 14f), redBiome);
+
+            // Central transition hub — a round sand platform tying the wedges together.
+            Cylinder(root, "TransitionHub", new Vector3(0, -0.3f, 6f), new Vector3(30f, 0.7f, 30f), sandHub);
+            // A small stone altar in the middle (the sketch's central mark).
+            var stone = MakeMaterial(new Color(0.5f, 0.48f, 0.45f), 0.2f, 0.4f);
+            foreach (float a in new[] { 0f, 60f, 120f, 180f, 240f, 300f })
+            {
+                float rad = a * Mathf.Deg2Rad;
+                Box(root, "AltarStone", new Vector3(Mathf.Cos(rad) * 4f, 0.9f, 6f + Mathf.Sin(rad) * 4f),
+                    new Vector3(0, a, 0), new Vector3(1.1f, 1.8f, 1.1f), stone);
+            }
+
+            // --- Biome props ---
+            // Area 1: forest.
+            var trunk = MakeMaterial(new Color(0.35f, 0.24f, 0.14f));
+            var leaves = MakeMaterial(new Color(0.18f, 0.45f, 0.14f));
+            foreach (var p in new[] { new Vector3(-44, 0, 6), new Vector3(-36, 0, 15), new Vector3(-48, 0, 16), new Vector3(-40, 0, 3) })
+            {
+                Cylinder(root, "TreeTrunk", p + new Vector3(0, 1.6f, 0), new Vector3(0.7f, 1.6f, 0.7f), trunk);
+                Sphere(root, "TreeCanopy", p + new Vector3(0, 3.6f, 0), Vector3.one * 3.2f, leaves);
+            }
+            // Area 2: plains — boulders + grass tufts.
+            var boulder = MakeMaterial(new Color(0.5f, 0.52f, 0.5f), 0.2f, 0.4f);
+            foreach (var p in new[] { new Vector3(-22, 0, 24), new Vector3(-14, 0, 18), new Vector3(-24, 0, 15) })
+                Sphere(root, "Boulder", p + new Vector3(0, 0.9f, 0), new Vector3(2.4f, 1.6f, 2.4f), boulder);
+            // Area 3: desert — cacti + a dune.
+            var cactus = MakeMaterial(new Color(0.25f, 0.5f, 0.28f));
+            foreach (var p in new[] { new Vector3(16, 0, 24), new Vector3(24, 0, 18), new Vector3(20, 0, 27) })
+                Cylinder(root, "Cactus", p + new Vector3(0, 1.8f, 0), new Vector3(0.8f, 1.8f, 0.8f), cactus);
+            Sphere(root, "Dune", new Vector3(12f, -0.5f, 20f), new Vector3(9f, 2.2f, 7f), yellowBiome);
+            // Area 4: volcanic — dark rocks + glowing lava cracks.
+            var darkRock = MakeMaterial(new Color(0.15f, 0.12f, 0.12f), 0.3f, 0.3f);
+            var lava = MakeEmissiveMaterial(new Color(1f, 0.4f, 0.1f), 2.6f);
+            foreach (var p in new[] { new Vector3(38, 0, 6), new Vector3(46, 0, 14), new Vector3(42, 0, 16) })
+                Sphere(root, "VolcanicRock", p + new Vector3(0, 1f, 0), new Vector3(2.6f, 2f, 2.6f), darkRock);
+            foreach (var p in new[] { new Vector3(40, 0.05f, 10), new Vector3(44, 0.05f, 8), new Vector3(37, 0.05f, 13) })
+                Box(root, "LavaCrack", p, new Vector3(0, Random.Range(0, 90), 0), new Vector3(3.5f, 0.1f, 0.6f), lava);
+
+            // --- Teleporter: pad at the Area 1 tip <-> pad at the hub ---
+            var padA = TeleportPadObject(root, "Teleporter_Area1", new Vector3(-55f, 0.1f, 15f));
+            var padB = TeleportPadObject(root, "Teleporter_Hub", new Vector3(0f, 0.1f, 14f));
+            padA.linked = padB;
+            padB.linked = padA;
+
+            // Soft area labels floating above each biome so players learn the map.
+            AreaLabel(root, "AREA 1", new Vector3(-42f, 6f, 10f));
+            AreaLabel(root, "AREA 2", new Vector3(-19f, 6f, 21f));
+            AreaLabel(root, "AREA 3", new Vector3(19f, 6f, 21f));
+            AreaLabel(root, "AREA 4", new Vector3(42f, 6f, 10f));
+        }
+
+        /// <summary>Spawn points spread across the four biomes (P Story is free-roam).</summary>
+        public static Vector3[] PStorySpawnCandidates()
+        {
+            return new[]
+            {
+                new Vector3(-40f, 1.2f, 10f), new Vector3(-19f, 1.2f, 21f),
+                new Vector3(19f, 1.2f, 21f),  new Vector3(40f, 1.2f, 10f),
+                new Vector3(0f, 1.2f, 6f),    new Vector3(-48f, 1.2f, 14f),
+                new Vector3(48f, 1.2f, 14f),  new Vector3(0f, 1.2f, 18f),
+            };
+        }
+
+        private static TeleportPad TeleportPadObject(Transform root, string name, Vector3 pos)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            go.name = name;
+            go.transform.SetParent(root);
+            go.transform.position = pos;
+            go.transform.localScale = new Vector3(3f, 0.15f, 3f);
+            go.GetComponent<Renderer>().material = MakeEmissiveMaterial(new Color(0.3f, 0.7f, 1f), 2.4f);
+            var col = go.GetComponent<Collider>();
+            col.isTrigger = true; // trigger only — you walk onto it
+            // A thin solid disc under the trigger so players don't fall through.
+            Cylinder(root, name + "_Base", pos + Vector3.down * 0.1f, new Vector3(3.2f, 0.1f, 3.2f),
+                MakeMaterial(new Color(0.2f, 0.3f, 0.4f), 0.3f, 0.5f));
+            return go.AddComponent<TeleportPad>();
+        }
+
+        private static void AreaLabel(Transform root, string text, Vector3 pos)
+        {
+            var go = new GameObject(text);
+            go.transform.SetParent(root);
+            go.transform.position = pos;
+            var tm = go.AddComponent<TextMesh>();
+            tm.text = text;
+            tm.characterSize = 0.5f;
+            tm.fontSize = 64;
+            tm.fontStyle = FontStyle.Bold;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = new Color(1f, 1f, 1f, 0.6f);
+
+            Font font = null;
+            try { font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
+            if (font == null) { try { font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } }
+            if (font != null)
+            {
+                tm.font = font;
+                go.GetComponent<MeshRenderer>().material = font.material;
+            }
+            go.AddComponent<Nametag>(); // billboards toward the camera
+        }
+
+        private static void Sphere(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = name;
+            go.transform.SetParent(parent);
+            go.transform.position = pos;
+            go.transform.localScale = scale;
+            go.GetComponent<Renderer>().material = mat;
+        }
+
+        // ------------------------------------------------------------------
         // Shared pieces
         // ------------------------------------------------------------------
 

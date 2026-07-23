@@ -13,6 +13,7 @@ namespace FpsBase
         FreeForAll = 2,     // everyone for themselves, first to 20 kills
         GunGame = 3,        // race through the arsenal, knife kill wins
         ZombieSurvival = 4,
+        PStory = 5,         // free-roam story island, third-person camera
     }
 
     /// <summary>
@@ -76,6 +77,7 @@ namespace FpsBase
                     case GameMode.Duel: return 10;
                     case GameMode.TeamDeathmatch: return 30;
                     case GameMode.FreeForAll: return 20;
+                    case GameMode.PStory: return 9999; // free-roam, effectively no round end
                     default: return GunGameOrder.Length;
                 }
             }
@@ -144,6 +146,8 @@ namespace FpsBase
             if (!IsServer || !LobbyOpen.Value) return;
             if (CurrentMode == GameMode.ZombieSurvival)
                 MapIndex.Value = Mathf.Min(5, MapCatalog.Count - 1);
+            if (CurrentMode == GameMode.PStory)
+                MapIndex.Value = MapCatalog.PStoryMapIndex();
             LobbyOpen.Value = false;
             if (CurrentMode == GameMode.ZombieSurvival && GetComponent<ZombieDirector>() == null)
                 gameObject.AddComponent<ZombieDirector>();
@@ -159,7 +163,10 @@ namespace FpsBase
         public void HostCycleMode()
         {
             if (!IsServer || !LobbyOpen.Value) return;
-            Mode.Value = (Mode.Value + 1) % 5;
+            Mode.Value = (Mode.Value + 1) % 6;
+            // Preview the forced maps in the lobby card as the host cycles.
+            if (CurrentMode == GameMode.PStory)
+                MapIndex.Value = MapCatalog.PStoryMapIndex();
         }
 
         public void HostToggleBots()
