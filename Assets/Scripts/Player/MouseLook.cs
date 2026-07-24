@@ -155,9 +155,9 @@ namespace FpsBase
             Vector3 pivotWorld = root.TransformPoint(pivotLocal);
             Vector3 desiredWorld = root.TransformPoint(desiredLocal);
             Vector3 dir = desiredWorld - pivotWorld;
-            float dist = dir.magnitude;
-            if (dist > 0.01f && CameraCastIgnoringSelf(pivotWorld, dir / dist, dist, root, out float hitDist))
-                desiredWorld = pivotWorld + dir / dist * Mathf.Max(0.6f, hitDist - 0.15f);
+            float castLen = dir.magnitude;
+            if (castLen > 0.01f && CameraCastIgnoringSelf(pivotWorld, dir / castLen, castLen, root, out float hitDist))
+                desiredWorld = pivotWorld + dir / castLen * Mathf.Max(0.6f, hitDist - 0.15f);
 
             transform.position = desiredWorld;
             transform.localRotation = Quaternion.Euler(pitchNow, 0f, roll);
