@@ -41,7 +41,7 @@ namespace FpsBase
 
         // The anchor arcs around this local point (shoulder height) with pitch.
         private static readonly Vector3 ShoulderPivot = new Vector3(0f, 1.38f, 0f);
-        private const float ReloadPoseBlendSpeed = 10f;
+        private float reloadPoseBlendSpeed = 10f;
 
         private void Awake()
         {
@@ -81,11 +81,11 @@ namespace FpsBase
             handIkWeight = Mathf.MoveTowards(
                 handIkWeight,
                 targetPoseWeight,
-                ReloadPoseBlendSpeed * Time.deltaTime);
+                reloadPoseBlendSpeed * Time.deltaTime);
             lookAtWeight = Mathf.MoveTowards(
                 lookAtWeight,
                 targetPoseWeight,
-                ReloadPoseBlendSpeed * Time.deltaTime);
+                reloadPoseBlendSpeed * Time.deltaTime);
 
             // Weapon anchor follows aim pitch, arcing around the shoulder.
             // (Done in Update so the IK pass below sees the final gun position.)
