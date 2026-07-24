@@ -45,16 +45,19 @@ jobs:
       - name: Install Velopack CLI
         run: dotnet tool install -g vpk
 
-      # 5. Pack the build with Velopack
+      # 5. DEBUG: See exactly what Unity named the executable
+      - name: List Build Files
+        run: ls -R build/StandaloneWindows64/
+
+      # 6. Pack the build with Velopack
       - name: Create Velopack Installer
         run: |
-          # Strip the 'v' from the tag (e.g., v1.0.1 becomes 1.0.1)
           VERSION=${GITHUB_REF_NAME#v}
           
-          # Pack the game. Change NouveauDossier.exe to your actual executable name!
+          # Replace 'NouveauDossier.exe' below with the EXACT name found in Step 5
           vpk pack -u MyGame -v $VERSION -p build/StandaloneWindows64 -e NouveauDossier.exe -o VelopackReleases
           
-      # 6. Upload all Velopack files to GitHub Releases
+      # 7. Upload all Velopack files to GitHub Releases
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
