@@ -23,7 +23,7 @@ public class VelopackUpdater : MonoBehaviour
         {
             // Connect to your GitHub repository's releases
             var source = new GithubSource(githubRepoUrl, null, false);
-            using var mgr = new UpdateManager(source);
+            var mgr = new UpdateManager(source);
 
             // Check if there is a newer version available on GitHub
             var newVersion = await mgr.CheckForUpdatesAsync();
