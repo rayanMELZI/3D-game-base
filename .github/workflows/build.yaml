@@ -62,7 +62,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           
           # Because buildName is set to 'MyGame', Unity outputs MyGame.exe
-          vpk pack -u MyGame -v $VERSION -p build/StandaloneWindows64 -e MyGame.exe -o VelopackReleases
+          vpk pack win -u MyGame -v $VERSION -p build/StandaloneWindows64 -e MyGame.exe -o VelopackReleases
           
       # 7. Upload all Velopack files to GitHub Releases
       - name: Create GitHub Release
