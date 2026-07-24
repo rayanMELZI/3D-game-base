@@ -41,26 +41,22 @@ jobs:
           restore-keys: |
             Library-
 
-      # 4. Build the Unity project using GameCI
-      - name: Build Unity Project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          targetPlatform: StandaloneWindows64
-          buildName: NouveauDossier # Change this to your game's executable name
-          
-      # 5. Zip the built files so they can be downloaded easily
-      - name: Zip the Build
+      # 4. Install Velopack CLI
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
+
+      # 5. Pack the build with Velopack
+      - name: Create Velopack Installer
         run: |
-          cd build/StandaloneWindows64
-          zip -r ../../NouveauDossier-Windows.zip .
+          # Strip the 'v' from the tag (e.g., v1.0.1 becomes 1.0.1)
+          VERSION=${GITHUB_REF_NAME#v}
           
-      # 6. Create a GitHub Release and attach the Zip file
+          # Pack the game. Change NouveauDossier.exe to your actual executable name!
+          vpk pack -u MyGame -v $VERSION -p build/StandaloneWindows64 -e NouveauDossier.exe -o VelopackReleases
+          
+      # 6. Upload all Velopack files to GitHub Releases
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: NouveauDossier-Windows.zip
+          files: VelopackReleases/*
           generate_release_notes: true
