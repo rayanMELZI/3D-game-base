@@ -1,0 +1,55 @@
+name: Build and Release Unity Game
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers automatically when you push a tag like 'v1.0.0'
+  workflow_dispatch: # Allows you to run it manually from the Actions tab
+
+permissions:
+  contents: write # Required to allow GitHub Actions to create a Release
+
+jobs:
+  build-and-release:
+    name: Build for Windows and Release
+    runs-on: ubuntu-latest # Free tier runner
+    
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true # Essential if you use Git Large File Storage for 3D models/audio
+
+      # 2. Cache the Unity Library folder to speed up future builds
+      - name: Cache Unity Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      # 3. Build the Unity project using GameCI
+      - name: Build Unity Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          buildName: NouveauDossier # Change this to your game's executable name
+          
+      # 4. Zip the built files so they can be downloaded easily
+      - name: Zip the Build
+        run: |
+          cd build/StandaloneWindows64
+          zip -r ../../NouveauDossier-Windows.zip .
+          
+      # 5. Create a GitHub Release and attach the Zip file
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: NouveauDossier-Windows.zip
+          generate_release_notes: true

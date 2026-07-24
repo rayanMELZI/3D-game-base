@@ -33,6 +33,10 @@ namespace FpsBase
         public float proneEyeHeight = 0.58f;
         public float proneSpeed = 1.45f;
 
+        [Header("Crouch Visual")]
+        [Tooltip("Apply the legacy procedural body squash used by the primitive character.")]
+        public bool useProceduralBodyCrouch = true;
+
         [Header("References (wired by PlayerFactory)")]
         public Transform cameraTransform;
         public Transform bodyVisual;
@@ -45,6 +49,9 @@ namespace FpsBase
         public bool IsCrouching { get; private set; }
         public bool IsSliding => slideTimer > 0f;
         public bool IsProne { get; private set; }
+        public bool IsGrounded =>
+            controller != null && controller.isGrounded;
+        public float VerticalSpeed => verticalVelocity;
         public Vector2 MoveInput => moveInput;
         public float CurrentHorizontalSpeed => horizontalVelocity.magnitude;
         /// <summary>0 = standing, 1 = fully crouched — also drives the body squash.</summary>
@@ -85,12 +92,14 @@ namespace FpsBase
             IsProne = proneToggle;
             bool wantCrouch = !IsProne && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C)
                 || Input.GetKey(KeyCode.JoystickButton1));
-            IsSprinting = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9))
+            bool sprintHeld = Input.GetKey(KeyCode.LeftShift)
+                || Input.GetKey(KeyCode.JoystickButton9);
+            IsSprinting = sprintHeld && inputZ > 0.1f
                 && moving && !wantCrouch && !IsProne && !IsSliding;
 
             // --- Slide: press crouch while sprinting on the ground ---
             if (grounded && slideTimer <= 0f
-                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9)) && moving
+                && sprintHeld && inputZ > 0.1f && moving
                 && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C)))
             {
                 slideTimer = slideDuration;
@@ -135,7 +144,8 @@ namespace FpsBase
                 camPos.y = Mathf.Lerp(standEyeHeight, IsProne ? proneEyeHeight : crouchEyeHeight, CrouchBlend);
                 cameraTransform.localPosition = camPos;
             }
-            ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
+            if (useProceduralBodyCrouch)
+                ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
 
             // --- Jump (hold Space to bunny hop) + gravity ---
             if (grounded && verticalVelocity < 0f)

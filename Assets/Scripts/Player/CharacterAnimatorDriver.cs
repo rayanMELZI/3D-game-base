@@ -17,6 +17,10 @@ namespace FpsBase
         [SerializeField, Min(0.01f)] private float strafeLeftAuthoredSpeed = 1.8f;
         [SerializeField, Min(0.01f)] private float strafeRightAuthoredSpeed = 1.8f;
         [SerializeField, Min(0.01f)] private float sprintForwardAuthoredSpeed = 5.5f;
+        [SerializeField, Min(0.01f)] private float crouchForwardAuthoredSpeed = 1f;
+        [SerializeField, Min(0.01f)] private float crouchBackwardAuthoredSpeed = 1f;
+        [SerializeField, Min(0.01f)] private float crouchLeftAuthoredSpeed = 1f;
+        [SerializeField, Min(0.01f)] private float crouchRightAuthoredSpeed = 1f;
 
         [Header("Motion Speed Matching")]
         [SerializeField, Min(0f)] private float motionSpeedDampTime = 0.08f;
@@ -35,6 +39,9 @@ namespace FpsBase
         private static readonly int GroundedHash =
             Animator.StringToHash("Grounded");
 
+        private static readonly int VerticalSpeedHash =
+            Animator.StringToHash("VerticalSpeed");
+
         private static readonly int MotionSpeedHash =
             Animator.StringToHash("MotionSpeed");
 
@@ -50,21 +57,25 @@ namespace FpsBase
         private static readonly int ReloadingHash =
             Animator.StringToHash("Reloading");
 
+        private static readonly int AimingHash =
+            Animator.StringToHash("Aiming");
+
         private Vector3 lastPosition;
         private float smoothedSpeed;
         private Vector2 smoothedDirection;
-        private CharacterController characterController;
         
         [SerializeField] private float networkBlendSpeed = 10f;
 
         private Vector2 targetNetworkMoveInput;
         private float targetNetworkSpeed;
+        private float targetNetworkVerticalSpeed;
 
         private bool networkGrounded;
         private bool networkCrouching;
         private bool networkSprinting;
         private bool networkSliding;
         private bool networkReloading;
+        private bool networkAiming;
 
 
         public void ConfigureAuthoredSpeeds(
@@ -72,13 +83,21 @@ namespace FpsBase
             float walkBackward,
             float strafeLeft,
             float strafeRight,
-            float sprintForward)
+            float sprintForward,
+            float crouchForward,
+            float crouchBackward,
+            float crouchLeft,
+            float crouchRight)
         {
             walkForwardAuthoredSpeed = walkForward;
             walkBackwardAuthoredSpeed = walkBackward;
             strafeLeftAuthoredSpeed = strafeLeft;
             strafeRightAuthoredSpeed = strafeRight;
             sprintForwardAuthoredSpeed = sprintForward;
+            crouchForwardAuthoredSpeed = crouchForward;
+            crouchBackwardAuthoredSpeed = crouchBackward;
+            crouchLeftAuthoredSpeed = crouchLeft;
+            crouchRightAuthoredSpeed = crouchRight;
         }
 
 
@@ -91,27 +110,29 @@ namespace FpsBase
                 ? playerRoot.position
                 : transform.position;
 
-            if (movement != null)
-                characterController = movement.GetComponent<CharacterController>();
         }
 
         public void SetNetworkAnimationState(
             Vector2 moveInput,
             float speed,
             bool grounded,
+            float verticalSpeed,
             bool crouching,
             bool sprinting,
             bool sliding,
-            bool reloading)
+            bool reloading,
+            bool aiming)
         {
             targetNetworkMoveInput = moveInput;
             targetNetworkSpeed = speed;
+            targetNetworkVerticalSpeed = verticalSpeed;
 
             networkGrounded = grounded;
             networkCrouching = crouching;
             networkSprinting = sprinting;
             networkSliding = sliding;
             networkReloading = reloading;
+            networkAiming = aiming;
         }
         private void Update()
         {
@@ -140,7 +161,10 @@ namespace FpsBase
                 float networkMotionSpeed = CalculateMotionSpeed(
                     targetNetworkSpeed,
                     targetNetworkMoveInput,
-                    networkSprinting);
+                    networkGrounded,
+                    networkCrouching,
+                    networkSprinting,
+                    networkSliding);
                 animator.SetFloat(
                     MotionSpeedHash,
                     networkMotionSpeed,
@@ -148,10 +172,16 @@ namespace FpsBase
                     Time.deltaTime);
 
                 animator.SetBool(GroundedHash, networkGrounded);
+                animator.SetFloat(
+                    VerticalSpeedHash,
+                    targetNetworkVerticalSpeed,
+                    0.08f,
+                    Time.deltaTime);
                 animator.SetBool(CrouchingHash, networkCrouching);
                 animator.SetBool(SprintingHash, networkSprinting);
                 animator.SetBool(SlidingHash, networkSliding);
                 animator.SetBool(ReloadingHash, networkReloading);
+                animator.SetBool(AimingHash, networkAiming);
 
                 return;
             }
@@ -212,7 +242,10 @@ namespace FpsBase
             float localMotionSpeed = CalculateMotionSpeed(
                 targetSpeed,
                 targetDirection,
-                movement != null && movement.IsSprinting);
+                movement == null || movement.IsGrounded,
+                movement != null && movement.IsCrouching,
+                movement != null && movement.IsSprinting,
+                movement != null && movement.IsSliding);
             animator.SetFloat(
                 MotionSpeedHash,
                 localMotionSpeed,
@@ -221,11 +254,12 @@ namespace FpsBase
 
             if (movement != null)
             {
-                animator.SetBool(
-                    GroundedHash,
-                    characterController != null && characterController.isGrounded
-                );
-
+                animator.SetBool(GroundedHash, movement.IsGrounded);
+                animator.SetFloat(
+                    VerticalSpeedHash,
+                    movement.VerticalSpeed,
+                    0.08f,
+                    Time.deltaTime);
                 animator.SetBool(CrouchingHash, movement.IsCrouching);
                 animator.SetBool(SprintingHash, movement.IsSprinting);
                 animator.SetBool(SlidingHash, movement.IsSliding);
@@ -237,10 +271,14 @@ namespace FpsBase
                     ReloadingHash,
                     weaponController.IsReloading
                 );
+                animator.SetBool(AimingHash, weaponController.IsZoomed);
             }
         }
 
-        private float CalculateAuthoredReferenceSpeed(Vector2 moveInput, bool sprinting)
+        private float CalculateAuthoredReferenceSpeed(
+            Vector2 moveInput,
+            bool crouching,
+            bool sprinting)
         {
             Vector2 input = moveInput.sqrMagnitude > 1f
                 ? moveInput.normalized
@@ -252,29 +290,49 @@ namespace FpsBase
             float leftWeight = Mathf.Max(0f, -input.x);
             float totalWeight = forwardWeight + backwardWeight + rightWeight + leftWeight;
 
-            if (totalWeight <= Mathf.Epsilon)
-                return walkForwardAuthoredSpeed;
+            float forwardSpeed = crouching
+                ? crouchForwardAuthoredSpeed
+                : sprinting
+                    ? sprintForwardAuthoredSpeed
+                    : walkForwardAuthoredSpeed;
+            float backwardSpeed = crouching
+                ? crouchBackwardAuthoredSpeed
+                : walkBackwardAuthoredSpeed;
+            float rightSpeed = crouching
+                ? crouchRightAuthoredSpeed
+                : strafeRightAuthoredSpeed;
+            float leftSpeed = crouching
+                ? crouchLeftAuthoredSpeed
+                : strafeLeftAuthoredSpeed;
 
-            float forwardSpeed = sprinting
-                ? sprintForwardAuthoredSpeed
-                : walkForwardAuthoredSpeed;
+            if (totalWeight <= Mathf.Epsilon)
+                return forwardSpeed;
 
             return (
                 forwardWeight * forwardSpeed
-                + backwardWeight * walkBackwardAuthoredSpeed
-                + rightWeight * strafeRightAuthoredSpeed
-                + leftWeight * strafeLeftAuthoredSpeed) / totalWeight;
+                + backwardWeight * backwardSpeed
+                + rightWeight * rightSpeed
+                + leftWeight * leftSpeed) / totalWeight;
         }
 
         private float CalculateMotionSpeed(
             float actualHorizontalSpeed,
             Vector2 moveInput,
-            bool sprinting)
+            bool grounded,
+            bool crouching,
+            bool sprinting,
+            bool sliding)
         {
+            if (sliding || !grounded)
+                return 1f;
+
             if (actualHorizontalSpeed < motionSpeedIdleThreshold)
                 return 1f;
 
-            float referenceSpeed = CalculateAuthoredReferenceSpeed(moveInput, sprinting);
+            float referenceSpeed = CalculateAuthoredReferenceSpeed(
+                moveInput,
+                crouching,
+                sprinting);
             if (referenceSpeed <= Mathf.Epsilon
                 || float.IsNaN(referenceSpeed)
                 || float.IsInfinity(referenceSpeed))

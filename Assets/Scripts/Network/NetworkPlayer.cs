@@ -89,6 +89,20 @@ namespace FpsBase
                 NetworkVariableWritePermission.Owner
             );
 
+        private readonly NetworkVariable<float> NetworkVerticalSpeed =
+            new(
+                0f,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
+        private readonly NetworkVariable<bool> NetworkGrounded =
+            new(
+                true,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
         private readonly NetworkVariable<bool> NetworkSprinting =
             new(
                 false,
@@ -97,6 +111,13 @@ namespace FpsBase
             );
 
         private readonly NetworkVariable<bool> NetworkReloading =
+            new(
+                false,
+                NetworkVariableReadPermission.Everyone,
+                NetworkVariableWritePermission.Owner
+            );
+
+        private readonly NetworkVariable<bool> NetworkAiming =
             new(
                 false,
                 NetworkVariableReadPermission.Everyone,
@@ -178,23 +199,30 @@ namespace FpsBase
                     rig.characterAnimator.SetNetworkAnimationState(
                         NetworkMoveInput.Value,
                         NetworkMoveSpeed.Value,
-                        true,
+                        NetworkGrounded.Value,
+                        NetworkVerticalSpeed.Value,
                         Crouched.Value,
                         NetworkSprinting.Value,
                         Sliding.Value,
-                        NetworkReloading.Value);
+                        NetworkReloading.Value,
+                        NetworkAiming.Value);
                 }
 
-                // Replicate the crouch squash on remote players.
+                // Preserve the primitive-character crouch squash, but do not
+                // distort an imported animated character unless explicitly enabled.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
-                PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);
+                bool useLegacyCrouchVisual = rig.characterAnimator == null
+                    || (rig.movement != null && rig.movement.useProceduralBodyCrouch);
+                if (useLegacyCrouchVisual)
+                    PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);
 
-                // Feed replicated aim pitch + slide into the body pose.
+                // Feed replicated aim pitch, slide and reload into the body pose.
                 if (rig.characterPose != null)
                 {
                     rig.characterPose.remoteDriven = true;
                     rig.characterPose.remotePitch = Pitch.Value;
                     rig.characterPose.remoteSlide = Sliding.Value ? 1f : 0f;
+                    rig.characterPose.remoteReloading = NetworkReloading.Value;
                 }
                 return;
             }
@@ -227,8 +255,11 @@ namespace FpsBase
             {
                 Vector2 moveInput = canPlay ? rig.movement.MoveInput : Vector2.zero;
                 float moveSpeed = canPlay ? rig.movement.CurrentHorizontalSpeed : 0f;
+                float verticalSpeed = canPlay ? rig.movement.VerticalSpeed : 0f;
+                bool grounded = canPlay ? rig.movement.IsGrounded : true;
                 bool sprinting = canPlay && rig.movement.IsSprinting;
                 bool reloading = canPlay && rig.weaponController.IsReloading;
+                bool aiming = canPlay && rig.weaponController.IsZoomed;
 
                 bool stoppedMoving = moveInput == Vector2.zero
                     && NetworkMoveInput.Value != Vector2.zero;
@@ -239,10 +270,19 @@ namespace FpsBase
                 if (stoppedSpeed
                     || Mathf.Abs(NetworkMoveSpeed.Value - moveSpeed) > 0.05f)
                     NetworkMoveSpeed.Value = moveSpeed;
+                bool stoppedVertically = verticalSpeed == 0f
+                    && NetworkVerticalSpeed.Value != 0f;
+                if (stoppedVertically
+                    || Mathf.Abs(NetworkVerticalSpeed.Value - verticalSpeed) > 0.05f)
+                    NetworkVerticalSpeed.Value = verticalSpeed;
+                if (NetworkGrounded.Value != grounded)
+                    NetworkGrounded.Value = grounded;
                 if (NetworkSprinting.Value != sprinting)
                     NetworkSprinting.Value = sprinting;
                 if (NetworkReloading.Value != reloading)
                     NetworkReloading.Value = reloading;
+                if (NetworkAiming.Value != aiming)
+                    NetworkAiming.Value = aiming;
             }
 
             // Per-mode weapon locking. Gun Game's whole point is its weapon
