@@ -57,12 +57,10 @@ jobs:
         run: dotnet tool install -g vpk
 
       # 6. Pack the build with Velopack
-      - name: Create Velopack Installer
+      - name: Package Windows Release with Velopack
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          
-          # Because buildName is set to 'MyGame', Unity outputs MyGame.exe
-          vpk pack win -u MyGame -v $VERSION -p build/StandaloneWindows64 -e MyGame.exe -o VelopackReleases
+          vpk "[win]" pack -u MyGame -v $VERSION -p build/StandaloneWindows64 -e MyGame.exe -o VelopackReleases
           
       # 7. Upload all Velopack files to GitHub Releases
       - name: Create GitHub Release
