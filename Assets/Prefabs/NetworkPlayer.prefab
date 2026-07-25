@@ -381,6 +381,9 @@ MonoBehaviour:
   crouchHeight: 1.05
   standEyeHeight: 1.62
   crouchEyeHeight: 1.12
+  proneHeight: 0.55
+  proneEyeHeight: 0.58
+  proneSpeed: 1.45
   cameraTransform: {fileID: 6542157336454525029}
   bodyVisual: {fileID: 8198481765542725742}
   spawnPoint: {x: 0, y: 0, z: 0}
@@ -414,6 +417,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34341ba3b0b936e4983f172839627758, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FpsBase.PlayerRigRefs
+  walkForwardAuthoredSpeed: 3.22
+  walkBackwardAuthoredSpeed: 2.7744
+  strafeLeftAuthoredSpeed: 2.7998
+  strafeRightAuthoredSpeed: 3.4017
+  sprintForwardAuthoredSpeed: 5
   cameraObject: {fileID: 4362130603570892299}
   playerCamera: {fileID: 9213762088308594283}
   mouseLook: {fileID: 6713938989515771184}
@@ -455,6 +463,10 @@ MonoBehaviour:
   - {fileID: 1427901437693551980}
   - {fileID: 511383863681904642}
   - {fileID: 4693556385546116754}
+  useImportedCharacter: 1
+  characterScale: 1
+  characterOffset: {x: 0, y: 0, z: 0}
+  characterYaw: 0
 --- !u!114 &33808702558744664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -467,7 +479,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3908486099
+  GlobalObjectIdHash: 745827387
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -584,6 +596,16 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 0
+  KillStreak:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  CareerLevel:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 1
   PlayerName:
     UpdateTraits:
       MinSecondsBetweenUpdates: 0
@@ -661,6 +683,26 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 0
+  Pitch:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  Sliding:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  Prone:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  Spectating:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
   respawnDelay: 3
 --- !u!114 &8692041971445573587
 MonoBehaviour:
@@ -680,6 +722,16 @@ MonoBehaviour:
       MinSecondsBetweenUpdates: 0
       MaxSecondsBetweenUpdates: 0
     m_InternalValue: 4
+  AttachmentMask:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
+  ColorIndex:
+    UpdateTraits:
+      MinSecondsBetweenUpdates: 0
+      MaxSecondsBetweenUpdates: 0
+    m_InternalValue: 0
 --- !u!1 &2031711621275652099
 GameObject:
   m_ObjectHideFlags: 0
@@ -1060,6 +1112,9 @@ MonoBehaviour:
   baseFov: 60
   zoomLerpSpeed: 14
   recoilRecoverySpeed: 8
+  tpDistance: 4.4
+  tpHeight: 1.55
+  tpShoulder: 0.75
 --- !u!1 &5338145320821665737
 GameObject:
   m_ObjectHideFlags: 0
