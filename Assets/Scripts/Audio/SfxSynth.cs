@@ -24,8 +24,16 @@ namespace FpsBase
         // Gunshots
         // ------------------------------------------------------------------
 
-        public static AudioClip Shot(WeaponModelType type)
+        public static AudioClip Shot(WeaponModelType type, bool suppressed = false)
         {
+            var imported = WeaponAudioLibrary.Shared;
+            if (imported != null)
+            {
+                var importedClip = imported.RandomShot(type, suppressed);
+                if (importedClip != null)
+                    return importedClip;
+            }
+
             switch (type)
             {
                 case WeaponModelType.Knife:
@@ -91,8 +99,13 @@ namespace FpsBase
             }
         }
 
-        public static AudioClip Explosion() =>
-            MakeBuffered("explosion", 1.1f, b =>
+        public static AudioClip Explosion()
+        {
+            var imported = WeaponAudioLibrary.Shared;
+            if (imported != null && imported.grenadeLauncherExplosion != null)
+                return imported.grenadeLauncherExplosion;
+
+            return MakeBuffered("explosion", 1.1f, b =>
             {
                 AddFilteredNoise(b, 0f, 0.05f, 1.3f, 40f, 0.5f);   // blast crack
                 AddFilteredNoise(b, 0f, 0.7f, 1.2f, 5f, 0.1f);     // roar
@@ -101,6 +114,7 @@ namespace FpsBase
                 AddFilteredNoise(b, 0.15f, 0.9f, 0.35f, 3f, 0.05f); // rumble tail
                 Saturate(b, 2.4f);
             });
+        }
 
         // ------------------------------------------------------------------
         // Feedback & UI
@@ -117,6 +131,29 @@ namespace FpsBase
         public static AudioClip Reload() =>
             Make("reload", 0.22f, t =>
                 Noise() * 0.55f * (Mathf.Exp(-t * 300f) + (t > 0.12f ? Mathf.Exp(-(t - 0.12f) * 300f) : 0f)));
+
+        /// <summary>Play imported reload actions across the gameplay reload duration.</summary>
+        public static void PlayReload(WeaponModelType type, float duration, float volume = 1f)
+        {
+            var library = WeaponAudioLibrary.Shared;
+            var sequence = library != null ? library.ReloadSequence(type) : null;
+            if (sequence == null || sequence.Length == 0)
+            {
+                Play2D(Reload(), volume);
+                return;
+            }
+
+            float sequenceWindow = Mathf.Max(0f, duration * 0.82f);
+            for (int i = 0; i < sequence.Length; i++)
+            {
+                if (sequence[i] == null)
+                    continue;
+                float delay = sequence.Length > 1
+                    ? sequenceWindow * i / (sequence.Length - 1f)
+                    : 0f;
+                Play2DDelayed(sequence[i], delay, volume);
+            }
+        }
 
         public static AudioClip Death() =>
             Make("death", 0.5f, t =>
@@ -158,6 +195,8 @@ namespace FpsBase
         /// <summary>Positional 3D sound (gunshots, deaths, explosions).</summary>
         public static void PlayAt(AudioClip clip, Vector3 position, float volume = 1f)
         {
+            if (clip == null)
+                return;
             var source = MakeSource(clip, volume);
             source.transform.position = position;
             source.spatialBlend = 1f;
@@ -170,19 +209,30 @@ namespace FpsBase
         /// <summary>Non-positional UI/feedback sound (hit marker, clicks).</summary>
         public static void Play2D(AudioClip clip, float volume = 1f)
         {
+            if (clip == null)
+                return;
             var source = MakeSource(clip, volume);
             source.spatialBlend = 0f;
             source.Play();
         }
 
-        private static AudioSource MakeSource(AudioClip clip, float volume)
+        private static void Play2DDelayed(AudioClip clip, float delay, float volume)
+        {
+            if (clip == null)
+                return;
+            var source = MakeSource(clip, volume, delay);
+            source.spatialBlend = 0f;
+            source.PlayDelayed(delay);
+        }
+
+        private static AudioSource MakeSource(AudioClip clip, float volume, float delay = 0f)
         {
             var go = new GameObject("Sfx_" + clip.name);
             var source = go.AddComponent<AudioSource>();
             source.clip = clip;
             source.volume = volume;
             source.pitch = 1f + UnityEngine.Random.Range(-0.07f, 0.07f);
-            UnityEngine.Object.Destroy(go, clip.length + 0.25f);
+            UnityEngine.Object.Destroy(go, delay + clip.length + 0.25f);
             return source;
         }
 

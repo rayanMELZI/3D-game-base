@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6e9a4c7d80f4c329d2feaf5a1bc74d3, type: 3}
+  m_Name: WeaponAudioLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::FpsBase.WeaponAudioLibrary
+  handgunShots:
+  - {fileID: 8300000, guid: f9ab20b4342184a46921955b3300481d, type: 3}
+  - {fileID: 8300000, guid: fc96ad27ad7acc246bc0bf45b3ffd5c8, type: 3}
+  - {fileID: 8300000, guid: e3a46507263c1f04d9cee05cf2ebc532, type: 3}
+  handgunSuppressedShots:
+  - {fileID: 8300000, guid: c83c6e84f6617e84489eb5835cee4634, type: 3}
+  - {fileID: 8300000, guid: 49fc436170a5c1444a98e6fe61659877, type: 3}
+  - {fileID: 8300000, guid: 4b3830d11000279498a64c1265dfe970, type: 3}
+  rifleShots:
+  - {fileID: 8300000, guid: 74fd11f66ca8110418be57a810d2fad8, type: 3}
+  - {fileID: 8300000, guid: 76cfb7f0b7f354545b18c07b7d0bff61, type: 3}
+  - {fileID: 8300000, guid: 385137d1f615f524ea78bc1569276ee5, type: 3}
+  rifleSuppressedShots:
+  - {fileID: 8300000, guid: 99de276758fc97c48baea9b7514b0445, type: 3}
+  - {fileID: 8300000, guid: 5b2a626571981524bb603c1782bba17e, type: 3}
+  - {fileID: 8300000, guid: a05d3ff7e16d61c43b85a73ae1b3bf1e, type: 3}
+  shotgunShots:
+  - {fileID: 8300000, guid: e07faa26d7d74e348b43973cb93fa6bd, type: 3}
+  - {fileID: 8300000, guid: 345e09e37e315704a8ef418ee7ee8097, type: 3}
+  - {fileID: 8300000, guid: 28b4b9c0fbdb06c4b8e57c5bcd6a9af0, type: 3}
+  grenadeLauncherShot: {fileID: 8300000, guid: bea96d7184098574481c153c4ebe3048, type: 3}
+  grenadeLauncherExplosion: {fileID: 8300000, guid: 746e8b584521ae04eb1a96a21fd4c581, type: 3}
+  handgunReload:
+  - {fileID: 8300000, guid: 98809d2fe68d3ef4ebb406d5ade3df36, type: 3}
+  - {fileID: 8300000, guid: 74b34124f68768a4eb45af871e0f7606, type: 3}
+  - {fileID: 8300000, guid: e7e7fb1fcb8b2e247994afc502a6c252, type: 3}
+  - {fileID: 8300000, guid: 1b9a90c96eee6fb4ba7640a2d34bea91, type: 3}
+  rifleReload:
+  - {fileID: 8300000, guid: 0de87080feb9e4d46b1133b7a197ac4e, type: 3}
+  - {fileID: 8300000, guid: 17e1fac9dd649c048a8e57b51b3b7d0e, type: 3}
+  - {fileID: 8300000, guid: 82ab12c3d05cb3244a685281f8934e26, type: 3}
+  shotgunReload:
+  - {fileID: 8300000, guid: d521e0d9b3021674cbe2821f3012f6e4, type: 3}
+  - {fileID: 8300000, guid: 320e642ad32a207438ba4121b8e6b7e9, type: 3}
+  grenadeLauncherReload:
+  - {fileID: 8300000, guid: 2c4721cc09b425a40927b7423a63fac5, type: 3}
+  - {fileID: 8300000, guid: 27b66bb70e670dc42a7dc387bd63d322, type: 3}
+  - {fileID: 8300000, guid: 699bd86719ba9964991c544b699b754e, type: 3}
+  - {fileID: 8300000, guid: 601e9aa25da0ad4409dbcbc250509ce7, type: 3}

@@ -1,0 +1,70 @@
+name: Build and Release Unity Game
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers automatically when you push a tag like 'v1.0.0'
+  workflow_dispatch: # Allows you to run it manually from the Actions tab
+
+permissions:
+  contents: write # Required to allow GitHub Actions to create a Release
+
+jobs:
+  build-and-release:
+    name: Build for Windows and Release
+    runs-on: ubuntu-latest # Free tier runner
+    
+    steps:
+      # 1. Delete pre-installed software to make room for Unity
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: false
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      # 2. Check out the repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true # Essential if you use Git Large File Storage for 3D models/audio
+
+      # 3. Cache the Unity Library folder to speed up future builds
+      - name: Cache Unity Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-
+
+      # 4. BUILD UNITY PROJECT (This was missing!)
+      - name: Build Unity Project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          buildName: MyGame
+
+      # 5. Install Velopack CLI
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk
+
+      # 6. Pack the build with Velopack
+      - name: Package Windows Release with Velopack
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          vpk "[win]" pack -u MyGame -v $VERSION -p build/StandaloneWindows64 -e MyGame.exe -o VelopackReleases
+          
+      # 7. Upload all Velopack files to GitHub Releases
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: VelopackReleases/*
+          generate_release_notes: true

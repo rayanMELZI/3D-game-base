@@ -8,6 +8,7 @@ namespace FpsBase
     /// Left Ctrl crouch · sprint+Ctrl slide.
     /// Uses the legacy Input Manager so it works out of the box.
     /// </summary>
+    [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(CharacterController))]
     public class PlayerMovement : MonoBehaviour
     {
@@ -33,6 +34,10 @@ namespace FpsBase
         public float proneEyeHeight = 0.58f;
         public float proneSpeed = 1.45f;
 
+        [Header("Crouch Visual")]
+        [Tooltip("Apply the legacy procedural body squash used by the primitive character.")]
+        public bool useProceduralBodyCrouch = true;
+
         [Header("References (wired by PlayerFactory)")]
         public Transform cameraTransform;
         public Transform bodyVisual;
@@ -45,6 +50,9 @@ namespace FpsBase
         public bool IsCrouching { get; private set; }
         public bool IsSliding => slideTimer > 0f;
         public bool IsProne { get; private set; }
+        public bool IsGrounded =>
+            controller != null && controller.isGrounded;
+        public float VerticalSpeed => verticalVelocity;
         public Vector2 MoveInput => moveInput;
         public float CurrentHorizontalSpeed => horizontalVelocity.magnitude;
         /// <summary>0 = standing, 1 = fully crouched — also drives the body squash.</summary>
@@ -75,7 +83,6 @@ namespace FpsBase
 
             float inputX = Input.GetAxisRaw("Horizontal");
             float inputZ = Input.GetAxisRaw("Vertical");
-            moveInput = new Vector2(inputX, inputZ);
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
@@ -85,12 +92,21 @@ namespace FpsBase
             IsProne = proneToggle;
             bool wantCrouch = !IsProne && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C)
                 || Input.GetKey(KeyCode.JoystickButton1));
-            IsSprinting = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9))
+            bool sprintHeld = Input.GetKey(KeyCode.LeftShift)
+                || Input.GetKey(KeyCode.JoystickButton9);
+            IsSprinting = sprintHeld && inputZ > 0.1f
                 && moving && !wantCrouch && !IsProne && !IsSliding;
+
+            // Sprinting is a committed forward movement. Ignore strafe input while
+            // sprinting so diagonal input cannot receive sprint speed, and expose
+            // the direction actually travelled to animation/networking.
+            moveInput = IsSprinting
+                ? new Vector2(0f, inputZ)
+                : new Vector2(inputX, inputZ);
 
             // --- Slide: press crouch while sprinting on the ground ---
             if (grounded && slideTimer <= 0f
-                && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.JoystickButton9)) && moving
+                && sprintHeld && inputZ > 0.1f && moving
                 && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C)))
             {
                 slideTimer = slideDuration;
@@ -119,7 +135,9 @@ namespace FpsBase
             else
             {
                 speed = IsProne ? proneSpeed : (IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed));
-                horizontal = moveDirection * speed;
+                horizontal = IsSprinting
+                    ? transform.forward * speed
+                    : moveDirection * speed;
             }
             horizontalVelocity = horizontal;
 
@@ -135,7 +153,8 @@ namespace FpsBase
                 camPos.y = Mathf.Lerp(standEyeHeight, IsProne ? proneEyeHeight : crouchEyeHeight, CrouchBlend);
                 cameraTransform.localPosition = camPos;
             }
-            ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
+            if (useProceduralBodyCrouch)
+                ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
 
             // --- Jump (hold Space to bunny hop) + gravity ---
             if (grounded && verticalVelocity < 0f)

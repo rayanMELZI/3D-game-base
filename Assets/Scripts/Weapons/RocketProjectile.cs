@@ -26,11 +26,11 @@ namespace FpsBase
             var rocket = go.AddComponent<RocketProjectile>();
 
             // The joke: the RPG launches... RPGs. Fly a mini launcher barrel-first.
-            var launcherPrefab = Resources.Load<GameObject>("Weapons/Launcher_G");
+            var launcherPrefab = Resources.Load<GameObject>("Weapons/Modern/RocketLauncher");
             if (launcherPrefab != null)
             {
                 var launcher = Instantiate(launcherPrefab, go.transform, false);
-                launcher.transform.localScale = Vector3.one * 0.55f;
+                launcher.transform.localScale = Vector3.one * 0.1f;
                 foreach (var col in launcher.GetComponentsInChildren<Collider>())
                     Destroy(col);
                 rocket.spinVisual = launcher.transform;

@@ -20,6 +20,18 @@ namespace FpsBase
         [SerializeField] private float sprintForwardAuthoredSpeed = 5f;
 
 
+        [Header("Crouch Locomotion Authored Speeds")]
+        [SerializeField, Min(0.01f)]
+        private float crouchForwardAuthoredSpeed = 1f;
+
+        [SerializeField, Min(0.01f)]
+        private float crouchBackwardAuthoredSpeed = 1f;
+
+        [SerializeField, Min(0.01f)]
+        private float crouchLeftAuthoredSpeed = 1f;
+
+        [SerializeField, Min(0.01f)]
+        private float crouchRightAuthoredSpeed = 1f;
 
         [Header("Wired by PlayerFactory")]
         public GameObject cameraObject;
@@ -112,6 +124,9 @@ namespace FpsBase
             instance.transform.localRotation = Quaternion.Euler(0f, characterYaw, 0f);
             instance.transform.localScale = Vector3.one * characterScale;
 
+            if (movement != null)
+                movement.useProceduralBodyCrouch = false;
+
             var animator = instance.GetComponent<Animator>();
             if (animator != null)
             {
@@ -128,7 +143,11 @@ namespace FpsBase
                     walkBackwardAuthoredSpeed,
                     strafeLeftAuthoredSpeed,
                     strafeRightAuthoredSpeed,
-                    sprintForwardAuthoredSpeed
+                    sprintForwardAuthoredSpeed,
+                    crouchForwardAuthoredSpeed,
+                    crouchBackwardAuthoredSpeed,
+                    crouchLeftAuthoredSpeed,
+                    crouchRightAuthoredSpeed
                 );
                 characterAnimator.animator = animator;
                 characterAnimator.movement = movement;
