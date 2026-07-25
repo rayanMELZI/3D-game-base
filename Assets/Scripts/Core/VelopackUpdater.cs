@@ -9,46 +9,65 @@ public class VelopackUpdater : MonoBehaviour
     [Tooltip("The full URL to your public GitHub repository")]
     public string githubRepoUrl = "https://github.com/rayanMELZI/3D-game-base";
 
+    // 1. Automatically runs right when the game starts before scene objects load
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void InitializeVelopack()
+    {
+#if !UNITY_EDITOR
+        try
+        {
+            // Initializes VelopackLocator and processes installer hooks
+            VelopackApp.Build().Run();
+            Debug.Log("[Velopack] Initialized successfully.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[Velopack] Initialization failed: {ex.Message}");
+        }
+#endif
+    }
+
     void Start()
     {
-        // Run the update process asynchronously so it doesn't freeze the game
         _ = CheckAndApplyUpdates();
     }
 
     private async Task CheckAndApplyUpdates()
     {
-        // Velopack only works in the compiled build, not the Unity Editor
 #if !UNITY_EDITOR
         try
         {
-            // Connect to your GitHub repository's releases
             var source = new GithubSource(githubRepoUrl, null, false);
             var mgr = new UpdateManager(source);
 
-            // Check if there is a newer version available on GitHub
+            Debug.Log($"[Velopack] Is Installed: {mgr.IsInstalled}");
+            Debug.Log($"[Velopack] Current Version: {mgr.CurrentVersion}");
+
+            if (!mgr.IsInstalled)
+            {
+                Debug.LogWarning("[Velopack] Application is running directly from source/uninstalled folder. Skipping auto-update.");
+                return;
+            }
+
             var newVersion = await mgr.CheckForUpdatesAsync();
             if (newVersion == null)
             {
-                Debug.Log("Game is up to date.");
+                Debug.Log("[Velopack] Game is up to date.");
                 return; 
             }
 
-            Debug.Log($"Update {newVersion.TargetFullRelease.Version} found. Downloading...");
-            
-            // Download the delta/full update
+            Debug.Log($"[Velopack] Update {newVersion.TargetFullRelease.Version} found. Downloading...");
             await mgr.DownloadUpdatesAsync(newVersion);
 
-            Debug.Log("Update downloaded. Restarting game...");
-
-            // Closes the game, swaps the files in the background, and restarts it
+            Debug.Log("[Velopack] Update downloaded. Restarting game...");
             mgr.ApplyUpdatesAndRestart(newVersion);
         }
         catch (Exception ex)
         {
-            Debug.LogError($"Velopack update failed: {ex.Message}");
+            Debug.LogError($"[Velopack] Update check failed: {ex.Message}");
         }
 #else
-        Debug.Log("Velopack updates are disabled in the Unity Editor.");
+        Debug.Log("[Velopack] Updates are disabled in the Unity Editor.");
         await Task.CompletedTask;
 #endif
     }

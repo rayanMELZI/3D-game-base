@@ -147,7 +147,7 @@ namespace FpsBase
             GUILayout.BeginArea(new Rect(panel.x + 30, panel.y + 22, w - 60, h - 44));
 
             GUILayout.Label(GameSettings.GameTitle, MenuWidgets.Title, GUILayout.Height(56));
-            GUILayout.Label("MyGame online arena shooter · " + GameSettings.Version, MenuWidgets.Subtitle);
+            GUILayout.Label("online arena shooter · " + Application.version, MenuWidgets.Subtitle);
             GUILayout.Space(14);
 
             switch (screen)
