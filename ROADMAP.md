@@ -14,23 +14,23 @@ check items off (move to Shipped) only when the user confirms they work.
 
 ## 1) Weapon add-ons (NEXT — user said the packs contain the attachment models)
 
-- [ ] Per-weapon configurable add-ons using the imported attachment prefabs:
+- [X] Per-weapon configurable add-ons using the imported attachment prefabs:
       optic (not sniper — has one), suppressor (less recoil, quieter, **no
       radar ping on fire**), foregrip (less recoil), extended mag (+50% ammo)
-- [ ] Configured in the CLASSES menu, saved permanently (PlayerPrefs)
-- [ ] **Loadout toggle**: 2-weapon class mode OR full arsenal like before —
+- [X] Configured in the CLASSES menu, saved permanently (PlayerPrefs)
+- [X] **Loadout toggle**: 2-weapon class mode OR full arsenal like before —
       add-ons apply in BOTH modes
 - [ ] Other players see your attachments (replicate as bitmask in NetworkWeapon)
-- [ ] OPEN QUESTION for user: add-ons per weapon globally (default) or per class?
+- [ ] OPEN QUESTION for user: add-ons per weapon globally (default) or per class?: *should be per class*
 
 ## 2) Feedback & polish pack
 
 - [ ] Hit-direction indicator on the camera when you take damage
-- [ ] Heavy-breathing sound at low HP — starts after the hit, fades after a few
+- [X] Heavy-breathing sound at low HP — starts after the hit, fades after a few
       seconds, NOT infinite
-- [ ] Killstreak sounds at 5/10/15/20/25/30... kills in a row (+ feed line)
-- [ ] No-scope sniper kills flagged in the kill feed
-- [ ] Spectator: join as spectator or switch to spectator "team"
+- [X] Killstreak sounds at 5/10/15/20/25/30... kills in a row (+ feed line)
+- [X] No-scope sniper kills flagged in the kill feed
+- [X] Spectator: join as spectator or switch to spectator "team"
 - [ ] Controller support (gameplay first; menus later if feasible)
 
 ## 3) Arsenal expansion
@@ -38,13 +38,13 @@ check items off (move to Shipped) only when the user confirms they work.
 - [ ] Every weapon in the imported packs as a real separate weapon in game
 - [ ] LMG (heavy machine gun)
 - [ ] Grenade-launcher gun
-- [ ] Throwables: grenades, flashbangs, sticky bombs, throwing knives
+- [X] Throwables: grenades, flashbangs, sticky bombs, throwing knives
 - [ ] Shotgun reloads shell-by-shell (interruptible, CoD style)
-- [ ] Gun color skins chosen in the class menu (if gun materials allow tinting)
+- [X] Gun color skins chosen in the class menu (if gun materials allow tinting)
 
 ## 4) Lobby + progression
 
-- [ ] Pre-game lobby: host configures the match while everyone in the lobby
+- [X] Pre-game lobby: host configures the match while everyone in the lobby
       SEES the settings live, players prep their classes there — "exactly like
       CoD"
 - [ ] Level/XP system (kills, wins → levels; shown in lobby/scoreboard)
@@ -56,20 +56,13 @@ check items off (move to Shipped) only when the user confirms they work.
 
 ## 6) New maps
 
-- [ ] Western-vibes map
-- [ ] Underwater-vibes map
+- [X] Western-vibes map
+- [X] Underwater-vibes map
 - [ ] Map inside a giant flying plane
 - [ ] (older wish) Crawl/prone state using the imported crawl animation —
       requires re-importing the Generic-rig FBXs as Humanoid
 
-## Shipped (0.5.0) — pending user confirmation in multiplayer
-
-Killcam replay (skippable) · classes menu ·
-IK weapon-hold + aim pitch + slide lean replication · spawn protection 3s · click-speed pistol · Nuketown = editable custom prefab with
-injected spawn markers · Steam fixes (own SteamManager, transport switch,
-visible errors) · death-display cleanup.
-
-## Implemented in 0.6.0–0.11.0 — awaiting Rayan's multiplayer confirmation
+## Implemented in 0.6.0–0.11.0 — awaiting multiplayer confirmation
 
 All six roadmap batches are implemented in the working tree. Per the rule at
 the top of this file, their checkboxes remain unchecked until Rayan verifies

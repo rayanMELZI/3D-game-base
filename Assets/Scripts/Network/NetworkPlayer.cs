@@ -53,6 +53,7 @@ namespace FpsBase
         private CharacterController characterController;
         private float remoteCrouchBlend;
         private bool respawning;
+        private bool wasInLobby;
 
         private void Awake()
         {
@@ -157,7 +158,7 @@ namespace FpsBase
                 rig.cameraObject.SetActive(true);
                 rig.movement.enabled = true;
                 rig.weaponController.enabled = true;
-                rig.SetFirstPerson(true);
+                rig.SetFirstPerson(!ThirdPersonMode()); // P Story shows your body (third-person)
 
                 var hud = gameObject.AddComponent<HudOverlay>();
                 hud.weaponController = rig.weaponController;
@@ -242,6 +243,15 @@ namespace FpsBase
                 Pitch.Value = pitch;
 
             var gameMode = GameModeManager.Instance;
+
+            // Pre-game lobby: free the cursor so the player can use the lobby UI
+            // (classes, settings); re-lock the moment the match starts.
+            bool inLobby = gameMode != null && gameMode.IsSpawned && gameMode.LobbyOpen.Value;
+            if (inLobby != wasInLobby)
+            {
+                wasInLobby = inLobby;
+                MouseLook.LockCursor(!inLobby);
+            }
 
             // Freeze input while dead, between matches, or during a respawn teleport
             // (the respawn coroutine holds control until the map is built locally).
@@ -373,6 +383,32 @@ namespace FpsBase
 
         public void RequestSpectatorToggle() => SpectatorServerRpc(!Spectating.Value);
 
+        // ------------------------------------------------------------------
+        // Throwable replication — the owner spawns its own damage-dealing copy;
+        // this broadcasts the throw so every OTHER client spawns a visual replica
+        // (same pattern as NetworkWeapon's shot replication).
+        // ------------------------------------------------------------------
+
+        public void SendThrow(int type, Vector3 origin, Vector3 velocity)
+        {
+            if (IsServer)
+                ThrowClientRpc(type, origin, velocity);
+            else
+                ThrowServerRpc(type, origin, velocity);
+        }
+
+        [ServerRpc]
+        private void ThrowServerRpc(int type, Vector3 origin, Vector3 velocity)
+            => ThrowClientRpc(type, origin, velocity);
+
+        [ClientRpc]
+        private void ThrowClientRpc(int type, Vector3 origin, Vector3 velocity)
+        {
+            if (IsOwner)
+                return; // the thrower already has the authoritative copy
+            ThrowableController.Spawn(type, origin, velocity, transform, authoritative: false);
+        }
+
         [ServerRpc]
         private void SpectatorServerRpc(bool spectate)
         {
@@ -402,11 +438,16 @@ namespace FpsBase
         // Death, kill cam & respawn (server-driven)
         // ------------------------------------------------------------------
 
+        /// <summary>True in the P Story mode, where the local camera is third-person and the body is shown.</summary>
+        private static bool ThirdPersonMode() =>
+            GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+            && GameModeManager.Instance.CurrentMode == GameMode.PStory;
+
         private void OnDeadChanged(bool previous, bool dead)
         {
             rig.SetVisible(!dead);
             if (IsOwner && !dead)
-                rig.SetFirstPerson(true); // SetVisible re-enabled the head parts
+                rig.SetFirstPerson(!ThirdPersonMode()); // keep the body visible in P Story
             if (networkWeapon != null)
                 networkWeapon.SetThirdPersonVisible(!dead);
             if (nametag != null)
@@ -448,10 +489,23 @@ namespace FpsBase
                 {
                     string killerName = player.PlayerName.Value.IsEmpty
                         ? $"Player {killerId + 1}" : player.PlayerName.Value.ToString();
+
+                    // The killer's currently-held weapon (replicated index), shown
+                    // as a viewmodel in the replay so you see what killed you.
+                    WeaponDefinition killerWeapon = null;
+                    var killerWep = player.GetComponent<NetworkWeapon>();
+                    var killerRig = player.GetComponent<PlayerRigRefs>();
+                    if (killerWep != null && killerRig != null && killerRig.weaponController != null)
+                    {
+                        var weapons = killerRig.weaponController.weapons;
+                        int idx = Mathf.Clamp(killerWep.WeaponIndex.Value, 0, weapons.Length - 1);
+                        killerWeapon = weapons[idx];
+                    }
+
                     // Replay the killer's last seconds from their eyes (skippable),
                     // then fall back to the orbiting spectate until respawn.
                     DeathCam.BeginReplay(player.GetKillcamHistory(), player.transform,
-                        $"KILLCAM  —  {killerName}");
+                        $"KILLCAM  —  {killerName}", killerWeapon);
                     return;
                 }
             }

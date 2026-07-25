@@ -450,6 +450,260 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // P Story — a big crescent island of four biome wedges around a central
+        // transition hub, with a teleporter linking the left tip to the hub.
+        // Used only by the P Story game mode (third-person).
+        // ------------------------------------------------------------------
+
+        // Biome region centers (crescent arc); shared by the builder and spawns.
+        private static readonly Vector3[] PStoryCenters =
+        {
+            new Vector3(-40f, 0f, 8f),   // Area 1 — forest
+            new Vector3(-18f, 0f, 17f),  // Area 2 — plains
+            new Vector3(18f, 0f, 17f),   // Area 3 — desert
+            new Vector3(40f, 0f, 8f),    // Area 4 — volcanic
+        };
+        private static readonly Vector3 PStoryHub = new Vector3(0f, 0f, 5f);
+
+        public static void BuildPStoryIsland()
+        {
+            var root = new GameObject(MapRootName).transform;
+
+            // Ocean.
+            var sea = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            sea.name = "Sea";
+            sea.transform.SetParent(root);
+            sea.transform.position = new Vector3(0, -5f, 10f);
+            sea.transform.localScale = new Vector3(60f, 1f, 60f);
+            sea.GetComponent<Renderer>().material = MakeMaterial(new Color(0.06f, 0.28f, 0.4f), 0.2f, 0.85f);
+
+            var rock = MakeMaterial(new Color(0.32f, 0.3f, 0.28f), 0.1f, 0.35f);       // exposed rock / cliffs
+
+            // THE walkable surface: solid box slabs (reliable BoxColliders) shaped
+            // to the crescent, tops at y ~ 0. Every decorative cylinder below has
+            // its collider stripped (a Unity cylinder's default CapsuleCollider,
+            // scaled flat and wide, becomes a giant invisible dome — that caused
+            // the void spawns and the lurching third-person camera). These boxes
+            // are dark rock and sit just under the biome discs, so you never see
+            // them but you always have solid ground.
+            Box(root, "IslandFloor", new Vector3(-40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
+            Box(root, "IslandFloor", new Vector3(0f, -1.02f, 6f), Vector3.zero, new Vector3(42f, 2f, 38f), rock);
+            Box(root, "IslandFloor", new Vector3(40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
+            var greenBiome = MakeMaterial(new Color(0.28f, 0.55f, 0.16f));
+            var limeBiome = MakeMaterial(new Color(0.55f, 0.74f, 0.22f));
+            var yellowBiome = MakeMaterial(new Color(0.86f, 0.72f, 0.28f));
+            var redBiome = MakeMaterial(new Color(0.5f, 0.16f, 0.13f));
+            var sandHub = MakeMaterial(new Color(0.82f, 0.75f, 0.55f));
+
+            // Rounded landmass: overlapping discs (rounded tops at y=0) sitting on a
+            // rock shelf that fills every seam, so the island reads as one organic
+            // shape and nobody can fall between biomes.
+            void Disc(string name, Vector3 c, float radius, float top, Material mat) =>
+                Cylinder(root, name, new Vector3(c.x, top - 0.4f, c.z), new Vector3(radius * 2f, 0.4f, radius * 2f), mat);
+
+            // Rock shelf (safety floor + visible rock between biomes), just under the grass.
+            Disc("RockShelf_L", new Vector3(-40, 0, 9), 26f, -0.35f, rock);
+            Disc("RockShelf_C", PStoryHub, 24f, -0.35f, rock);
+            Disc("RockShelf_R", new Vector3(40, 0, 9), 26f, -0.35f, rock);
+
+            // Cliff bodies below the shelf so the island has real sides, not thin slabs.
+            void Cliff(Vector3 c, float radius) =>
+                Cylinder(root, "Cliff", new Vector3(c.x, -3.4f, c.z), new Vector3(radius * 2f, 6f, radius * 2f), rock);
+            Cliff(new Vector3(-40, 0, 9), 24f);
+            Cliff(PStoryHub, 22f);
+            Cliff(new Vector3(40, 0, 9), 24f);
+
+            // Biome surfaces.
+            Disc("Area1_Forest", PStoryCenters[0], 18f, 0f, greenBiome);
+            Disc("Area1_Tip", new Vector3(-56, 0, 13), 10f, 0f, greenBiome);
+            Disc("Area2_Plains", PStoryCenters[1], 17f, 0f, limeBiome);
+            Disc("Area3_Desert", PStoryCenters[2], 17f, 0f, yellowBiome);
+            Disc("Area4_Volcanic", PStoryCenters[3], 18f, 0f, redBiome);
+            Disc("Area4_Tip", new Vector3(56, 0, 13), 10f, 0f, redBiome);
+            Disc("Hub_Sand", PStoryHub, 15f, 0.02f, sandHub);
+
+            BuildPStoryHub(root, rock);
+            BuildForest(root);
+            BuildPlains(root);
+            BuildDesert(root);
+            BuildVolcano(root);
+
+            // Teleporter: Area 1 tip <-> hub.
+            var padA = TeleportPadObject(root, "Teleporter_Area1", new Vector3(-56f, 0.1f, 13f));
+            var padB = TeleportPadObject(root, "Teleporter_Hub", new Vector3(6f, 0.1f, 12f));
+            padA.linked = padB;
+            padB.linked = padA;
+
+            // Ground signposts (diegetic, replaces the floating labels).
+            Signpost(root, "AREA 1", new Vector3(-30f, 0, 8f), greenBiome);
+            Signpost(root, "AREA 2", new Vector3(-10f, 0, 12f), limeBiome);
+            Signpost(root, "AREA 3", new Vector3(10f, 0, 12f), yellowBiome);
+            Signpost(root, "AREA 4", new Vector3(30f, 0, 8f), redBiome);
+
+            // Strip every decorative collider so only the IslandFloor boxes and the
+            // teleporter triggers remain — no capsule domes to void-spawn on or snag
+            // the camera. Decorations become visual-only (you can brush past props).
+            foreach (var col in root.GetComponentsInChildren<Collider>())
+            {
+                if (col.isTrigger) continue;                 // teleporter pads
+                if (col.gameObject.name == "IslandFloor") continue; // the walkable floor
+                Object.Destroy(col);
+            }
+        }
+
+        private static void BuildPStoryHub(Transform root, Material rock)
+        {
+            // Raised stone dais with a ring of pillars — the "transition" nexus.
+            Cylinder(root, "Hub_Dais", new Vector3(PStoryHub.x, 0.25f, PStoryHub.z), new Vector3(11f, 0.5f, 11f), rock);
+            var pillar = MakeMaterial(new Color(0.45f, 0.43f, 0.4f), 0.2f, 0.4f);
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i * 45f * Mathf.Deg2Rad;
+                Cylinder(root, "Hub_Pillar",
+                    new Vector3(PStoryHub.x + Mathf.Cos(a) * 6f, 2f, PStoryHub.z + Mathf.Sin(a) * 6f),
+                    new Vector3(0.9f, 2.2f, 0.9f), pillar);
+            }
+            Sphere(root, "Hub_Orb", new Vector3(PStoryHub.x, 2.6f, PStoryHub.z), Vector3.one * 1.6f,
+                MakeEmissiveMaterial(new Color(0.5f, 0.85f, 1f), 2.2f));
+        }
+
+        private static void BuildForest(Transform root)
+        {
+            var trunk = MakeMaterial(new Color(0.32f, 0.22f, 0.13f));
+            var leaves = MakeMaterial(new Color(0.16f, 0.42f, 0.14f));
+            var leaves2 = MakeMaterial(new Color(0.22f, 0.5f, 0.18f));
+            var c = PStoryCenters[0];
+            for (int i = 0; i < 9; i++)
+            {
+                float a = i * 40f * Mathf.Deg2Rad;
+                float r = 5f + (i % 3) * 4.5f;
+                var p = new Vector3(c.x + Mathf.Cos(a) * r, 0, c.z + Mathf.Sin(a) * r);
+                float h = 2f + (i % 3) * 0.6f;
+                Cylinder(root, "TreeTrunk", p + new Vector3(0, h, 0), new Vector3(0.6f, h, 0.6f), trunk);
+                Sphere(root, "TreeCanopy", p + new Vector3(0, h * 2f + 0.6f, 0), Vector3.one * (3f + (i % 2)), i % 2 == 0 ? leaves : leaves2);
+            }
+        }
+
+        private static void BuildPlains(Transform root)
+        {
+            var boulder = MakeMaterial(new Color(0.5f, 0.52f, 0.5f), 0.2f, 0.4f);
+            var bush = MakeMaterial(new Color(0.3f, 0.55f, 0.22f));
+            var c = PStoryCenters[1];
+            foreach (var o in new[] { new Vector3(-6, 0, 4), new Vector3(5, 0, -3), new Vector3(-2, 0, 8), new Vector3(8, 0, 5) })
+                Sphere(root, "Boulder", c + o + new Vector3(0, 0.8f, 0), new Vector3(2.2f, 1.4f, 2.2f), boulder);
+            foreach (var o in new[] { new Vector3(-9, 0, -2), new Vector3(2, 0, 9), new Vector3(10, 0, -4), new Vector3(-5, 0, 10) })
+                Sphere(root, "Bush", c + o + new Vector3(0, 0.5f, 0), new Vector3(1.5f, 1f, 1.5f), bush);
+        }
+
+        private static void BuildDesert(Transform root)
+        {
+            var cactus = MakeMaterial(new Color(0.24f, 0.48f, 0.27f));
+            var c = PStoryCenters[2];
+            foreach (var o in new[] { new Vector3(-6, 0, 3), new Vector3(6, 0, -2), new Vector3(0, 0, 8), new Vector3(9, 0, 4) })
+            {
+                Cylinder(root, "Cactus", c + o + new Vector3(0, 1.8f, 0), new Vector3(0.7f, 1.8f, 0.7f), cactus);
+                Cylinder(root, "CactusArm", c + o + new Vector3(0.6f, 2.2f, 0), new Vector3(0.4f, 0.7f, 0.4f), cactus);
+            }
+            Sphere(root, "Dune", c + new Vector3(-8, -0.6f, -4), new Vector3(10f, 2.4f, 8f),
+                MakeMaterial(new Color(0.9f, 0.78f, 0.34f)));
+            Sphere(root, "Dune2", c + new Vector3(7, -0.7f, 7), new Vector3(8f, 2f, 7f),
+                MakeMaterial(new Color(0.88f, 0.74f, 0.3f)));
+        }
+
+        private static void BuildVolcano(Transform root)
+        {
+            var darkRock = MakeMaterial(new Color(0.14f, 0.11f, 0.11f), 0.3f, 0.3f);
+            var lava = MakeEmissiveMaterial(new Color(1f, 0.4f, 0.1f), 2.8f);
+            var c = PStoryCenters[3];
+            // A cone volcano (stacked shrinking cylinders) with a glowing crater.
+            for (int i = 0; i < 5; i++)
+            {
+                float t = i / 4f;
+                Cylinder(root, "VolcanoTier", c + new Vector3(0, 1f + i * 1.4f, 0),
+                    new Vector3(Mathf.Lerp(14f, 3f, t), 0.8f, Mathf.Lerp(14f, 3f, t)), darkRock);
+            }
+            Cylinder(root, "Crater", c + new Vector3(0, 7.4f, 0), new Vector3(3.2f, 0.4f, 3.2f), lava);
+            foreach (var o in new[] { new Vector3(-9, 0, 5), new Vector3(8, 0, -6), new Vector3(11, 0, 4) })
+                Sphere(root, "VolcanicRock", c + o + new Vector3(0, 1f, 0), new Vector3(2.6f, 2f, 2.6f), darkRock);
+            foreach (var o in new[] { new Vector3(-6, 0.05f, -3), new Vector3(4, 0.05f, 6), new Vector3(-2, 0.05f, 8) })
+                Box(root, "LavaCrack", c + o, new Vector3(0, Random.Range(0, 90), 0), new Vector3(3.5f, 0.1f, 0.7f), lava);
+        }
+
+        private static void Signpost(Transform root, string text, Vector3 pos, Material signMat)
+        {
+            Cylinder(root, "SignPost", pos + new Vector3(0, 1.2f, 0), new Vector3(0.2f, 1.2f, 0.2f),
+                MakeMaterial(new Color(0.3f, 0.22f, 0.13f)));
+            Box(root, "SignPanel", pos + new Vector3(0, 2.4f, 0), Vector3.zero, new Vector3(3f, 1f, 0.15f), signMat);
+            AreaLabel(root, text, pos + new Vector3(0, 2.4f, 0.12f), 0.28f);
+        }
+
+        /// <summary>Spawn points spread across the four biomes (P Story is free-roam).</summary>
+        public static Vector3[] PStorySpawnCandidates()
+        {
+            var list = new List<Vector3>();
+            foreach (var c in PStoryCenters)
+            {
+                list.Add(c + new Vector3(0, 1.2f, 0));
+                list.Add(c + new Vector3(6f, 1.2f, -4f));
+            }
+            list.Add(PStoryHub + new Vector3(0, 1.5f, 0));
+            list.Add(new Vector3(-56f, 1.2f, 13f));
+            list.Add(new Vector3(56f, 1.2f, 13f));
+            return list.ToArray();
+        }
+
+        private static TeleportPad TeleportPadObject(Transform root, string name, Vector3 pos)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            go.name = name;
+            go.transform.SetParent(root);
+            go.transform.position = pos;
+            go.transform.localScale = new Vector3(3f, 0.15f, 3f);
+            go.GetComponent<Renderer>().material = MakeEmissiveMaterial(new Color(0.3f, 0.7f, 1f), 2.4f);
+            var col = go.GetComponent<Collider>();
+            col.isTrigger = true; // trigger only — you walk onto it
+            // A thin solid disc under the trigger so players don't fall through.
+            Cylinder(root, name + "_Base", pos + Vector3.down * 0.1f, new Vector3(3.2f, 0.1f, 3.2f),
+                MakeMaterial(new Color(0.2f, 0.3f, 0.4f), 0.3f, 0.5f));
+            return go.AddComponent<TeleportPad>();
+        }
+
+        private static void AreaLabel(Transform root, string text, Vector3 pos, float size = 0.5f)
+        {
+            var go = new GameObject(text);
+            go.transform.SetParent(root);
+            go.transform.position = pos;
+            var tm = go.AddComponent<TextMesh>();
+            tm.text = text;
+            tm.characterSize = size;
+            tm.fontSize = 64;
+            tm.fontStyle = FontStyle.Bold;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = new Color(1f, 1f, 1f, 0.6f);
+
+            Font font = null;
+            try { font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
+            if (font == null) { try { font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } }
+            if (font != null)
+            {
+                tm.font = font;
+                go.GetComponent<MeshRenderer>().material = font.material;
+            }
+            go.AddComponent<Nametag>(); // billboards toward the camera
+        }
+
+        private static void Sphere(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = name;
+            go.transform.SetParent(parent);
+            go.transform.position = pos;
+            go.transform.localScale = scale;
+            go.GetComponent<Renderer>().material = mat;
+        }
+
+        // ------------------------------------------------------------------
         // Shared pieces
         // ------------------------------------------------------------------
 

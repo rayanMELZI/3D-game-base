@@ -88,30 +88,136 @@ namespace FpsBase
 
         private void DrawLobby(NetworkManager nm, GameModeManager gameMode)
         {
-            float w = 620f, h = 360f;
-            var panel = new Rect((Screen.width - w) * 0.5f, (Screen.height - h) * 0.5f, w, h);
-            GUI.color = new Color(0f, 0f, 0f, 0.88f);
-            GUI.DrawTexture(panel, Texture2D.whiteTexture);
+            // The class editor overlay (opened from here) draws on top; hide the
+            // lobby behind it so they don't fight.
+            if (MainMenu.ShowClassesOverlay)
+                return;
+
+            // Full-screen dim.
+            GUI.color = new Color(0.03f, 0.04f, 0.06f, 0.92f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
             GUI.color = Color.white;
+
             bannerStyle.normal.textColor = MenuWidgets.Accent;
-            GUI.Label(new Rect(panel.x, panel.y + 20, w, 55), "PRE-GAME LOBBY", bannerStyle);
+            GUI.Label(new Rect(0, 26, Screen.width, 56), "PRE-GAME LOBBY", bannerStyle);
+            subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.8f);
+            GUI.Label(new Rect(0, 84, Screen.width, 24),
+                nm.IsHost ? "You are the host — set up the match, then START."
+                          : "Waiting for the host to start… you can prepare your class.", subStyle);
+
+            float top = 130f;
+            float colH = Screen.height - top - 40f;
+            float centerX = Screen.width * 0.5f;
+
+            // ---- LEFT: player list ----
+            var left = new Rect(centerX - 470f, top, 300f, colH);
+            Panel(left);
+            headerStyle.normal.textColor = MenuWidgets.Accent;
+            GUI.Label(new Rect(left.x + 16, left.y + 12, left.width - 32, 24), "PLAYERS", headerStyle);
+            var players = Players();
+            float ry = left.y + 46f;
+            rowStyle.alignment = TextAnchor.MiddleLeft; // CenteredRow() mutates the shared style
+            foreach (var p in players)
+            {
+                if (p == null) continue;
+                bool spec = p.Spectating.Value;
+                rowStyle.normal.textColor = spec ? new Color(1f, 1f, 1f, 0.5f)
+                    : EnvironmentBuilder.TeamColor(p.Team.Value);
+                string name = p.PlayerName.Value.IsEmpty ? $"Player {p.OwnerClientId + 1}" : p.PlayerName.Value.ToString();
+                string tag = spec ? "  (spectator)" : $"  ·  lvl {p.CareerLevel.Value}";
+                GUI.Label(new Rect(left.x + 16, ry, left.width - 32, 24), name + tag, rowStyle);
+                ry += 26f;
+            }
+
+            // ---- RIGHT: map "card" (name + mode; no real thumbnail exists) ----
+            var right = new Rect(centerX + 170f, top, 300f, colH);
+            Panel(right);
+            headerStyle.normal.textColor = MenuWidgets.Accent;
+            GUI.Label(new Rect(right.x + 16, right.y + 12, right.width - 32, 24), "MAP", headerStyle);
+            var pic = new Rect(right.x + 16, right.y + 46, right.width - 32, 150f);
+            GUI.color = new Color(0.15f, 0.17f, 0.22f, 1f);
+            GUI.DrawTexture(pic, Texture2D.whiteTexture);
+            GUI.color = MenuWidgets.Accent;
+            GUI.DrawTexture(new Rect(pic.x, pic.y, pic.width, 3f), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            bannerStyle.fontSize = 26;
+            GUI.Label(pic, MapCatalog.Name(gameMode.MapIndex.Value), bannerStyle);
+            bannerStyle.fontSize = 46;
             subStyle.normal.textColor = Color.white;
-            GUI.Label(new Rect(panel.x + 30, panel.y + 88, w - 60, 28), ModeTitle(gameMode), subStyle);
-            GUI.Label(new Rect(panel.x + 30, panel.y + 122, w - 60, 28),
-                $"{Players().Length} player(s)  ·  level {GameSettings.Level}  ·  classes and attachments are ready", subStyle);
+            GUI.Label(new Rect(right.x + 16, pic.yMax + 10, right.width - 32, 60), ModeTitle(gameMode), subStyle);
+
+            // ---- CENTER: vertical settings menu ----
+            var menu = new Rect(centerX - 140f, top, 280f, colH);
+            float my = menu.y;
+            const float bh = 40f, gap = 8f;
+            Rect Slot() { var r = new Rect(menu.x, my, menu.width, bh); my += bh + gap; return r; }
+
+            // Everyone can edit their own class here.
+            if (GUI.Button(Slot(), "EDIT CLASSES / GUNSMITH"))
+                MainMenu.ShowClassesOverlay = true;
+            my += 6f;
 
             if (nm.IsHost)
             {
-                if (GUI.Button(new Rect(panel.x + 60, panel.y + 175, 150, 38), "PREV MAP")) gameMode.HostCycleMap(-1);
-                if (GUI.Button(new Rect(panel.x + 235, panel.y + 175, 150, 38), "CHANGE MODE")) gameMode.HostCycleMode();
-                if (GUI.Button(new Rect(panel.x + 410, panel.y + 175, 150, 38), "NEXT MAP")) gameMode.HostCycleMap(1);
-                if (GUI.Button(new Rect(panel.x + 60, panel.y + 230, 190, 42),
-                    gameMode.BotsEnabled.Value ? "BOTS: ON" : "BOTS: OFF")) gameMode.HostToggleBots();
-                if (GUI.Button(new Rect(panel.x + 275, panel.y + 230, 285, 52), "START MATCH")) gameMode.HostStartMatch();
+                var mapRow = Slot();
+                if (GUI.Button(new Rect(mapRow.x, mapRow.y, 54, bh), "◀")) gameMode.HostCycleMap(-1);
+                GUI.Label(new Rect(mapRow.x + 60, mapRow.y, mapRow.width - 120, bh), "MAP", CenteredRow());
+                if (GUI.Button(new Rect(mapRow.xMax - 54, mapRow.y, 54, bh), "▶")) gameMode.HostCycleMap(1);
+
+                if (GUI.Button(Slot(), $"MODE: {ModeShort(gameMode)}")) gameMode.HostCycleMode();
+                if (GUI.Button(Slot(), gameMode.SniperOnly.Value ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF"))
+                    gameMode.HostToggleSniper();
+                if (GUI.Button(Slot(), $"MINIMAP: {RadarLabel(gameMode.RadarMode.Value)}"))
+                    gameMode.HostCycleRadar();
+
+                my += 6f;
+                var start = Slot(); start.height = 52f;
+                var prev = GUI.backgroundColor;
+                GUI.backgroundColor = MenuWidgets.Accent;
+                if (GUI.Button(start, "START MATCH")) gameMode.HostStartMatch();
+                GUI.backgroundColor = prev;
             }
-            else
-                GUI.Label(new Rect(panel.x + 30, panel.y + 205, w - 60, 40), "Waiting for the host…", subStyle);
+
+            // Spectator toggle for everyone.
+            my += 6f;
+            var local = LocalPlayer();
+            if (local != null && GUI.Button(Slot(),
+                local.Spectating.Value ? "SPECTATING (click to join)" : "JOIN AS SPECTATOR"))
+                local.RequestSpectatorToggle();
+
+            GUI.Label(new Rect(menu.x, menu.yMax - 26, menu.width, 22),
+                "Players can join at any time, even mid-match.", modeStyle);
         }
+
+        private void Panel(Rect r)
+        {
+            GUI.color = new Color(0.06f, 0.07f, 0.1f, 0.92f);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = Color.white;
+        }
+
+        private GUIStyle CenteredRow()
+        {
+            rowStyle.alignment = TextAnchor.MiddleCenter;
+            rowStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+            return rowStyle;
+        }
+
+        private static string ModeShort(GameModeManager gm)
+        {
+            switch (gm.CurrentMode)
+            {
+                case GameMode.Duel: return "1V1";
+                case GameMode.TeamDeathmatch: return "TDM";
+                case GameMode.FreeForAll: return "FFA";
+                case GameMode.ZombieSurvival: return "ZOMBIES";
+                case GameMode.PStory: return "P STORY";
+                default: return "GUN GAME";
+            }
+        }
+
+        private static string RadarLabel(int mode) =>
+            mode == 0 ? "OFF" : mode == 1 ? "ALWAYS" : "ON FIRE";
 
         private void EnsureStyles()
         {
@@ -147,6 +253,7 @@ namespace FpsBase
                 case GameMode.TeamDeathmatch: return $"TEAM DEATHMATCH · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.FreeForAll: return $"FREE-FOR-ALL · first to {gameMode.ScoreLimit} · {map}{sniper}";
                 case GameMode.ZombieSurvival: return $"ZOMBIE SURVIVAL · {map}";
+                case GameMode.PStory: return $"P STORY · third-person free-roam · {map}";
                 default: return $"GUN GAME · {GameModeManager.GunGameOrder.Length} weapons · {map}{sniper}";
             }
         }

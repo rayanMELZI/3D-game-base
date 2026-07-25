@@ -15,7 +15,7 @@ namespace FpsBase
     /// </summary>
     public static class MapCatalog
     {
-        private enum Kind { Arena, Backrooms, Western, Underwater, FlyingPlane, Dark, Custom }
+        private enum Kind { Arena, Backrooms, Western, Underwater, FlyingPlane, Dark, PStory, Custom }
 
         private struct Entry
         {
@@ -46,6 +46,16 @@ namespace FpsBase
         /// <summary>Force a re-scan (e.g. after adding a map in the editor).</summary>
         public static void Refresh() => entries = null;
 
+        /// <summary>Index of the P Story island (the mode forces this map).</summary>
+        public static int PStoryMapIndex()
+        {
+            EnsureLoaded();
+            for (int i = 0; i < entries.Count; i++)
+                if (entries[i].kind == Kind.PStory)
+                    return i;
+            return 0;
+        }
+
         private static void EnsureLoaded()
         {
             if (entries != null)
@@ -62,6 +72,7 @@ namespace FpsBase
                 new Entry { name = "ABYSS", kind = Kind.Underwater },
                 new Entry { name = "SKYFREIGHT", kind = Kind.FlyingPlane },
                 new Entry { name = "NIGHTFALL", kind = Kind.Dark },
+                new Entry { name = "P STORY ISLAND", kind = Kind.PStory },
             };
 
             // Custom map prefabs, sorted for a stable cross-client index order.
@@ -92,6 +103,7 @@ namespace FpsBase
                 case Kind.Underwater: EnvironmentBuilder.BuildThemeArena("Underwater", new Color(0.02f, 0.18f, 0.24f), new Color(0.1f, 0.75f, 0.8f), false); break;
                 case Kind.FlyingPlane: EnvironmentBuilder.BuildThemeArena("FlyingPlane", new Color(0.18f, 0.2f, 0.24f), new Color(0.75f, 0.78f, 0.82f), false); break;
                 case Kind.Dark: EnvironmentBuilder.BuildThemeArena("Dark", new Color(0.025f, 0.025f, 0.035f), new Color(0.55f, 0.05f, 0.03f), true); break;
+                case Kind.PStory: EnvironmentBuilder.BuildPStoryIsland(); break;
                 default:
                     var root = new GameObject(EnvironmentBuilder.MapRootName);
                     var instance = Object.Instantiate(entry.prefab, root.transform);
@@ -153,6 +165,8 @@ namespace FpsBase
             }
 
             // Built-in maps.
+            if (entry.kind == Kind.PStory)
+                return EnvironmentBuilder.PStorySpawnCandidates();
             Vector3[] ForSide(int s) => EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
             if (side < 0)
             {

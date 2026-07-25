@@ -122,8 +122,12 @@ namespace FpsBase
             if (DeathCam.CurrentLabel != null)
                 return;
 
+            // The fullscreen scope overlay is a first-person thing; in the
+            // third-person P Story view, keep the normal crosshair while aiming.
+            bool thirdPerson = GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+                && GameModeManager.Instance.CurrentMode == GameMode.PStory;
             bool zoomed = weaponController != null && weaponController.IsZoomed
-                && weaponController.CurrentWeapon.hideWhenZoomed;
+                && weaponController.CurrentWeapon.hideWhenZoomed && !thirdPerson;
             if (zoomed)
                 DrawScopeOverlay();
             else
@@ -134,6 +138,7 @@ namespace FpsBase
             DrawAmmoPanel();
             DrawHealthPanel();
             DrawRadar();
+            DrawEquipment();
             if (Time.time < flashUntil)
             {
                 GUI.color = new Color(1f, 1f, 1f, Mathf.Clamp01((flashUntil - Time.time) * flashStrength));
@@ -141,6 +146,45 @@ namespace FpsBase
                 GUI.color = Color.white;
             }
         }
+
+        // Equipment strip (bottom-center): shows the throwable keys + cooldowns
+        // so throwing feels deliberate, not like random hotkeys.
+        private void DrawEquipment()
+        {
+            if (throwables == null)
+            {
+                throwables = GetComponent<ThrowableController>();
+                if (throwables == null) return;
+            }
+
+            const float bw = 74f, bh = 30f, gap = 6f;
+            int n = ThrowableController.Count;
+            float totalW = n * bw + (n - 1) * gap;
+            float x0 = (Screen.width - totalW) / 2f;
+            float y = Screen.height - 92f;
+
+            for (int i = 0; i < n; i++)
+            {
+                var rect = new Rect(x0 + i * (bw + gap), y, bw, bh);
+                float cd = throwables.CooldownFraction(i);
+
+                GUI.color = new Color(0f, 0f, 0f, 0.5f);
+                GUI.DrawTexture(rect, whiteTex);
+                if (cd > 0f) // cooldown fills from the left
+                {
+                    GUI.color = new Color(0.6f, 0.25f, 0.15f, 0.55f);
+                    GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * cd, rect.height), whiteTex);
+                }
+                GUI.color = MenuWidgets.Accent;
+                GUI.DrawTexture(new Rect(rect.x, rect.y, 3f, rect.height), whiteTex);
+                GUI.color = Color.white;
+
+                if (smallText != null)
+                    GUI.Label(rect, $" {ThrowableController.Keys[i].ToString()[0]}·{ThrowableController.Names[i]}", smallText);
+            }
+        }
+
+        private ThrowableController throwables;
 
         private void DrawDamageDirection()
         {

@@ -110,10 +110,38 @@ namespace FpsBase
                 return;
             }
 
+            // Class editor opened from the pre-game lobby — reuses the full menu
+            // class/gunsmith UI as an overlay during a running game.
+            if (ShowClassesOverlay)
+            {
+                DrawClassesOverlayWindow();
+                return;
+            }
+
             if (!NetworkRunning)
                 DrawMainMenu();
-            else if (Cursor.lockState != CursorLockMode.Locked)
+            else if (Cursor.lockState != CursorLockMode.Locked && !InLobby)
                 DrawPauseMenu();
+        }
+
+        /// <summary>Set by the lobby to open the class editor over a running game.</summary>
+        public static bool ShowClassesOverlay;
+
+        private static bool InLobby =>
+            GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+            && GameModeManager.Instance.LobbyOpen.Value;
+
+        private void DrawClassesOverlayWindow()
+        {
+            screen = MenuScreen.Classes;
+            float w = 480f, h = 700f;
+            var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
+            MenuWidgets.Panel(panel);
+            GUILayout.BeginArea(new Rect(panel.x + 30, panel.y + 20, w - 60, h - 40));
+            GUILayout.Label("CLASSES", MenuWidgets.Title, GUILayout.Height(48));
+            GUILayout.Space(6);
+            DrawClasses(); // its BACK button clears ShowClassesOverlay
+            GUILayout.EndArea();
         }
 
         private void DrawConnectingWindow()
@@ -203,37 +231,13 @@ namespace FpsBase
                 GameSettings.Save();
             }
             GUILayout.EndHorizontal();
+            GUILayout.Space(8);
+
+            // Match settings live in the pre-game lobby now (map / mode / snipers /
+            // minimap), so hosting drops you straight there to set everything up.
+            GUILayout.Label("Map, mode and match options are set in the lobby after you host.", MenuWidgets.Small);
+
             GUILayout.Space(10);
-
-            // Match setup.
-            GUILayout.BeginHorizontal();
-            if (MenuWidgets.MenuButton($"MAP: {MapCatalog.Name(selectedMap)}", 32f))
-                selectedMap = (selectedMap + 1) % MapCatalog.Count;
-            if (MenuWidgets.MenuButton(sniperOnly ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF", 32f))
-                sniperOnly = !sniperOnly;
-            GUILayout.EndHorizontal();
-            GUILayout.Space(4);
-            string radarLabel = radarMode == 0 ? "MINIMAP: OFF"
-                : radarMode == 1 ? "MINIMAP: ALWAYS ON" : "MINIMAP: PING ON FIRE";
-            if (MenuWidgets.MenuButton(radarLabel, 32f))
-                radarMode = (radarMode + 1) % 3;
-            GUILayout.Space(4);
-            GUILayout.BeginHorizontal();
-            foreach (var mode in new[] { GameMode.Duel, GameMode.TeamDeathmatch, GameMode.FreeForAll, GameMode.GunGame })
-            {
-                string label = mode == GameMode.Duel ? "1V1"
-                    : mode == GameMode.TeamDeathmatch ? "TDM"
-                    : mode == GameMode.FreeForAll ? "FFA" : "GUN GAME";
-                var prev = GUI.backgroundColor;
-                if (selectedMode == mode)
-                    GUI.backgroundColor = MenuWidgets.Accent;
-                if (MenuWidgets.MenuButton(label, 30f))
-                    selectedMode = mode;
-                GUI.backgroundColor = prev;
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(12);
             GUILayout.Label("LOCAL / LAN", MenuWidgets.Subtitle);
             if (MenuWidgets.MenuButton("HOST GAME"))
                 StartHost();
@@ -322,9 +326,10 @@ namespace FpsBase
             DrawGunsmith();
 
             GUILayout.Space(8);
-            if (MenuWidgets.MenuButton("BACK", 32f))
+            if (MenuWidgets.MenuButton(ShowClassesOverlay ? "BACK TO LOBBY" : "BACK", 32f))
             {
                 GameSettings.Save();
+                ShowClassesOverlay = false; // close the lobby overlay if that's how we got here
                 screen = MenuScreen.Root;
             }
         }
@@ -527,13 +532,26 @@ namespace FpsBase
 
         private void ConfigureTransport(string address)
         {
-            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            var nm = NetworkManager.Singleton;
+            var transport = nm.GetComponent<UnityTransport>();
             transport.SetConnectionData(address, Port, "0.0.0.0");
+            // Force LAN back onto UnityTransport. The Steam path permanently
+            // swaps NetworkConfig.NetworkTransport to the Steam transport, and
+            // that swap survives Shutdown (the NetworkManager singleton lives on)
+            // — so without this, any LAN host/join after one Steam session (or
+            // when Steam auto-selects its transport) routes the IP through the
+            // wrong transport and silently fails.
+            nm.NetworkConfig.NetworkTransport = transport;
         }
 
         private void Leave()
         {
             NetworkManager.Singleton.Shutdown();
+#if FPSBASE_STEAM
+            // Drop any Steam lobby so the next host/join starts clean (a stale
+            // lobby was part of why "Steam worked once then stopped").
+            SteamLobbyService.LeaveLobby();
+#endif
             MouseLook.LockCursor(false);
             if (MultiplayerBootstrap.Instance != null)
                 MultiplayerBootstrap.Instance.SetMenuCamera(true);
