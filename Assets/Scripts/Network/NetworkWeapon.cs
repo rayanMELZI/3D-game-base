@@ -145,7 +145,8 @@ namespace FpsBase
 
             // Positional gunshot so you can hear where enemies are firing from
             // (a suppressor makes their shots much quieter).
-            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model), from, 0.8f * Attachments.ShotVolumeMultiplier(AttachmentMask.Value));
+            bool suppressed = Attachments.Has(AttachmentMask.Value, AttachmentType.Suppressor);
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, suppressed), from, 0.8f * Attachments.ShotVolumeMultiplier(AttachmentMask.Value));
 
             // Remote rocket: explosion at the predicted impact after the flight time.
             if (weapon.isProjectile)

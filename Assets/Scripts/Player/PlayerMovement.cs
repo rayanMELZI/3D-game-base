@@ -8,6 +8,7 @@ namespace FpsBase
     /// Left Ctrl crouch · sprint+Ctrl slide.
     /// Uses the legacy Input Manager so it works out of the box.
     /// </summary>
+    [DefaultExecutionOrder(-100)]
     [RequireComponent(typeof(CharacterController))]
     public class PlayerMovement : MonoBehaviour
     {
@@ -82,7 +83,6 @@ namespace FpsBase
 
             float inputX = Input.GetAxisRaw("Horizontal");
             float inputZ = Input.GetAxisRaw("Vertical");
-            moveInput = new Vector2(inputX, inputZ);
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
@@ -96,6 +96,13 @@ namespace FpsBase
                 || Input.GetKey(KeyCode.JoystickButton9);
             IsSprinting = sprintHeld && inputZ > 0.1f
                 && moving && !wantCrouch && !IsProne && !IsSliding;
+
+            // Sprinting is a committed forward movement. Ignore strafe input while
+            // sprinting so diagonal input cannot receive sprint speed, and expose
+            // the direction actually travelled to animation/networking.
+            moveInput = IsSprinting
+                ? new Vector2(0f, inputZ)
+                : new Vector2(inputX, inputZ);
 
             // --- Slide: press crouch while sprinting on the ground ---
             if (grounded && slideTimer <= 0f
@@ -128,7 +135,9 @@ namespace FpsBase
             else
             {
                 speed = IsProne ? proneSpeed : (IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed));
-                horizontal = moveDirection * speed;
+                horizontal = IsSprinting
+                    ? transform.forward * speed
+                    : moveDirection * speed;
             }
             horizontalVelocity = horizontal;
 

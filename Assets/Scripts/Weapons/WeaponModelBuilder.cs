@@ -7,15 +7,22 @@ namespace FpsBase
     {
         public GameObject root;
         public Transform muzzle;
+        public Transform rightHandGrip;
+        public Transform leftHandGrip;
+        public Transform magazine;
+        public Vector3 magazineRestPosition;
+        public Quaternion magazineRestRotation;
+        public Transform pull;
+        public Vector3 pullRestPosition;
+        public Quaternion pullRestRotation;
         public Light muzzleFlash;
     }
 
     /// <summary>
     /// Builds each weapon model. Matched weapon types (pistol / SMG / shotgun /
-    /// rifle / sniper / RPG) use the imported low-poly Asset Store models loaded
-    /// from Resources/Weapons; the knife (no imported match) and any failed load
-    /// fall back to the original Unity-primitive models, so the project still
-    /// runs even if the imported prefabs are missing.
+    /// rifle / sniper / RPG / knife) use imported low-poly Asset Store models
+    /// loaded from Resources/Weapons. Any failed load falls back to the original
+    /// Unity-primitive model, so the project still runs if a prefab is missing.
     /// Used both for the first-person viewmodel and the third-person model
     /// other players see in multiplayer.
     /// </summary>
@@ -30,6 +37,16 @@ namespace FpsBase
             Vector3 muzzlePos;
             if (!TryBuildImported(def.model, root.transform, out muzzlePos))
                 muzzlePos = BuildProcedural(def.model, root.transform);
+
+            // Authored sockets are optional. Weapons without them keep using the
+            // old generic hand placement and hard-coded muzzle position.
+            Transform rightHandGrip = FindDeepChild(root.transform, "RightHandGrip");
+            Transform leftHandGrip = FindDeepChild(root.transform, "LeftHandGrip");
+            Transform muzzleSocket = FindDeepChild(root.transform, "MuzzleSocket");
+            Transform magazine = FindDeepChildEndingWith(root.transform, "_magazine");
+            Transform pull = FindDeepChildEndingWith(root.transform, "_pull");
+            if (muzzleSocket != null)
+                muzzlePos = root.transform.InverseTransformPoint(muzzleSocket.position);
 
             // Bolt on the chosen add-ons (may push the muzzle forward: suppressor).
             attachmentMask = Attachments.Sanitize(attachmentMask, def.model);
@@ -56,7 +73,39 @@ namespace FpsBase
             flash.range = 4f;
             flash.enabled = false;
 
-            return new WeaponModelInstance { root = root, muzzle = muzzle.transform, muzzleFlash = flash };
+            var posePoints = root.AddComponent<WeaponPosePoints>();
+            posePoints.Configure(rightHandGrip, leftHandGrip);
+
+            return new WeaponModelInstance
+            {
+                root = root,
+                muzzle = muzzle.transform,
+                rightHandGrip = rightHandGrip,
+                leftHandGrip = leftHandGrip,
+                magazine = magazine,
+                magazineRestPosition = magazine != null ? magazine.localPosition : Vector3.zero,
+                magazineRestRotation = magazine != null ? magazine.localRotation : Quaternion.identity,
+                pull = pull,
+                pullRestPosition = pull != null ? pull.localPosition : Vector3.zero,
+                pullRestRotation = pull != null ? pull.localRotation : Quaternion.identity,
+                muzzleFlash = flash
+            };
+        }
+
+        private static Transform FindDeepChild(Transform parent, string childName)
+        {
+            foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+                if (child.name == childName)
+                    return child;
+            return null;
+        }
+
+        private static Transform FindDeepChildEndingWith(Transform parent, string suffix)
+        {
+            foreach (var child in parent.GetComponentsInChildren<Transform>(true))
+                if (child.name.EndsWith(suffix, System.StringComparison.OrdinalIgnoreCase))
+                    return child;
+            return null;
         }
 
         private static readonly Color[] SkinColors =
@@ -159,31 +208,91 @@ namespace FpsBase
         {
             switch (type)
             {
+                case WeaponModelType.Knife:
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/Knife",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = Vector3.zero,
+                        muzzle = new Vector3(0, 0, 0.22f)
+                    };
                 case WeaponModelType.Pistol:
-                    return new ModelFit { resource = "Weapons/Pistol_P", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.02f), muzzle = new Vector3(0, 0.03f, 0.2f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/Pistol",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.055f, -0.03f),
+                        muzzle = new Vector3(0, 0.018f, 0.26f)
+                    };
                 case WeaponModelType.Smg:
-                    return new ModelFit { resource = "Weapons/SMG_P", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.02f, 0.32f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/SMG",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.075f, -0.1f),
+                        muzzle = new Vector3(0, 0.035f, 0.43f)
+                    };
                 case WeaponModelType.Shotgun:
-                    return new ModelFit { resource = "Weapons/ShotGun_P", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.55f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/ShotGun",
+                        // This prefab's mesh children already carry a 1.25 scale.
+                        scale = new Vector3(0.16f, 0.16f, 0.16f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.09f, -0.12f),
+                        muzzle = new Vector3(0, 0.035f, 0.56f)
+                    };
                 case WeaponModelType.Rifle:
-                    return new ModelFit { resource = "Weapons/AR_T", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.5f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/AssaultRifle",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.08f, -0.12f),
+                        // Rifle_1's barrel sits above the pack origin. The old
+                        // value (y = .02) emitted tracers below the real muzzle.
+                        muzzle = new Vector3(0, 0.045f, 0.5f)
+                    };
                 case WeaponModelType.Sniper:
-                    return new ModelFit { resource = "Weapons/Recon_P", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.15f), muzzle = new Vector3(0, 0.02f, 0.75f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/SniperRifle",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.07f, -0.15f),
+                        muzzle = new Vector3(0, 0.04f, 0.55f)
+                    };
                 case WeaponModelType.Rpg:
-                    return new ModelFit { resource = "Weapons/Launcher_G", scale = Vector3.one,
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.04f, 0.55f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/RocketLauncher",
+                        scale = new Vector3(0.18f, 0.18f, 0.18f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.09f, -0.1f),
+                        muzzle = new Vector3(0, 0.005f, 0.52f)
+                    };
                 case WeaponModelType.Lmg:
-                    return new ModelFit { resource = "Weapons/AR_T", scale = new Vector3(1.08f, 1.08f, 1.16f),
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.12f), muzzle = new Vector3(0, 0.02f, 0.58f) };
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/LMG",
+                        scale = new Vector3(0.2f, 0.2f, 0.2f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.08f, -0.12f),
+                        muzzle = new Vector3(0, 0.04f, 0.52f)
+                    };
                 case WeaponModelType.GrenadeLauncher:
-                    return new ModelFit { resource = "Weapons/Launcher_G", scale = new Vector3(0.82f, 0.82f, 0.78f),
-                        euler = Vector3.zero, offset = new Vector3(0, 0, -0.1f), muzzle = new Vector3(0, 0.04f, 0.43f) };
-                default: // Knife has no imported match — always procedural.
+                    return new ModelFit
+                    {
+                        resource = "Weapons/Modern/RocketLauncher",
+                        scale = new Vector3(0.16f, 0.16f, 0.16f),
+                        euler = Vector3.zero,
+                        offset = new Vector3(0, -0.08f, -0.1f),
+                        muzzle = new Vector3(0, 0.005f, 0.45f)
+                    };
+                default:
                     return new ModelFit { resource = null };
             }
         }
