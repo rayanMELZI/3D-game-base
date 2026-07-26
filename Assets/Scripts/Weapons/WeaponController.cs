@@ -154,7 +154,9 @@ namespace FpsBase
         /// </summary>
         public void ApplySelectedClass()
         {
-            if (!GameSettings.UseClassLoadout)
+            // The 2-weapon-class vs all-unlocked rule is now the host's match-wide
+            // choice (networked), so every player in a game plays the same way.
+            if (!GameModeManager.ClassLoadoutActive)
             {
                 classSlots = null;
                 if (models != null && !lockSwitching && CurrentIndex != WeaponDefinition.DefaultIndex)
