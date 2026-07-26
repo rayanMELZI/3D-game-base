@@ -13,7 +13,7 @@ namespace FpsBase
         /// <summary>0.MINOR.PATCH — bump MINOR for features, PATCH for fixes.
         /// Git tags follow the same number (v0.5.0 style).</summary>
 
-        public const string Version = "0.14.0";
+        public const string Version = "0.14.1";
 
 
         /// <summary>
