@@ -167,6 +167,8 @@ namespace FpsBase
                 if (GUI.Button(Slot(), $"MODE: {ModeShort(gameMode)}")) gameMode.HostCycleMode();
                 if (GUI.Button(Slot(), gameMode.SniperOnly.Value ? "SNIPERS ONLY: ON" : "SNIPERS ONLY: OFF"))
                     gameMode.HostToggleSniper();
+                if (GUI.Button(Slot(), gameMode.ClassLoadout.Value ? "WEAPONS: CLASS LOADOUT" : "WEAPONS: ALL UNLOCKED"))
+                    gameMode.HostToggleClassLoadout();
                 if (GUI.Button(Slot(), $"MINIMAP: {RadarLabel(gameMode.RadarMode.Value)}"))
                     gameMode.HostCycleRadar();
 

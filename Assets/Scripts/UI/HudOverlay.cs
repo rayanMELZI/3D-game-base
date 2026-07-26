@@ -57,8 +57,11 @@ namespace FpsBase
 
         public void NotifyFlash(float strength)
         {
-            flashStrength = Mathf.Max(flashStrength, strength);
-            flashUntil = Time.time + 2.8f * strength;
+            // Anyone caught in the blast is meaningfully blinded (floor), and a
+            // direct hit whites the screen out for a good few seconds.
+            strength = Mathf.Clamp01(strength);
+            flashStrength = Mathf.Max(flashStrength, 0.6f + strength);
+            flashUntil = Mathf.Max(flashUntil, Time.time + 1.6f + 4f * strength);
         }
 
         private void EnsureBreathing()

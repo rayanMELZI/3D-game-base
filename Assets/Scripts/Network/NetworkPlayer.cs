@@ -42,6 +42,9 @@ namespace FpsBase
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         public NetworkVariable<bool> Spectating = new NetworkVariable<bool>(
             false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>True while the player has post-respawn immunity — drives the glow on every client.</summary>
+        public NetworkVariable<bool> Protected = new NetworkVariable<bool>(
+            false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         public float respawnDelay = 3f;
 
@@ -130,6 +133,7 @@ namespace FpsBase
         {
             Team.OnValueChanged += OnTeamChanged;
             IsDead.OnValueChanged += OnDeadChanged;
+            Protected.OnValueChanged += OnProtectedChanged;
             PlayerName.OnValueChanged += OnNameChanged;
 
             // Give each player an imported character skin by join order
@@ -175,6 +179,7 @@ namespace FpsBase
             Team.OnValueChanged -= OnTeamChanged;
             IsDead.OnValueChanged -= OnDeadChanged;
             PlayerName.OnValueChanged -= OnNameChanged;
+            Protected.OnValueChanged -= OnProtectedChanged;
 
             if (IsOwner)
             {
@@ -189,6 +194,11 @@ namespace FpsBase
         {
             if (!IsSpawned)
                 return;
+
+            // Server ends the immunity glow when the timer runs out (shooting
+            // clears it earlier via ServerClearSpawnProtection).
+            if (IsServer && Protected.Value && Time.time >= spawnProtectedUntil)
+                Protected.Value = false;
 
             RecordKillcamSample();
             
@@ -443,6 +453,11 @@ namespace FpsBase
             GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
             && GameModeManager.Instance.CurrentMode == GameMode.PStory;
 
+        private void OnProtectedChanged(bool previous, bool nowProtected)
+        {
+            if (rig != null) rig.SetProtectedGlow(nowProtected);
+        }
+
         private void OnDeadChanged(bool previous, bool dead)
         {
             rig.SetVisible(!dead);
@@ -520,9 +535,13 @@ namespace FpsBase
         /// <summary>Server-side anti-spawnkill: brief immunity after spawning, ends when you shoot.</summary>
         public bool IsSpawnProtected => Time.time < spawnProtectedUntil;
         private float spawnProtectedUntil;
-        private const float SpawnProtectionSeconds = 3f;
+        private const float SpawnProtectionSeconds = 2f;
 
-        public void ServerClearSpawnProtection() => spawnProtectedUntil = 0f;
+        public void ServerClearSpawnProtection()
+        {
+            spawnProtectedUntil = 0f;
+            if (IsServer) Protected.Value = false;
+        }
 
         public void ServerRespawn()
         {
@@ -532,6 +551,7 @@ namespace FpsBase
             health.ServerResetHealth();
             IsDead.Value = false;
             spawnProtectedUntil = Time.time + SpawnProtectionSeconds;
+            Protected.Value = true;
 
             Vector3 pos = GameModeManager.Instance != null
                 ? GameModeManager.Instance.GetSpawnPoint(Team.Value)

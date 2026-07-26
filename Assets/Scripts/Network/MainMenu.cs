@@ -283,17 +283,21 @@ namespace FpsBase
         /// </summary>
         private void DrawClasses()
         {
+            // The 2-weapons-vs-all rule is now the host's match-wide choice (set in
+            // the lobby). This button picks what YOU'D host with + the offline/
+            // practice default; in a game the host's lobby toggle wins for everyone.
             var previousBackground = GUI.backgroundColor;
             if (GameSettings.UseClassLoadout)
                 GUI.backgroundColor = MenuWidgets.Accent;
             if (MenuWidgets.MenuButton(GameSettings.UseClassLoadout
-                    ? "LOADOUT: 2 WEAPONS + KNIFE"
-                    : "LOADOUT: FULL ARSENAL", 34f))
+                    ? "HOST RULE: CLASS LOADOUT (2 + KNIFE)"
+                    : "HOST RULE: ALL WEAPONS UNLOCKED", 34f))
+            {
                 GameSettings.UseClassLoadout = !GameSettings.UseClassLoadout;
+                GameModeManager.PendingClassLoadout = GameSettings.UseClassLoadout;
+            }
             GUI.backgroundColor = previousBackground;
-            GUILayout.Label(GameSettings.UseClassLoadout
-                    ? "Spawn with the selected class; keys 1/2/3 select knife, secondary, primary."
-                    : "Carry all seven weapons; number keys and scroll use the global arsenal order.",
+            GUILayout.Label("Match-wide, chosen by the host (changeable in the lobby). Everyone plays the same rule.",
                 MenuWidgets.Small);
             GUILayout.Space(6);
 

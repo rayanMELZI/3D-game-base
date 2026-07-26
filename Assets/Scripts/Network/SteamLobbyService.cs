@@ -60,7 +60,10 @@ namespace FpsBase
         private static void OnLobbyCreated(LobbyCreated_t data)
         {
             if (data.m_eResult != EResult.k_EResultOK)
+            {
+                Debug.LogError($"[Steam] CreateLobby failed: {data.m_eResult}");
                 return;
+            }
             currentLobby = new CSteamID(data.m_ulSteamIDLobby);
             SteamMatchmaking.SetLobbyData(currentLobby, HostIdKey, SteamUser.GetSteamID().ToString());
 
@@ -68,7 +71,8 @@ namespace FpsBase
             // LAN UnityTransport — friends join via Steam relay, not by IP).
             if (!UseSteamTransport())
                 return;
-            NetworkManager.Singleton.StartHost();
+            bool ok = NetworkManager.Singleton.StartHost();
+            Debug.Log($"[Steam] Lobby {currentLobby.m_SteamID} created; StartHost={ok}. Waiting for friends.");
         }
 
         /// <summary>Switch Netcode onto the Steam transport; false if it isn't on the NetworkManager.</summary>
@@ -85,27 +89,44 @@ namespace FpsBase
             return true;
         }
 
-        // A friend clicked "Join Game" in the Steam overlay.
+        // A friend clicked "Join Game" in the Steam overlay or accepted an invite.
         private static void OnJoinRequested(GameLobbyJoinRequested_t data)
         {
+            EnsureCallbacks(); // in case the game just launched from the invite
+            Debug.Log($"[Steam] Join requested for lobby {data.m_steamIDLobby.m_SteamID}.");
             SteamMatchmaking.JoinLobby(data.m_steamIDLobby);
         }
 
         private static void OnLobbyEntered(LobbyEnter_t data)
         {
             currentLobby = new CSteamID(data.m_ulSteamIDLobby);
-            string hostId = SteamMatchmaking.GetLobbyData(currentLobby, HostIdKey);
-            if (string.IsNullOrEmpty(hostId) || hostId == SteamUser.GetSteamID().ToString())
-                return; // we are the host
 
-            // Point the Steam transport at the host and connect.
-            // (Component from the Netcode community contributions repo.)
+            // The lobby OWNER is the host — available immediately on entry, unlike
+            // the custom host_steam_id data which may not have propagated yet
+            // (that race made joiners silently give up or connect to nothing).
+            CSteamID owner = SteamMatchmaking.GetLobbyOwner(currentLobby);
+            CSteamID me = SteamUser.GetSteamID();
+            Debug.Log($"[Steam] Entered lobby {currentLobby.m_SteamID}; owner={owner.m_SteamID}, me={me.m_SteamID}.");
+
+            if (!owner.IsValid() || owner == me)
+                return; // we are the host (StartHost already ran in OnLobbyCreated)
+
             if (!UseSteamTransport())
                 return;
+
+            // A leftover half-open connection from a previous attempt breaks the
+            // next join; start from a clean NetworkManager.
+            if (NetworkManager.Singleton.IsListening || NetworkManager.Singleton.IsClient)
+            {
+                Debug.LogWarning("[Steam] NetworkManager already running — shutting down before re-joining.");
+                NetworkManager.Singleton.Shutdown();
+            }
+
             var transport = (Netcode.Transports.SteamNetworkingSocketsTransport)
                 NetworkManager.Singleton.NetworkConfig.NetworkTransport;
-            transport.ConnectToSteamID = ulong.Parse(hostId);
-            NetworkManager.Singleton.StartClient();
+            transport.ConnectToSteamID = owner.m_SteamID;
+            bool ok = NetworkManager.Singleton.StartClient();
+            Debug.Log($"[Steam] Connecting to host {owner.m_SteamID} via relay; StartClient={ok}.");
         }
 
         public static void LeaveLobby()

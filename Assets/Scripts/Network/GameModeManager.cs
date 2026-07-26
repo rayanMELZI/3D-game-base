@@ -32,6 +32,12 @@ namespace FpsBase
         public static bool PendingSniperOnly = false;
         /// <summary>0 = off, 1 = players always visible, 2 = visible while firing.</summary>
         public static int PendingRadarMode = 2;
+        /// <summary>Host's initial weapons rule: true = class loadout (2 weapons), false = all unlocked.</summary>
+        public static bool PendingClassLoadout = true;
+
+        /// <summary>The active weapons rule: the host's networked choice in a game, else the local setting (offline).</summary>
+        public static bool ClassLoadoutActive =>
+            Instance != null && Instance.IsSpawned ? Instance.ClassLoadout.Value : GameSettings.UseClassLoadout;
 
         /// <summary>Gun Game weapon order by loadout index (knife last).</summary>
         public static readonly int[] GunGameOrder = { 1, 2, 3, 4, 7, 5, 8, 6, 0 };
@@ -45,6 +51,10 @@ namespace FpsBase
         /// <summary>Minimap radar: 0 = off, 1 = always show players, 2 = show while firing.</summary>
         public NetworkVariable<int> RadarMode = new NetworkVariable<int>(
             2, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>Host-chosen for the whole match: true = class loadout (2 weapons),
+        /// false = every weapon unlocked. Replaces the old per-player toggle.</summary>
+        public NetworkVariable<bool> ClassLoadout = new NetworkVariable<bool>(
+            true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam0 = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> ScoreTeam1 = new NetworkVariable<int>(
@@ -127,6 +137,7 @@ namespace FpsBase
                 MapIndex.Value = PendingHostMap;
                 SniperOnly.Value = PendingSniperOnly;
                 RadarMode.Value = PendingRadarMode;
+                ClassLoadout.Value = PendingClassLoadout;
                 ScoreTeam0.Value = 0;
                 ScoreTeam1.Value = 0;
                 WinnerTeam.Value = -1;
@@ -172,6 +183,11 @@ namespace FpsBase
         public void HostToggleBots()
         {
             if (IsServer && LobbyOpen.Value) BotsEnabled.Value = !BotsEnabled.Value;
+        }
+
+        public void HostToggleClassLoadout()
+        {
+            if (IsServer && LobbyOpen.Value) ClassLoadout.Value = !ClassLoadout.Value;
         }
 
         public void HostToggleSniper()
