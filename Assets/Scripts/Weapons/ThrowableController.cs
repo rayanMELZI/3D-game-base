@@ -4,9 +4,9 @@ using UnityEngine;
 namespace FpsBase
 {
     /// <summary>
-    /// Equipment throwing. Four throwables on dedicated keys:
-    ///   G = Frag (lethal)   F = Flashbang (tactical)
-    ///   V = Sticky bomb     X = Throwing knife
+    /// Equipment throwing. In the class loadout: G throws your chosen lethal,
+    /// E your chosen tactical. When the host unlocks all weapons, every throwable
+    /// gets its own key instead (G frag · F flash · V sticky · X knife).
     /// Only the local OWNER reads input (added to every player object, so an
     /// un-gated Update used to fire on every remote copy at once — that was the
     /// "everyone throws when only I pressed" bug). Throws are replicated through
@@ -20,8 +20,11 @@ namespace FpsBase
 
         public const int Count = 4;
         public static readonly string[] Names = { "FRAG", "FLASH", "STICKY", "KNIFE" };
+        // Per-throwable keys used only in "all weapons unlocked" games.
         public static readonly KeyCode[] Keys = { KeyCode.G, KeyCode.F, KeyCode.V, KeyCode.X };
         private static readonly float[] Cooldown = { 3.5f, 6f, 5f, 1.2f };
+        /// <summary>Which throwables count as tactical (E); the rest are lethal (G).</summary>
+        public static readonly bool[] IsTactical = { false, true, false, false };
 
         private readonly float[] readyAt = new float[Count];
         private NetworkPlayer net;
@@ -44,9 +47,19 @@ namespace FpsBase
             if (Cursor.lockState != CursorLockMode.Locked || viewCamera == null)
                 return;
 
-            for (int type = 0; type < Count; type++)
-                if (Input.GetKeyDown(Keys[type]))
-                    TryThrow(type);
+            if (GameModeManager.ClassLoadoutActive)
+            {
+                // Class loadout: one lethal on G, one tactical on E (your picks).
+                if (Input.GetKeyDown(KeyCode.G)) TryThrow(Mathf.Clamp(GameSettings.LethalType, 0, Count - 1));
+                if (Input.GetKeyDown(KeyCode.E)) TryThrow(Mathf.Clamp(GameSettings.TacticalType, 0, Count - 1));
+            }
+            else
+            {
+                // All weapons unlocked: every throwable on its own key.
+                for (int type = 0; type < Count; type++)
+                    if (Input.GetKeyDown(Keys[type]))
+                        TryThrow(type);
+            }
         }
 
         private void TryThrow(int type)
@@ -136,7 +149,7 @@ namespace FpsBase
 
         private void Detonate()
         {
-            float radius = type == 1 ? 9f : 5f;
+            float radius = type == 1 ? 15f : 5f; // flashbangs reach far
             foreach (var hit in Physics.OverlapSphere(transform.position, radius,
                          Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
             {
@@ -148,10 +161,11 @@ namespace FpsBase
                 if (type == 1)
                 {
                     // Flash only the LOCAL player when they're in range (IsOwner
-                    // is true only for this client's own player object).
+                    // is true only for this client's own player object). A gentle
+                    // curve keeps it strong across most of the radius.
                     var np = hit.GetComponentInParent<NetworkPlayer>();
                     if (np != null && np.IsOwner && HudOverlay.Local != null)
-                        HudOverlay.Local.NotifyFlash(falloff);
+                        HudOverlay.Local.NotifyFlash(Mathf.Sqrt(falloff));
                 }
                 else if (authoritative)
                 {

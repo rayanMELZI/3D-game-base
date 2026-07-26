@@ -202,5 +202,38 @@ namespace FpsBase
 
         /// <summary>The renderers that actually show the body — the imported skin once swapped in, else the primitives.</summary>
         private Renderer[] VisibleRenderers => characterRenderers ?? allRenderers;
+
+        // Spawn-immunity glow: a translucent emissive bubble around the player.
+        private GameObject protectionShield;
+
+        /// <summary>Show/hide the immunity aura (called on every client when the Protected state changes).</summary>
+        public void SetProtectedGlow(bool on)
+        {
+            if (on && protectionShield == null && bodyRoot != null)
+            {
+                protectionShield = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                protectionShield.name = "SpawnShield";
+                Destroy(protectionShield.GetComponent<Collider>());
+                protectionShield.transform.SetParent(bodyRoot, false);
+                protectionShield.transform.localPosition = new Vector3(0f, 1f, 0f);
+                protectionShield.transform.localScale = new Vector3(1.4f, 1.25f, 1.4f);
+
+                var mat = EnvironmentBuilder.MakeEmissiveMaterial(new Color(0.4f, 0.85f, 1f), 1.6f);
+                // Make it see-through so the player still reads underneath.
+                mat.SetFloat("_Mode", 3f); // transparent
+                mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                mat.SetInt("_ZWrite", 0);
+                mat.DisableKeyword("_ALPHATEST_ON");
+                mat.EnableKeyword("_ALPHABLEND_ON");
+                mat.renderQueue = 3000;
+                mat.color = new Color(0.4f, 0.85f, 1f, 0.22f);
+                var r = protectionShield.GetComponent<Renderer>();
+                r.material = mat;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            if (protectionShield != null)
+                protectionShield.SetActive(on);
+        }
     }
 }

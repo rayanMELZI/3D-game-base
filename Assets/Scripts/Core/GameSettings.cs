@@ -10,10 +10,8 @@ namespace FpsBase
     {
         /// <summary>Shown on the main menu — rename your game here.</summary>
         public const string GameTitle = "SUNDOWN ARENA";
-        /// <summary>0.MINOR.PATCH — bump MINOR for features, PATCH for fixes.
-        /// Git tags follow the same number (v0.5.0 style).</summary>
-
-        public const string Version = "0.13.5";
+        // Version comes from Unity: Project Settings > Player > Version
+        // (Application.version / bundleVersion). Do not hardcode it here.
 
 
         /// <summary>
@@ -39,6 +37,10 @@ namespace FpsBase
         public static bool UseClassLoadout;
         public static readonly int[] ClassPrimary = new int[ClassCount];
         public static readonly int[] ClassSecondary = new int[ClassCount];
+        // Equipment slots: which throwable is on the lethal (G) and tactical (E)
+        // key when playing the class loadout. Indices into ThrowableController.
+        public static int LethalType;
+        public static int TacticalType;
 
         // Weapon add-ons: one bitmask per GLOBAL weapon index (see AttachmentType).
         // Chosen per weapon, shared by every class, and persisted permanently.
@@ -62,6 +64,8 @@ namespace FpsBase
             int[] defaultSecondary = { 1, 3, 1 }; // pistol, shotgun, pistol
             SelectedClass = Mathf.Clamp(PlayerPrefs.GetInt("selectedClass", 0), 0, ClassCount - 1);
             UseClassLoadout = PlayerPrefs.GetInt("useClassLoadout", 1) != 0;
+            LethalType = Mathf.Clamp(PlayerPrefs.GetInt("lethalType", 0), 0, ThrowableController.Count - 1);   // frag
+            TacticalType = Mathf.Clamp(PlayerPrefs.GetInt("tacticalType", 1), 0, ThrowableController.Count - 1); // flash
             for (int i = 0; i < ClassCount; i++)
             {
                 ClassPrimary[i] = PlayerPrefs.GetInt($"class{i}Primary", defaultPrimary[i]);
@@ -101,6 +105,8 @@ namespace FpsBase
             PlayerPrefs.SetInt("experience", Experience);
             PlayerPrefs.SetInt("selectedClass", SelectedClass);
             PlayerPrefs.SetInt("useClassLoadout", UseClassLoadout ? 1 : 0);
+            PlayerPrefs.SetInt("lethalType", LethalType);
+            PlayerPrefs.SetInt("tacticalType", TacticalType);
             for (int i = 0; i < ClassCount; i++)
             {
                 PlayerPrefs.SetInt($"class{i}Primary", ClassPrimary[i]);

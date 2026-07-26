@@ -16,7 +16,7 @@ namespace FpsBase
     {
         public static string LatestVersion { get; private set; }
         public static bool UpdateAvailable =>
-            !string.IsNullOrEmpty(LatestVersion) && LatestVersion != GameSettings.Version;
+            !string.IsNullOrEmpty(LatestVersion) && LatestVersion != Application.version;
 
         private static bool started;
 
