@@ -10,10 +10,8 @@ namespace FpsBase
     {
         /// <summary>Shown on the main menu — rename your game here.</summary>
         public const string GameTitle = "SUNDOWN ARENA";
-        /// <summary>0.MINOR.PATCH — bump MINOR for features, PATCH for fixes.
-        /// Git tags follow the same number (v0.5.0 style).</summary>
-
-        public const string Version = "0.14.2";
+        // Version comes from Unity: Project Settings > Player > Version
+        // (Application.version / bundleVersion). Do not hardcode it here.
 
 
         /// <summary>

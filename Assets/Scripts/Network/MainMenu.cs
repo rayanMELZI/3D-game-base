@@ -195,7 +195,7 @@ namespace FpsBase
         private void DrawRoot()
         {
             if (UpdateChecker.UpdateAvailable)
-                GUILayout.Label($"Update available: {UpdateChecker.LatestVersion} (you have {GameSettings.Version})",
+                GUILayout.Label($"Update available: {UpdateChecker.LatestVersion} (you have {Application.version})",
                     MenuWidgets.Label);
 
             if (MenuWidgets.MenuButton("PLAY"))
