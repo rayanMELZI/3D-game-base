@@ -50,8 +50,11 @@ namespace FpsBase
 
             // Bolt on the chosen add-ons (may push the muzzle forward: suppressor).
             attachmentMask = Attachments.Sanitize(attachmentMask, def.model);
-            if (attachmentMask != 0)
-                AddAttachments(root.transform, attachmentMask, ref muzzlePos);
+            // A built-in suppressor is part of the model already: no extra can.
+            int mountedMask = def.integralSuppressor
+                ? attachmentMask & ~Attachments.Bit(AttachmentType.Suppressor) : attachmentMask;
+            if (mountedMask != 0)
+                AddAttachments(root.transform, mountedMask, ref muzzlePos);
 
             ApplyColor(root, colorIndex);
 
