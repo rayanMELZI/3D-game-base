@@ -37,8 +37,12 @@ is the onboarding brief for AI assistants working on the repo.
   on it) · `WeaponController` (fire/reload/ADS/switch; `classSlots` restricts
   switching to the selected class) · `WeaponModelBuilder` (imported models from
   `Resources/Weapons` with per-weapon `FitFor()` tuning table; procedural
-  fallback; knife always procedural) · `RocketProjectile` (flies a mini
-  launcher as the gag).
+  fallback; knife and grenade launcher always procedural) · `RocketProjectile`
+  (flies a mini launcher as the gag; shooter-simulated, others see a predicted
+  explosion) · `GrenadeProjectile` (grenade launcher, `projectileGravity > 0`:
+  NetworkWeapon has the SERVER simulate the damaging round, every client flies
+  a visual replica). `WeaponDefinition.mobility`/`adsSpeed` make heavy weapons
+  (LMG) slower to move and aim.
 - **Network/**: `NetworkPlayer` (owner setup, team colors, death/respawn +
   3s spawn protection, killcam ring buffer, replicated `Pitch`/`Sliding`/
   `Crouched`) · `NetworkWeapon` (third-person weapon + shot replication +
