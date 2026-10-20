@@ -139,13 +139,22 @@ namespace FpsBase
             ammo = new int[weapons.Length];
             models = new WeaponModelInstance[weapons.Length];
             for (int i = 0; i < weapons.Length; i++)
-            {
                 ammo[i] = MagSize(i);
-                models[i] = WeaponModelBuilder.Build(weapons[i], viewmodelHolder, weapons[i].viewOffset, castShadows: false, MaskFor(i), GameSettings.WeaponColors[i]);
-                models[i].root.SetActive(i == CurrentIndex);
-            }
+            // Viewmodels are built on first use (EnsureModel): the arsenal is
+            // ~30 weapons and a class only ever draws three of them.
+            EnsureModel(CurrentIndex);
+            models[CurrentIndex].root.SetActive(true);
             RebuildShadowModel();
             ApplySelectedClass();
+        }
+
+        private void EnsureModel(int index)
+        {
+            if (models[index].root != null)
+                return;
+            models[index] = WeaponModelBuilder.Build(weapons[index], viewmodelHolder, weapons[index].viewOffset,
+                castShadows: false, MaskFor(index), GameSettings.WeaponColors[index]);
+            models[index].root.SetActive(false);
         }
 
         /// <summary>
@@ -510,6 +519,7 @@ namespace FpsBase
                 ResetReloadParts(models[CurrentIndex]);
                 models[CurrentIndex].root.SetActive(false);
                 CurrentIndex = pendingSwitchIndex;
+                EnsureModel(CurrentIndex);
                 ResetReloadParts(models[CurrentIndex]);
                 models[CurrentIndex].root.SetActive(true);
                 SetWeaponSwitchPose(models[CurrentIndex], weapons[CurrentIndex]);
