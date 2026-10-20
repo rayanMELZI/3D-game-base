@@ -209,6 +209,7 @@ namespace FpsBase
             var weapon = weapons[index];
             if (!weapon.isProjectile || weapon.projectileGravity <= 0f)
                 return false; // only grenade weapons launch grenades
+            velocity = Vector3.ClampMagnitude(velocity, weapon.projectileSpeed * 1.05f); // no hyper-fast rounds
             GrenadeProjectile.Launch(origin, velocity, weapon.projectileGravity, weapon.damage,
                 weapon.explosionRadius, transform, mode, OwnerClientId);
             return true;
