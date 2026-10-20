@@ -106,6 +106,16 @@ namespace FpsBase
                 Hp.Value = maxHealth;
         }
 
+        /// <summary>
+        /// Server-simulated splash (grenade launcher): the server already knows who
+        /// fired, so the attacker is passed in instead of read from an RPC sender.
+        /// Hitting yourself is allowed (self-damage counts as a suicide).
+        /// </summary>
+        public void ServerExplosionDamage(float amount, ulong attackerId)
+        {
+            if (IsServer) ApplyDamageOnServer(amount, false, attackerId);
+        }
+
         public void ServerZombieDamage(float amount)
         {
             if (IsServer) ApplyDamageOnServer(amount, false, ulong.MaxValue);
