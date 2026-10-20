@@ -72,6 +72,11 @@ namespace FpsBase
         public float shellInsertTime = 0.58f;
         [Tooltip("Pump rack at the end of a reload that started from empty.")]
         public float shellRackTime = 0.42f;
+        [Tooltip("Loading port: this far from the gun root toward the muzzle, plus shellPortOffset (weapon-root space).")]
+        public float shellPortAlongBarrel = 0.3f;
+        public Vector3 shellPortOffset = new Vector3(0f, -0.045f, 0f);
+        [Tooltip("Where the hand brings each shell from, relative to the loading port.")]
+        public Vector3 shellStartOffset = new Vector3(-0.05f, -0.14f, -0.08f);
 
         // Not serialized on purpose: the loadout always comes from
         // WeaponDefinition.CreateDefaultLoadout(), so balance edits in code apply
@@ -140,6 +145,8 @@ namespace FpsBase
         private float reloadStepDuration;
         private bool shellRacking;     // shotgun: final pump after the last shell
         private bool shellRackNeeded;  // shotgun: reload started with an empty tube
+        private float shellPoseBlend;  // shotgun: reload pose held across every shell
+        private GameObject shellVisual;
         private float flashOffTime;
         private float adsBlend;
         private Vector3 currentKick; // viewmodel kickback offset
@@ -423,10 +430,21 @@ namespace FpsBase
             // Tilt into a readable reload pose, operate the named model parts,
             // then blend the entire weapon back to its normal pose.
             float reload = ReloadAnimationProgress();
-            float reloadPoseWeight = Phase(reload, 0f, 0.12f)
-                * (1f - Phase(reload, 0.88f, 1f));
+            // A magazine reload tilts in and out once. A shell reload holds the
+            // tilt for every shell (in after the first, out after the last or
+            // when interrupted) with a small thumb push as each shell goes in.
+            shellPoseBlend = Mathf.MoveTowards(shellPoseBlend, reloadPending && shellReload ? 1f : 0f, deltaTime / 0.15f);
+            float reloadPoseWeight = reloadPending && !shellReload
+                ? Phase(reload, 0f, 0.12f) * (1f - Phase(reload, 0.88f, 1f))
+                : Mathf.SmoothStep(0f, 1f, shellPoseBlend);
             basePos += reloadGunPositionOffset * reloadPoseWeight;
             baseEuler += reloadGunRotation * reloadPoseWeight;
+            if (shellReload && !shellRacking)
+            {
+                float push = Envelope(reload, 0.78f, 0.88f, 0.9f, 1f);
+                basePos += new Vector3(0f, 0.008f, 0.01f) * push;
+                baseEuler += new Vector3(-3f, 0f, 2.5f) * push;
+            }
 
             Vector3 normalPosition = basePos + proceduralPos + currentKick;
             Quaternion normalRotation = Quaternion.Euler(baseEuler + proceduralEuler + currentKickRotation);
@@ -458,6 +476,7 @@ namespace FpsBase
             model.root.transform.localPosition = Vector3.Lerp(model.root.transform.localPosition, targetPosition, follow);
             model.root.transform.localRotation = Quaternion.Slerp(model.root.transform.localRotation, targetRotation, follow);
             AnimateReloadParts(model, reload);
+            AnimateShell(model, reload);
         }
 
         private static float SignedNoise(float seed, float time) =>
@@ -476,8 +495,9 @@ namespace FpsBase
             float magazineWeight = shellReload
                 ? 0f
                 : Envelope(progress, 0.1f, 0.34f, 0.5f, 0.7f);
+            // The pump only moves on the final rack, not for every shell.
             float pullWeight = shellReload
-                ? Envelope(progress, 0.5f, 0.68f, 0.72f, 0.92f)
+                ? (shellRacking ? Envelope(progress, 0.05f, 0.35f, 0.45f, 0.85f) : 0f)
                 : Envelope(progress, 0.72f, 0.82f, 0.86f, 0.98f);
 
             SetAnimatedPartPose(
@@ -496,6 +516,63 @@ namespace FpsBase
                 reloadPullOffset,
                 reloadPullRotation,
                 pullWeight);
+        }
+
+        /// <summary>
+        /// Shotgun: a shell travels from below into the loading port during each
+        /// step and vanishes as it goes in (the step's end adds the round).
+        /// </summary>
+        private void AnimateShell(WeaponModelInstance model, float progress)
+        {
+            bool visible = reloadPending && shellReload && !shellRacking && progress > 0.12f && progress < 0.97f;
+            if (!visible)
+            {
+                if (shellVisual != null && shellVisual.activeSelf)
+                    shellVisual.SetActive(false);
+                return;
+            }
+
+            var root = model.root.transform;
+            if (shellVisual == null)
+                shellVisual = BuildShellVisual();
+            if (shellVisual.transform.parent != root)
+                shellVisual.transform.SetParent(root, false);
+            if (!shellVisual.activeSelf)
+                shellVisual.SetActive(true);
+
+            Vector3 muzzleLocal = model.muzzle != null ? root.InverseTransformPoint(model.muzzle.position) : Vector3.forward * 0.5f;
+            Vector3 port = muzzleLocal * shellPortAlongBarrel + shellPortOffset;
+            Vector3 start = port + shellStartOffset;
+            Vector3 entry = port + new Vector3(0f, -0.02f, 0.04f); // lined up under the port, nose forward
+            Vector3 position = progress < 0.8f
+                ? Vector3.Lerp(start, entry, Phase(progress, 0.12f, 0.8f))
+                : Vector3.Lerp(entry, port, Phase(progress, 0.8f, 0.97f));
+            shellVisual.transform.localPosition = position;
+            shellVisual.transform.localRotation = Quaternion.Euler(Mathf.Lerp(60f, 90f, Phase(progress, 0.12f, 0.8f)), 0f, 0f);
+        }
+
+        private static GameObject BuildShellVisual()
+        {
+            var shell = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shell.name = "ShotgunShell";
+            Destroy(shell.GetComponent<Collider>()); // cosmetic only
+            shell.transform.localScale = new Vector3(0.02f, 0.034f, 0.02f); // ~7 cm, 12 gauge
+            var hull = shell.GetComponent<Renderer>();
+            hull.sharedMaterial = EnvironmentBuilder.SharedMaterial(new Color(0.72f, 0.12f, 0.1f), 0f, 0.45f);
+            hull.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            cap.name = "Brass";
+            Destroy(cap.GetComponent<Collider>());
+            cap.transform.SetParent(shell.transform, false);
+            cap.transform.localPosition = new Vector3(0f, -0.8f, 0f);
+            cap.transform.localScale = new Vector3(1.06f, 0.25f, 1.06f);
+            var brass = cap.GetComponent<Renderer>();
+            brass.sharedMaterial = EnvironmentBuilder.SharedMaterial(new Color(0.8f, 0.62f, 0.25f), 0.8f, 0.6f);
+            brass.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            shell.SetActive(false);
+            return shell;
         }
 
         private static void ResetReloadParts(WeaponModelInstance model)
