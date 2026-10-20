@@ -38,6 +38,8 @@ namespace FpsBase
         public float reloadTime = 1.5f;
         public bool automatic = true;        // hold vs click per shot
         public float recoil = 1f;            // camera kick per shot (degrees)
+        [Tooltip("Gunshot pitch (1 = the family's clip as is). Gives weapons sharing a sound family their own voice.")]
+        public float shotPitch = 1f;
 
         [Header("Special behaviour")]
         public bool isMelee = false;
@@ -165,6 +167,7 @@ namespace FpsBase
                 new WeaponDefinition // 9
                 {
                     displayName = "STORM RIFLE", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_2_Used",
+                    shotPitch = 0.97f,
                     damage = 24f, fireRate = 8f, range = 260f, magazineSize = 30,
                     reloadTime = 1.9f, automatic = true, recoil = 0.72f, zoomFov = 45f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -173,6 +176,7 @@ namespace FpsBase
                 new WeaponDefinition // 10 — hits harder than the rifle, kicks harder
                 {
                     displayName = "AK-47", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_11_Used",
+                    shotPitch = 0.88f,
                     damage = 27f, fireRate = 7.5f, range = 240f, magazineSize = 30,
                     reloadTime = 2.1f, automatic = true, recoil = 0.95f, zoomFov = 45f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -181,6 +185,7 @@ namespace FpsBase
                 new WeaponDefinition // 11 — 3-shot kill, slow and heavy
                 {
                     displayName = "BATTLE RIFLE", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_10_Used",
+                    shotPitch = 0.8f,
                     damage = 34f, fireRate = 6f, range = 300f, magazineSize = 20,
                     reloadTime = 2.2f, automatic = true, recoil = 1.15f, zoomFov = 42f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -189,6 +194,7 @@ namespace FpsBase
                 new WeaponDefinition // 12 — semi-auto, 3-shot kill
                 {
                     displayName = "MARKSMAN RIFLE", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_9_Used",
+                    shotPitch = 0.85f,
                     damage = 40f, fireRate = 5f, range = 350f, magazineSize = 20,
                     reloadTime = 2f, automatic = false, recoil = 1.3f, zoomFov = 32f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -197,6 +203,7 @@ namespace FpsBase
                 new WeaponDefinition // 13 — VSS-style carbine, low recoil
                 {
                     displayName = "WHISPER", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_4_Used",
+                    shotPitch = 1.1f,
                     damage = 25f, fireRate = 8.5f, range = 220f, magazineSize = 20,
                     reloadTime = 1.9f, automatic = true, recoil = 0.55f, zoomFov = 34f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -205,6 +212,7 @@ namespace FpsBase
                 new WeaponDefinition // 14 — 2 body shots, headshots still lethal
                 {
                     displayName = "SEMI-AUTO SNIPER", model = WeaponModelType.Sniper, modelName = "Modern/Rifle_14_Used",
+                    shotPitch = 0.9f,
                     damage = 75f, fireRate = 2.2f, range = 450f, magazineSize = 10,
                     reloadTime = 2.6f, automatic = false, recoil = 2.2f,
                     zoomFov = 20f, hideWhenZoomed = true,
@@ -213,6 +221,7 @@ namespace FpsBase
                 new WeaponDefinition // 15
                 {
                     displayName = "MACHINE PISTOL", model = WeaponModelType.Smg, modelName = "Modern/Rifle_3_Used",
+                    shotPitch = 1.25f,
                     damage = 13f, fireRate = 15f, range = 110f, magazineSize = 32,
                     reloadTime = 1.7f, automatic = true, recoil = 0.45f, zoomFov = 52f,
                     viewOffset = new Vector3(0.25f, -0.22f, 0.4f),
@@ -221,6 +230,7 @@ namespace FpsBase
                 new WeaponDefinition // 16
                 {
                     displayName = "PDW", model = WeaponModelType.Smg, modelName = "Modern/Rifle_7_Used",
+                    shotPitch = 1.15f,
                     damage = 15f, fireRate = 14f, range = 160f, magazineSize = 40,
                     reloadTime = 1.8f, automatic = true, recoil = 0.35f, zoomFov = 50f,
                     viewOffset = new Vector3(0.25f, -0.22f, 0.4f),
@@ -229,6 +239,7 @@ namespace FpsBase
                 new WeaponDefinition // 17 — huge mag
                 {
                     displayName = "BULLPUP SMG", model = WeaponModelType.Smg, modelName = "Modern/Rifle_8_Used",
+                    shotPitch = 1.2f,
                     damage = 12f, fireRate = 15f, range = 140f, magazineSize = 50,
                     reloadTime = 2.3f, automatic = true, recoil = 0.3f, zoomFov = 50f,
                     viewOffset = new Vector3(0.25f, -0.22f, 0.4f),
@@ -237,6 +248,7 @@ namespace FpsBase
                 new WeaponDefinition // 18 — full-auto sidearm
                 {
                     displayName = "AUTO PISTOL", model = WeaponModelType.Pistol, modelName = "Modern/Pistol_1_Used",
+                    shotPitch = 1.15f,
                     damage = 13f, fireRate = 16f, range = 90f, magazineSize = 18,
                     reloadTime = 1.3f, automatic = true, recoil = 0.6f, zoomFov = 50f,
                     viewOffset = new Vector3(0.24f, -0.21f, 0.38f),
@@ -245,6 +257,7 @@ namespace FpsBase
                 new WeaponDefinition // 19
                 {
                     displayName = "TACTICAL PISTOL", model = WeaponModelType.Pistol, modelName = "Modern/Pistol_3_Used",
+                    shotPitch = 1.07f,
                     damage = 18f, fireRate = 15f, range = 130f, magazineSize = 20,
                     reloadTime = 1.2f, automatic = false, recoil = 0.9f, zoomFov = 48f,
                     viewOffset = new Vector3(0.24f, -0.21f, 0.38f),
@@ -253,6 +266,7 @@ namespace FpsBase
                 new WeaponDefinition // 20 — 2-shot kill, big kick
                 {
                     displayName = "HAND CANNON", model = WeaponModelType.Pistol, modelName = "Modern/Pistol_4_Used",
+                    shotPitch = 0.72f,
                     damage = 48f, fireRate = 3f, range = 150f, magazineSize = 7,
                     reloadTime = 1.6f, automatic = false, recoil = 3f, zoomFov = 46f,
                     viewOffset = new Vector3(0.24f, -0.21f, 0.38f),
@@ -261,6 +275,7 @@ namespace FpsBase
                 new WeaponDefinition // 21
                 {
                     displayName = "FIELD RIFLE", model = WeaponModelType.Rifle, modelName = "AR_T",
+                    shotPitch = 0.93f,
                     damage = 23f, fireRate = 8.5f, range = 260f, magazineSize = 35,
                     reloadTime = 1.9f, automatic = true, recoil = 0.7f, zoomFov = 45f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -269,6 +284,7 @@ namespace FpsBase
                 new WeaponDefinition // 22 — short rifle, fast fire, shorter reach
                 {
                     displayName = "COMPACT CARBINE", model = WeaponModelType.Rifle, modelName = "AR_U",
+                    shotPitch = 1.08f,
                     damage = 20f, fireRate = 10.5f, range = 200f, magazineSize = 30,
                     reloadTime = 1.6f, automatic = true, recoil = 0.6f, zoomFov = 47f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -277,6 +293,7 @@ namespace FpsBase
                 new WeaponDefinition // 23
                 {
                     displayName = "TACTICAL CARBINE", model = WeaponModelType.Rifle, modelName = "AR_W",
+                    shotPitch = 1.03f,
                     damage = 21f, fireRate = 9.5f, range = 230f, magazineSize = 30,
                     reloadTime = 1.5f, automatic = true, recoil = 0.55f, zoomFov = 45f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -285,6 +302,7 @@ namespace FpsBase
                 new WeaponDefinition // 24
                 {
                     displayName = "AK-74", model = WeaponModelType.Rifle, modelName = "AR_X",
+                    shotPitch = 0.95f,
                     damage = 23f, fireRate = 9f, range = 250f, magazineSize = 30,
                     reloadTime = 1.9f, automatic = true, recoil = 0.6f, zoomFov = 45f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
@@ -293,6 +311,7 @@ namespace FpsBase
                 new WeaponDefinition // 25 — pistol-sized SMG
                 {
                     displayName = "MICRO SMG", model = WeaponModelType.Smg, modelName = "Pistol_P",
+                    shotPitch = 1.3f,
                     damage = 11f, fireRate = 17f, range = 90f, magazineSize = 25,
                     reloadTime = 1.4f, automatic = true, recoil = 0.5f, zoomFov = 52f,
                     viewOffset = new Vector3(0.24f, -0.21f, 0.38f),
@@ -301,6 +320,7 @@ namespace FpsBase
                 new WeaponDefinition // 26
                 {
                     displayName = "TACTICAL SMG", model = WeaponModelType.Smg, modelName = "SMG_P",
+                    shotPitch = 1.05f,
                     damage = 16f, fireRate = 12f, range = 170f, magazineSize = 30,
                     reloadTime = 1.9f, automatic = true, recoil = 0.42f, zoomFov = 50f,
                     viewOffset = new Vector3(0.25f, -0.22f, 0.4f),
@@ -309,6 +329,7 @@ namespace FpsBase
                 new WeaponDefinition // 27 — slower than the shotgun, deadlier up close
                 {
                     displayName = "PUMP SHOTGUN", model = WeaponModelType.Shotgun, modelName = "ShotGun_P",
+                    shotPitch = 0.85f,
                     damage = 14f, fireRate = 1f, range = 35f,
                     pellets = 9, spreadDegrees = 5.5f,
                     magazineSize = 8, reloadTime = 2.8f, automatic = false, recoil = 2.6f, zoomFov = 52f,
@@ -318,6 +339,7 @@ namespace FpsBase
                 new WeaponDefinition // 28 — bolt action, deeper zoom
                 {
                     displayName = "RECON SNIPER", model = WeaponModelType.Sniper, modelName = "Recon_P",
+                    shotPitch = 0.92f,
                     damage = 100f, fireRate = 0.75f, range = 550f, magazineSize = 5,
                     reloadTime = 2.6f, automatic = false, recoil = 3.2f,
                     zoomFov = 14f, hideWhenZoomed = true,
@@ -326,6 +348,7 @@ namespace FpsBase
                 new WeaponDefinition // 29 — semi-auto .50, slow reload
                 {
                     displayName = "HEAVY SNIPER", model = WeaponModelType.Sniper, modelName = "Launcher_G",
+                    shotPitch = 0.68f,
                     damage = 100f, fireRate = 1.2f, range = 600f, magazineSize = 7,
                     reloadTime = 3.4f, automatic = false, recoil = 4f,
                     zoomFov = 14f, hideWhenZoomed = true,
@@ -334,6 +357,7 @@ namespace FpsBase
                 new WeaponDefinition // 30 — 2-shot kill
                 {
                     displayName = "REVOLVER", model = WeaponModelType.Pistol, modelName = "Pistol_R",
+                    shotPitch = 0.8f,
                     damage = 55f, fireRate = 2.2f, range = 140f, magazineSize = 6,
                     reloadTime = 2.2f, automatic = false, recoil = 3.2f, zoomFov = 46f,
                     viewOffset = new Vector3(0.24f, -0.21f, 0.38f),
