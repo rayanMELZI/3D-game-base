@@ -45,6 +45,7 @@ namespace FpsBase
             {
                 rig.weaponController.ShotFired += OnLocalShotFired;
                 rig.weaponController.GrenadeLaunched += OnLocalGrenadeLaunched;
+                rig.weaponController.ReloadCuePlayed += OnLocalReloadCue;
             }
         }
 
@@ -57,6 +58,7 @@ namespace FpsBase
             {
                 rig.weaponController.ShotFired -= OnLocalShotFired;
                 rig.weaponController.GrenadeLaunched -= OnLocalGrenadeLaunched;
+                rig.weaponController.ReloadCuePlayed -= OnLocalReloadCue;
             }
         }
 
@@ -162,6 +164,47 @@ namespace FpsBase
             // Remote rocket: explosion at the predicted impact after the flight time.
             if (weapon.isProjectile && !arcing)
                 StartCoroutine(RemoteExplosion(endPoint, Vector3.Distance(from, endPoint) / Mathf.Max(1f, weapon.projectileSpeed)));
+        }
+
+        // ------------------------------------------------------------------
+        // Reload sounds: others hear a magazine reload, each shotgun shell and
+        // the final pump at the reloading player's position.
+        // ------------------------------------------------------------------
+
+        private void OnLocalReloadCue(ReloadCue cue)
+        {
+            if (IsServer)
+                ReloadCueClientRpc((byte)cue);
+            else
+                ReloadCueServerRpc((byte)cue);
+        }
+
+        [ServerRpc]
+        private void ReloadCueServerRpc(byte cue) => ReloadCueClientRpc(cue);
+
+        [ClientRpc]
+        private void ReloadCueClientRpc(byte cue)
+        {
+            if (IsOwner)
+                return; // the owner already heard it in 2D
+
+            Vector3 at = hasThirdPersonModel
+                ? thirdPersonModel.root.transform.position
+                : transform.position + Vector3.up * 1.3f;
+            switch ((ReloadCue)cue)
+            {
+                case ReloadCue.Shell:
+                    SfxSynth.PlayAtDelayed(SfxSynth.ShellInsert(), at, 0f, 0.7f); // short range: reload foley, not a gunshot
+                    break;
+                case ReloadCue.Rack:
+                    SfxSynth.PlayAtDelayed(SfxSynth.PumpRack(), at, 0f, 0.75f);
+                    break;
+                default:
+                    var weapons = rig.weaponController.weapons;
+                    var weapon = weapons[Mathf.Clamp(WeaponIndex.Value, 0, weapons.Length - 1)];
+                    SfxSynth.PlayReloadAt(weapon.model, weapon.reloadTime, at, 0.7f);
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------
