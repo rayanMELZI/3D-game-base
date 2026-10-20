@@ -52,6 +52,9 @@ namespace FpsBase
         public float explosionRadius = 0f;
         public float projectileSpeed = 28f;
 
+        [Tooltip("The model has a built-in suppressor: always quiet, no radar ping, no extra can mounted.")]
+        public bool integralSuppressor = false;
+
         [Header("Aiming")]
         [Tooltip("Right-click FOV. Every weapon can aim; the sniper scopes.")]
         public float zoomFov = 48f;
@@ -200,10 +203,10 @@ namespace FpsBase
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),
                     adsOffset = new Vector3(0f, -0.17f, 0.46f),
                 },
-                new WeaponDefinition // 13 — VSS-style carbine, low recoil
+                new WeaponDefinition // 13 — VSS-style carbine, integrally suppressed
                 {
                     displayName = "WHISPER", model = WeaponModelType.Rifle, modelName = "Modern/Rifle_4_Used",
-                    shotPitch = 1.1f,
+                    shotPitch = 1.1f, integralSuppressor = true,
                     damage = 25f, fireRate = 8.5f, range = 220f, magazineSize = 20,
                     reloadTime = 1.9f, automatic = true, recoil = 0.55f, zoomFov = 34f,
                     viewOffset = new Vector3(0.26f, -0.24f, 0.42f),

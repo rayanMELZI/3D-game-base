@@ -53,6 +53,13 @@ namespace FpsBase
 
         public static bool IsAllowed(WeaponModelType model, AttachmentType t) => (AllowedMask(model) & Bit(t)) != 0;
 
+        /// <summary>
+        /// The mask a weapon actually fires with: its chosen add-ons plus a
+        /// built-in suppressor if the model has one (WeaponDefinition.integralSuppressor).
+        /// </summary>
+        public static int Effective(int mask, WeaponDefinition def) =>
+            def != null && def.integralSuppressor ? mask | Bit(AttachmentType.Suppressor) : mask;
+
         /// <summary>Drop any bits a weapon can't actually mount (defends against stale prefs).</summary>
         public static int Sanitize(int mask, WeaponModelType model) => mask & AllowedMask(model);
 
