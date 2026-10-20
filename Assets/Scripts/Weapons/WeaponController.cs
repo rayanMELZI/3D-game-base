@@ -662,7 +662,7 @@ namespace FpsBase
             }
             int mask = MaskFor(CurrentIndex);
             bool suppressed = Attachments.Has(mask, AttachmentType.Suppressor);
-            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, suppressed), shootCamera.transform.position, 0.85f * Attachments.ShotVolumeMultiplier(mask));
+            SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, suppressed), shootCamera.transform.position, 0.85f * Attachments.ShotVolumeMultiplier(mask), weapon.shotPitch);
             float recoilScale = Attachments.RecoilMultiplier(mask);
             float visualRecoil = Mathf.Clamp(weapon.recoil * recoilScale, 0.35f, 3f);
             if (weapon.isMelee)
