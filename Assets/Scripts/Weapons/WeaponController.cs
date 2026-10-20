@@ -82,6 +82,12 @@ namespace FpsBase
         public event Action<Vector3> ShotFired;
         /// <summary>Raised when a shot damaged something; true = headshot (HUD hit marker + sound).</summary>
         public event Action<bool> TargetHit;
+        /// <summary>
+        /// Grenade launched (muzzle, velocity). Online, NetworkWeapon handles it so
+        /// the server owns the round; with no listener (offline) the shooter's own
+        /// copy deals the damage.
+        /// </summary>
+        public event Action<Vector3, Vector3> GrenadeLaunched;
 
         public int CurrentIndex { get; private set; } = WeaponDefinition.DefaultIndex;
         public WeaponDefinition CurrentWeapon => weapons[CurrentIndex];
@@ -664,7 +670,9 @@ namespace FpsBase
             nextFireTime = Time.time + 1f / weapon.fireRate;
 
             Vector3 endPoint;
-            if (weapon.isProjectile)
+            if (weapon.isProjectile && weapon.projectileGravity > 0f)
+                endPoint = FireGrenade(weapon);
+            else if (weapon.isProjectile)
                 endPoint = FireRocket(weapon);
             else
                 endPoint = FireHitscan(weapon);
@@ -777,6 +785,24 @@ namespace FpsBase
             RocketProjectile.Launch(
                 muzzle, dir,
                 weapon.projectileSpeed, weapon.damage, weapon.explosionRadius, selfRoot);
+            return aimPoint;
+        }
+
+        private Vector3 FireGrenade(WeaponDefinition weapon)
+        {
+            // Launched from the barrel toward the crosshair; gravity drops it from there.
+            Vector3 muzzle = CurrentViewMuzzle();
+            Vector3 aimPoint = CameraAimPoint(weapon.range);
+            Vector3 dir = (aimPoint - muzzle).sqrMagnitude > 0.01f
+                ? (aimPoint - muzzle).normalized
+                : shootCamera.transform.forward;
+            Vector3 velocity = dir * weapon.projectileSpeed;
+
+            if (GrenadeLaunched != null)
+                GrenadeLaunched.Invoke(muzzle, velocity);
+            else
+                GrenadeProjectile.Launch(muzzle, velocity, weapon.projectileGravity, weapon.damage,
+                    weapon.explosionRadius, selfRoot, GrenadeProjectile.DamageMode.Local);
             return aimPoint;
         }
 
