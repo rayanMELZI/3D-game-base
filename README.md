@@ -1,7 +1,7 @@
 # SUNDOWN ARENA — 3D FPS Base (Unity)
 
 An asset-free online first-person shooter base: 4 game modes on 3 maps with a
-7-weapon arsenal, kill cam, scoreboard, crouch/slide/bunny-hop movement and a
+31-weapon arsenal, kill cam, scoreboard, crouch/slide/bunny-hop movement and a
 stylized golden-hour look with custom post-processing — everything generated
 from code. Rename the game in `GameSettings.GameTitle`.
 
@@ -19,6 +19,13 @@ from code. Rename the game in `GameSettings.GameTitle`.
   Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
   jumps) · LMG · grenade launcher — **aim-down-sights on right-click** for all, one-shot **headshots**,
   reload animation + bar, fresh ammo every respawn
+- **Pack arsenal (22 more):** every model of the imported weapon packs is its
+  own weapon with its own stats and gunshot pitch — rifles (storm rifle, AK-47,
+  battle rifle, marksman rifle, WHISPER with a built-in suppressor, field rifle,
+  compact/tactical carbines, AK-74), SMGs (machine pistol, PDW, bullpup, micro,
+  tactical), pump shotgun, snipers (semi-auto, recon, heavy .50) and pistols
+  (auto pistol, tactical pistol, hand cannon, revolver). Picked in **CLASSES**
+  through category tabs and a scrolling list with stats
 - **Movement:** sprint, crouch (Ctrl), **slide** (sprint+Ctrl), **bunny hop**
   (hold Space), synced to other players
 - **Kill cam:** on death you spectate your killer; at match end everyone
@@ -46,7 +53,7 @@ from code. Rename the game in `GameSettings.GameTitle`.
 | WASD / Shift / Space (hold) | Move / sprint / jump & bunny hop |
 | Left Ctrl (or C) | Crouch — while sprinting: **slide** |
 | Left Mouse / Right Mouse | Shoot / aim (sniper scopes) |
-| 1–7 or scroll | Weapons |
+| 1–3 (class) / 1–9 + scroll (all weapons) | Weapons |
 | R | Reload |
 | G / F / V / X | Grenade / flashbang / sticky bomb / throwing knife |
 | Z | Toggle prone/crawl |
