@@ -291,14 +291,10 @@ namespace FpsBase
                         muzzle = new Vector3(0, 0.04f, 0.52f)
                     };
                 case WeaponModelType.GrenadeLauncher:
-                    return new ModelFit
-                    {
-                        resource = "Weapons/Modern/RocketLauncher",
-                        scale = new Vector3(0.16f, 0.16f, 0.16f),
-                        euler = Vector3.zero,
-                        offset = new Vector3(0, -0.08f, -0.1f),
-                        muzzle = new Vector3(0, 0.005f, 0.45f)
-                    };
+                    // The packs have no usable grenade launcher (the RocketLauncher
+                    // made it look like the RPG; the ithappy launchers are URP-only),
+                    // so it uses the procedural break-action launcher (BuildGrenadeLauncher).
+                    return new ModelFit { resource = null };
                 default:
                     return new ModelFit { resource = null };
             }
@@ -426,6 +422,9 @@ namespace FpsBase
                 case WeaponModelType.Rpg:
                     BuildRpg(t, metal, grip, accent);
                     return new Vector3(0, 0.04f, 0.55f);
+                case WeaponModelType.GrenadeLauncher:
+                    BuildGrenadeLauncher(t, metal, grip, accent);
+                    return new Vector3(0, 0.02f, 0.37f);
                 default:
                     BuildRifle(t, metal, grip, accent);
                     return new Vector3(0, 0.02f, 0.48f);
@@ -492,6 +491,21 @@ namespace FpsBase
             Part(t, PrimitiveType.Sphere, new Vector3(0, 0.04f, 0.56f), Vector3.zero, new Vector3(0.06f, 0.06f, 0.09f), warheadMat);           // warhead tip
             Part(t, PrimitiveType.Cube, new Vector3(0, -0.07f, -0.02f), new Vector3(-14, 0, 0), new Vector3(0.04f, 0.1f, 0.05f), grip);        // grip
             Part(t, PrimitiveType.Cube, new Vector3(0, 0.11f, -0.05f), Vector3.zero, new Vector3(0.03f, 0.05f, 0.09f), accent);     // sight block
+        }
+
+        private static void BuildGrenadeLauncher(Transform t, Material metal, Material grip, Material accent)
+        {
+            // Break-action 40 mm launcher: short fat barrel over a wooden forend and stock.
+            var wood = MakeMat(new Color(0.42f, 0.28f, 0.16f), 0.05f, 0.4f);
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.01f, -0.02f), Vector3.zero, new Vector3(0.06f, 0.08f, 0.14f), metal);        // breech block
+            Part(t, PrimitiveType.Cylinder, new Vector3(0, 0.02f, 0.2f), new Vector3(90, 0, 0), new Vector3(0.056f, 0.16f, 0.056f), metal); // 40 mm barrel
+            Part(t, PrimitiveType.Cylinder, new Vector3(0, 0.02f, 0.355f), new Vector3(90, 0, 0), new Vector3(0.064f, 0.012f, 0.064f), accent); // muzzle ring
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.02f, 0.16f), Vector3.zero, new Vector3(0.05f, 0.035f, 0.18f), wood);        // forend
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.072f, 0.04f), Vector3.zero, new Vector3(0.03f, 0.04f, 0.006f), accent);     // leaf sight
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.056f, 0.33f), Vector3.zero, new Vector3(0.008f, 0.02f, 0.01f), metal);      // front blade
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.075f, -0.07f), new Vector3(-18, 0, 0), new Vector3(0.04f, 0.1f, 0.05f), grip); // grip
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.03f, -0.24f), new Vector3(-6, 0, 0), new Vector3(0.05f, 0.085f, 0.22f), wood); // stock
+            Part(t, PrimitiveType.Cube, new Vector3(0, -0.042f, -0.355f), new Vector3(-6, 0, 0), new Vector3(0.052f, 0.09f, 0.02f), grip); // butt pad
         }
 
         private static void BuildPistol(Transform t, Material metal, Material grip, Material accent)
