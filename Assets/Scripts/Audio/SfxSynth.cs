@@ -141,13 +141,41 @@ namespace FpsBase
                 Noise() * 0.55f * (Mathf.Exp(-t * 300f) + (t > 0.12f ? Mathf.Exp(-(t - 0.12f) * 300f) : 0f)));
 
         /// <summary>Play imported reload actions across the gameplay reload duration.</summary>
-        public static void PlayReload(WeaponModelType type, float duration, float volume = 1f)
+        public static void PlayReload(WeaponModelType type, float duration, float volume = 1f) =>
+            PlayReloadSequence(type, duration, volume, null);
+
+        /// <summary>Same reload actions, positional: another player reloading near you.</summary>
+        public static void PlayReloadAt(WeaponModelType type, float duration, Vector3 position, float volume = 1f) =>
+            PlayReloadSequence(type, duration, volume, position);
+
+        /// <summary>One shotgun shell pushed into the tube (imported "chambering" foley).</summary>
+        public static AudioClip ShellInsert()
+        {
+            var sequence = WeaponAudioLibrary.Shared != null ? WeaponAudioLibrary.Shared.shotgunReload : null;
+            if (sequence != null && sequence.Length > 0 && sequence[0] != null)
+                return sequence[0];
+            return Make("shell_insert", 0.14f, t =>
+                Noise() * 0.5f * Mathf.Exp(-t * 260f)
+                + Mathf.Sin(Tau * 2400f * t) * 0.18f * Mathf.Exp(-t * 70f));
+        }
+
+        /// <summary>Shotgun pump racked back and forward (imported "slide action" foley).</summary>
+        public static AudioClip PumpRack()
+        {
+            var sequence = WeaponAudioLibrary.Shared != null ? WeaponAudioLibrary.Shared.shotgunReload : null;
+            if (sequence != null && sequence.Length > 1 && sequence[1] != null)
+                return sequence[1];
+            return Make("pump_rack", 0.3f, t =>
+                Noise() * 0.55f * (Mathf.Exp(-t * 220f) + (t > 0.16f ? Mathf.Exp(-(t - 0.16f) * 220f) : 0f)));
+        }
+
+        private static void PlayReloadSequence(WeaponModelType type, float duration, float volume, Vector3? position)
         {
             var library = WeaponAudioLibrary.Shared;
             var sequence = library != null ? library.ReloadSequence(type) : null;
             if (sequence == null || sequence.Length == 0)
             {
-                Play2D(Reload(), volume);
+                PlayMaybeAt(Reload(), 0f, volume, position);
                 return;
             }
 
@@ -159,8 +187,16 @@ namespace FpsBase
                 float delay = sequence.Length > 1
                     ? sequenceWindow * i / (sequence.Length - 1f)
                     : 0f;
-                Play2DDelayed(sequence[i], delay, volume);
+                PlayMaybeAt(sequence[i], delay, volume, position);
             }
+        }
+
+        private static void PlayMaybeAt(AudioClip clip, float delay, float volume, Vector3? position)
+        {
+            if (position.HasValue)
+                PlayAtDelayed(clip, position.Value, delay, volume);
+            else
+                Play2DDelayed(clip, delay, volume);
         }
 
         public static AudioClip Death() =>
@@ -212,6 +248,20 @@ namespace FpsBase
             source.maxDistance = 90f;
             source.rolloffMode = AudioRolloffMode.Linear;
             source.Play();
+        }
+
+        /// <summary>Positional sound started after a delay (another player's reload steps).</summary>
+        public static void PlayAtDelayed(AudioClip clip, Vector3 position, float delay, float volume = 1f)
+        {
+            if (clip == null)
+                return;
+            var source = MakeSource(clip, volume, delay);
+            source.transform.position = position;
+            source.spatialBlend = 1f;
+            source.minDistance = 2f;
+            source.maxDistance = 30f;
+            source.rolloffMode = AudioRolloffMode.Linear;
+            source.PlayDelayed(delay);
         }
 
         /// <summary>Non-positional UI/feedback sound (hit marker, clicks).</summary>
