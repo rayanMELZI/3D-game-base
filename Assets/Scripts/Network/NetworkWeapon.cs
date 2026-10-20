@@ -42,7 +42,10 @@ namespace FpsBase
             RebuildThirdPersonModel();
 
             if (IsOwner)
+            {
                 rig.weaponController.ShotFired += OnLocalShotFired;
+                rig.weaponController.GrenadeLaunched += OnLocalGrenadeLaunched;
+            }
         }
 
         public override void OnNetworkDespawn()
@@ -51,7 +54,10 @@ namespace FpsBase
             AttachmentMask.OnValueChanged -= OnWeaponChanged;
             ColorIndex.OnValueChanged -= OnWeaponChanged;
             if (IsOwner && rig.weaponController != null)
+            {
                 rig.weaponController.ShotFired -= OnLocalShotFired;
+                rig.weaponController.GrenadeLaunched -= OnLocalGrenadeLaunched;
+            }
         }
 
         private void Update()
@@ -142,7 +148,10 @@ namespace FpsBase
             int index = Mathf.Clamp(WeaponIndex.Value, 0, weapons.Length - 1);
             var weapon = weapons[index];
 
-            if (!weapon.isMelee)
+            // Grenades arc and are replicated as real rounds (GrenadeClientRpc), so
+            // no straight tracer or predicted explosion for them.
+            bool arcing = weapon.isProjectile && weapon.projectileGravity > 0f;
+            if (!weapon.isMelee && !arcing)
                 WeaponController.SpawnTracerLine(from, endPoint);
 
             // Positional gunshot so you can hear where enemies are firing from
@@ -151,8 +160,58 @@ namespace FpsBase
             SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, suppressed), from, 0.8f * Attachments.ShotVolumeMultiplier(AttachmentMask.Value), weapon.shotPitch);
 
             // Remote rocket: explosion at the predicted impact after the flight time.
-            if (weapon.isProjectile)
+            if (weapon.isProjectile && !arcing)
                 StartCoroutine(RemoteExplosion(endPoint, Vector3.Distance(from, endPoint) / Mathf.Max(1f, weapon.projectileSpeed)));
+        }
+
+        // ------------------------------------------------------------------
+        // Grenade launcher: the server owns the round (and its damage); every
+        // client flies a visual replica from the same launch parameters.
+        // ------------------------------------------------------------------
+
+        private void OnLocalGrenadeLaunched(Vector3 origin, Vector3 velocity)
+        {
+            int index = rig.weaponController.CurrentIndex;
+            if (IsServer)
+            {
+                SpawnGrenade(index, origin, velocity, GrenadeProjectile.DamageMode.Server);
+                GrenadeClientRpc(index, origin, velocity);
+            }
+            else
+            {
+                // Instant local feedback; the server's copy decides the damage.
+                SpawnGrenade(index, origin, velocity, GrenadeProjectile.DamageMode.None);
+                GrenadeServerRpc(index, origin, velocity);
+            }
+        }
+
+        [ServerRpc]
+        private void GrenadeServerRpc(int index, Vector3 origin, Vector3 velocity)
+        {
+            if (!SpawnGrenade(index, origin, velocity, GrenadeProjectile.DamageMode.Server))
+                return;
+            GrenadeClientRpc(index, origin, velocity);
+        }
+
+        [ClientRpc]
+        private void GrenadeClientRpc(int index, Vector3 origin, Vector3 velocity)
+        {
+            if (IsOwner || IsServer)
+                return; // the shooter and the server already have their copy
+            SpawnGrenade(index, origin, velocity, GrenadeProjectile.DamageMode.None);
+        }
+
+        private bool SpawnGrenade(int index, Vector3 origin, Vector3 velocity, GrenadeProjectile.DamageMode mode)
+        {
+            var weapons = rig.weaponController.weapons;
+            if (index < 0 || index >= weapons.Length)
+                return false;
+            var weapon = weapons[index];
+            if (!weapon.isProjectile || weapon.projectileGravity <= 0f)
+                return false; // only grenade weapons launch grenades
+            GrenadeProjectile.Launch(origin, velocity, weapon.projectileGravity, weapon.damage,
+                weapon.explosionRadius, transform, mode, OwnerClientId);
+            return true;
         }
 
         private System.Collections.IEnumerator RemoteExplosion(Vector3 point, float delay)
