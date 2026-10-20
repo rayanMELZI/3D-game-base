@@ -42,7 +42,9 @@ is the onboarding brief for AI assistants working on the repo.
   explosion) · `GrenadeProjectile` (grenade launcher, `projectileGravity > 0`:
   NetworkWeapon has the SERVER simulate the damaging round, every client flies
   a visual replica). `WeaponDefinition.mobility`/`adsSpeed` make heavy weapons
-  (LMG) slower to move and aim.
+  (LMG) slower to move and aim. Shotgun reloads are shell by shell
+  (`WeaponController.AdvanceShellReload`; `ReloadCue` events → NetworkWeapon
+  replays reload sounds positionally for other players).
 - **Network/**: `NetworkPlayer` (owner setup, team colors, death/respawn +
   3s spawn protection, killcam ring buffer, replicated `Pitch`/`Sliding`/
   `Crouched`) · `NetworkWeapon` (third-person weapon + shot replication +
