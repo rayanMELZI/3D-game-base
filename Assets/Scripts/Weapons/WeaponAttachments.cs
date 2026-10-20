@@ -33,7 +33,8 @@ namespace FpsBase
 
         /// <summary>
         /// Which add-ons a given weapon may mount. The knife and RPG stay bare
-        /// (a suppressed rocket launcher is silly); the sniper already ships with
+        /// (a suppressed rocket launcher is silly), the grenade launcher takes no
+        /// suppressor either; the sniper already ships with
         /// a scope, so it can't take a red-dot optic.
         /// </summary>
         public static int AllowedMask(WeaponModelType model)
@@ -45,6 +46,9 @@ namespace FpsBase
                     return 0;
                 case WeaponModelType.Sniper:
                     return Bit(AttachmentType.Suppressor) | Bit(AttachmentType.Foregrip) | Bit(AttachmentType.ExtendedMag);
+                case WeaponModelType.GrenadeLauncher:
+                    // No suppressor: an explosion is never quiet (and shouldn't hide you from radar).
+                    return Bit(AttachmentType.Optic) | Bit(AttachmentType.Foregrip) | Bit(AttachmentType.ExtendedMag);
                 default:
                     return Bit(AttachmentType.Optic) | Bit(AttachmentType.Suppressor)
                          | Bit(AttachmentType.Foregrip) | Bit(AttachmentType.ExtendedMag);
