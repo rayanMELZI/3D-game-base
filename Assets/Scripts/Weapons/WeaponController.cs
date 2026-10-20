@@ -246,6 +246,8 @@ namespace FpsBase
             var model = models[CurrentIndex];
             bool sprinting = movement != null && movement.IsSprinting;
             bool switching = IsSwitching;
+            if (movement != null)
+                movement.speedMultiplier = weapon.mobility; // heavy weapons (LMG) slow you down
 
             if (model.muzzleFlash != null && model.muzzleFlash.enabled && Time.time >= flashOffTime)
                 model.muzzleFlash.enabled = false;
