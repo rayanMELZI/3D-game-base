@@ -35,7 +35,7 @@ namespace FpsBase
             root.transform.localPosition = localPosition;
 
             Vector3 muzzlePos;
-            if (!TryBuildImported(def.model, root.transform, out muzzlePos))
+            if (!TryBuildImported(def, root.transform, out muzzlePos))
                 muzzlePos = BuildProcedural(def.model, root.transform);
 
             // Authored sockets are optional. Weapons without them keep using the
@@ -297,10 +297,76 @@ namespace FpsBase
             }
         }
 
-        private static bool TryBuildImported(WeaponModelType type, Transform holder, out Vector3 muzzlePos)
+        /// <summary>
+        /// Fit for weapons that name a specific imported model
+        /// (<see cref="WeaponDefinition.modelName"/>). Same rules as FitFor: one row
+        /// per model, tweak here. Each offset lines the model's trigger up with
+        /// the hand position of the tuned weapon of the same family (rifle / SMG /
+        /// sniper / pistol); the muzzle sits at the measured barrel tip. The
+        /// "Modern" pack is centimetre-built (scale 0.2 like the base arsenal),
+        /// the AR_/Pistol_/SMG_/Recon_ packs are metre-built (scale 0.85).
+        /// </summary>
+        private static ModelFit FitForModel(string modelName)
+        {
+            switch (modelName)
+            {
+                case "Modern/Rifle_2_Used": // AK-12 style rifle
+                    return Fit("Weapons/Modern/Rifle_2_Used", 0.2f, new Vector3(0, -0.084f, -0.12f), new Vector3(0, 0.005f, 0.709f));
+                case "Modern/Rifle_11_Used": // AKM
+                    return Fit("Weapons/Modern/Rifle_11_Used", 0.2f, new Vector3(0, -0.093f, -0.128f), new Vector3(0, 0.03f, 0.847f));
+                case "Modern/Rifle_10_Used": // SCAR-H style
+                    return Fit("Weapons/Modern/Rifle_10_Used", 0.2f, new Vector3(0, -0.077f, -0.118f), new Vector3(0, 0.01f, 0.599f));
+                case "Modern/Rifle_9_Used": // M16 style
+                    return Fit("Weapons/Modern/Rifle_9_Used", 0.2f, new Vector3(0, -0.081f, -0.122f), new Vector3(0, 0.02f, 0.885f));
+                case "Modern/Rifle_4_Used": // VSS style (integral suppressor)
+                    return Fit("Weapons/Modern/Rifle_4_Used", 0.2f, new Vector3(0, -0.069f, -0.122f), new Vector3(0, 0.007f, 0.669f));
+                case "Modern/Rifle_14_Used": // SVD style
+                    return Fit("Weapons/Modern/Rifle_14_Used", 0.2f, new Vector3(0, -0.071f, -0.167f), new Vector3(0, 0.003f, 1.246f));
+                case "Modern/Rifle_3_Used": // Uzi style
+                    return Fit("Weapons/Modern/Rifle_3_Used", 0.2f, new Vector3(0, -0.105f, -0.116f), new Vector3(0, -0.025f, 0.168f));
+                case "Modern/Rifle_7_Used": // MP7 style
+                    return Fit("Weapons/Modern/Rifle_7_Used", 0.2f, new Vector3(0, -0.094f, -0.096f), new Vector3(0, -0.048f, 0.145f));
+                case "Modern/Rifle_8_Used": // P90 style
+                    return Fit("Weapons/Modern/Rifle_8_Used", 0.2f, new Vector3(0, -0.088f, -0.081f), new Vector3(0, -0.037f, 0.126f));
+                case "Modern/Pistol_1_Used": // Glock style
+                    return Fit("Weapons/Modern/Pistol_1_Used", 0.2f, new Vector3(0, -0.068f, -0.032f), new Vector3(0, -0.002f, 0.138f));
+                case "Modern/Pistol_3_Used": // Five-seveN style
+                    return Fit("Weapons/Modern/Pistol_3_Used", 0.2f, new Vector3(0, -0.057f, -0.029f), new Vector3(0, 0.006f, 0.141f));
+                case "Modern/Pistol_4_Used": // Desert Eagle style
+                    return Fit("Weapons/Modern/Pistol_4_Used", 0.2f, new Vector3(0, -0.084f, -0.039f), new Vector3(0, 0.024f, 0.235f));
+                case "AR_T": // Galil style
+                    return Fit("Weapons/AR_T", 0.85f, new Vector3(0, -0.053f, -0.056f), new Vector3(0, 0.004f, 0.604f));
+                case "AR_U": // SG 552 style
+                    return Fit("Weapons/AR_U", 0.85f, new Vector3(0, -0.053f, -0.071f), new Vector3(0, 0.002f, 0.356f));
+                case "AR_W": // AR-15 carbine
+                    return Fit("Weapons/AR_W", 0.85f, new Vector3(0, -0.054f, -0.075f), new Vector3(0, 0.014f, 0.526f));
+                case "AR_X": // AK-74 style
+                    return Fit("Weapons/AR_X", 0.85f, new Vector3(0, -0.053f, -0.056f), new Vector3(0, -0.008f, 0.647f));
+                case "Pistol_P": // Micro Uzi style
+                    return Fit("Weapons/Pistol_P", 0.85f, new Vector3(0, -0.028f, 0.007f), new Vector3(0, 0.003f, 0.106f));
+                case "SMG_P": // modern 9mm SMG
+                    return Fit("Weapons/SMG_P", 0.85f, new Vector3(0, -0.067f, -0.081f), new Vector3(0, -0.018f, 0.26f));
+                case "ShotGun_P": // pump shotgun
+                    return Fit("Weapons/ShotGun_P", 0.85f, new Vector3(0, -0.049f, -0.073f), new Vector3(0, -0.017f, 0.565f));
+                case "Recon_P": // bolt-action sniper
+                    return Fit("Weapons/Recon_P", 0.85f, new Vector3(0, -0.07f, -0.116f), new Vector3(0, -0.006f, 0.651f));
+                case "Launcher_G": // Barrett style .50 (despite the pack name)
+                    return Fit("Weapons/Launcher_G", 0.85f, new Vector3(0, -0.072f, -0.115f), new Vector3(0, -0.016f, 0.61f));
+                case "Pistol_R": // revolver
+                    return Fit("Weapons/Pistol_R", 0.85f, new Vector3(0, -0.029f, 0.008f), new Vector3(0, 0.011f, 0.243f));
+                default:
+                    // Unknown name: still try to load it with a neutral rifle fit.
+                    return Fit("Weapons/" + modelName, 0.2f, new Vector3(0, -0.08f, -0.12f), new Vector3(0, 0.02f, 0.5f));
+            }
+        }
+
+        private static ModelFit Fit(string resource, float scale, Vector3 offset, Vector3 muzzle)
+            => new ModelFit { resource = resource, scale = Vector3.one * scale, euler = Vector3.zero, offset = offset, muzzle = muzzle };
+
+        private static bool TryBuildImported(WeaponDefinition def, Transform holder, out Vector3 muzzlePos)
         {
             muzzlePos = Vector3.zero;
-            var fit = FitFor(type);
+            var fit = string.IsNullOrEmpty(def.modelName) ? FitFor(def.model) : FitForModel(def.modelName);
             if (string.IsNullOrEmpty(fit.resource))
                 return false;
 
