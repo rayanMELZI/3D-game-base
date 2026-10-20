@@ -248,6 +248,8 @@ namespace FpsBase
             bool switching = IsSwitching;
             if (movement != null)
                 movement.speedMultiplier = weapon.mobility; // heavy weapons (LMG) slow you down
+            if (mouseLook != null)
+                mouseLook.zoomSpeedScale = weapon.adsSpeed; // ...and aim slower
 
             if (model.muzzleFlash != null && model.muzzleFlash.enabled && Time.time >= flashOffTime)
                 model.muzzleFlash.enabled = false;
@@ -325,7 +327,7 @@ namespace FpsBase
         private void AnimateViewmodel(WeaponDefinition weapon, WeaponModelInstance model, bool sprinting)
         {
             float deltaTime = Time.deltaTime;
-            adsBlend = Mathf.MoveTowards(adsBlend, IsZoomed && !weapon.hideWhenZoomed ? 1f : 0f, 9f * deltaTime);
+            adsBlend = Mathf.MoveTowards(adsBlend, IsZoomed && !weapon.hideWhenZoomed ? 1f : 0f, 9f * weapon.adsSpeed * deltaTime);
             sprintBlend = Mathf.MoveTowards(sprintBlend, sprinting ? 1f : 0f, 7f * deltaTime);
             currentKick = Vector3.Lerp(currentKick, Vector3.zero, 13f * deltaTime);
             currentKickRotation = Vector3.Lerp(currentKickRotation, Vector3.zero, 15f * deltaTime);
