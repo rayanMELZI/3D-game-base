@@ -21,6 +21,8 @@ namespace FpsBase
         [Header("Zoom")]
         public float baseFov = 60f;
         public float zoomLerpSpeed = 14f;
+        /// <summary>Set by the held weapon (WeaponDefinition.adsSpeed): heavy guns zoom in slower.</summary>
+        [System.NonSerialized] public float zoomSpeedScale = 1f;
 
         [Header("Recoil")]
         public float recoilRecoverySpeed = 8f;
@@ -72,7 +74,7 @@ namespace FpsBase
                 LockCursor(false);
 
             // Aiming (right-click) blend, used to tighten the third-person camera.
-            aimBlend = Mathf.MoveTowards(aimBlend, zoomFov > 0f ? 1f : 0f, 6f * Time.deltaTime);
+            aimBlend = Mathf.MoveTowards(aimBlend, zoomFov > 0f ? 1f : 0f, 6f * zoomSpeedScale * Time.deltaTime);
 
             // Smoothly move toward the target FOV (zoom, plus a subtle sprint boost).
             if (cam != null)
@@ -84,7 +86,7 @@ namespace FpsBase
                     targetFov = thirdPerson ? Mathf.Max(zoomFov, 46f) : zoomFov;
                 else
                     targetFov = BaseFovNow * (movement != null && movement.IsSprinting ? 1.07f : 1f);
-                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, zoomLerpSpeed * Time.deltaTime);
+                cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, zoomLerpSpeed * zoomSpeedScale * Time.deltaTime);
             }
 
             if (Cursor.lockState != CursorLockMode.Locked)
