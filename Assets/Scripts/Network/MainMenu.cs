@@ -391,17 +391,19 @@ namespace FpsBase
 
         private void DrawAddonToggle(AttachmentType type, WeaponModelType model)
         {
-            bool allowed = Attachments.IsAllowed(model, type);
+            // A built-in suppressor (WHISPER) is always on and can't be removed.
+            bool builtIn = type == AttachmentType.Suppressor && LoadoutInfo[gunsmithWeapon].integralSuppressor;
+            bool allowed = Attachments.IsAllowed(model, type) && !builtIn;
             int mask = GameSettings.WeaponAttachments[gunsmithWeapon];
-            bool on = Attachments.Has(mask, type);
+            bool on = Attachments.Has(mask, type) || builtIn;
 
             var prevBg = GUI.backgroundColor;
             bool prevEnabled = GUI.enabled;
             if (on) GUI.backgroundColor = MenuWidgets.Accent;
             GUI.enabled = allowed;
 
-            string label = allowed
-                ? $"{Attachments.Names[(int)type]}: {(on ? "ON" : "OFF")}"
+            string label = builtIn ? $"{Attachments.Names[(int)type]}: BUILT-IN"
+                : allowed ? $"{Attachments.Names[(int)type]}: {(on ? "ON" : "OFF")}"
                 : $"{Attachments.Names[(int)type]}: —";
             if (MenuWidgets.MenuButton(label, 30f) && allowed)
                 GameSettings.WeaponAttachments[gunsmithWeapon] = Attachments.Toggle(mask, type);
