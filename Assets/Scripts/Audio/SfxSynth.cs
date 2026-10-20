@@ -79,6 +79,14 @@ namespace FpsBase
                         AddFilteredNoise(b, 0.06f, 0.7f, 0.4f, 4.5f, 0.05f); // long echo tail
                         Saturate(b, 2.1f);
                     });
+                case WeaponModelType.GrenadeLauncher:
+                    return MakeBuffered("shot_grenade_launcher", 0.35f, b =>
+                    {
+                        AddSine(b, 0f, 0.18f, 110f, 55f, 1f, 14f);          // hollow "thoomp"
+                        AddFilteredNoise(b, 0f, 0.06f, 0.8f, 30f, 0.25f);
+                        AddFilteredNoise(b, 0.02f, 0.3f, 0.25f, 6f, 0.3f);  // tube hiss
+                        Saturate(b, 1.5f);
+                    });
                 case WeaponModelType.Rpg:
                     return MakeBuffered("shot_rpg", 0.6f, b =>
                     {
