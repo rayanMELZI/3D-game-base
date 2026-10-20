@@ -160,6 +160,7 @@ namespace FpsBase
                 new WeaponDefinition
                 {
                     displayName = "LMG", model = WeaponModelType.Lmg,
+                    shotPitch = 0.86f, // shares the rifle clips: deeper, heavier report
                     damage = 19f, fireRate = 10.5f, range = 230f, magazineSize = 75,
                     reloadTime = 4.2f, automatic = true, recoil = 0.82f, zoomFov = 48f,
                     mobility = 0.85f, adsSpeed = 0.55f, // heavy: slower to move and to aim
