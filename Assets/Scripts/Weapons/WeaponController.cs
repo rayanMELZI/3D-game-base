@@ -123,8 +123,9 @@ namespace FpsBase
         private bool IsSwitching => pendingSwitchIndex >= 0;
 
         // Add-on helpers — the mask is chosen per weapon and lives in GameSettings.
-        private int MaskFor(int index) =>
-            index >= 0 && index < GameSettings.WeaponAttachments.Length ? GameSettings.WeaponAttachments[index] : 0;
+        private int MaskFor(int index) => Attachments.Effective(
+            index >= 0 && index < GameSettings.WeaponAttachments.Length ? GameSettings.WeaponAttachments[index] : 0,
+            index >= 0 && index < weapons.Length ? weapons[index] : null);
         private int MagSize(int index) => Attachments.MagazineSize(weapons[index].magazineSize, MaskFor(index));
 
         private void Awake()

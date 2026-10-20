@@ -63,8 +63,10 @@ namespace FpsBase
                 if (WeaponIndex.Value != index)
                     WeaponIndex.Value = index;
 
-                int mask = index >= 0 && index < GameSettings.WeaponAttachments.Length
-                    ? GameSettings.WeaponAttachments[index] : 0;
+                var weapons = rig.weaponController.weapons;
+                int mask = Attachments.Effective(
+                    index >= 0 && index < GameSettings.WeaponAttachments.Length ? GameSettings.WeaponAttachments[index] : 0,
+                    index >= 0 && index < weapons.Length ? weapons[index] : null);
                 if (AttachmentMask.Value != mask)
                     AttachmentMask.Value = mask;
                 int color = index >= 0 && index < GameSettings.WeaponColors.Length ? GameSettings.WeaponColors[index] : 0;
