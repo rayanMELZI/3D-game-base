@@ -27,7 +27,7 @@ namespace FpsBase
         public string displayName = "WEAPON";
         public WeaponModelType model = WeaponModelType.Rifle;
         [Tooltip("Imported model under Resources/Weapons (e.g. \"Modern/Rifle_2_Used\"). " +
-                 "Empty = the default model of this weapon type. Fit tuned in WeaponModelBuilder.FitFor.")]
+                 "Empty = the default model of this weapon type. Fit tuned in WeaponModelBuilder.FitForModel.")]
         public string modelName = "";
 
         public float damage = 20f;
