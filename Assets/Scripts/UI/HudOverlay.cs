@@ -394,8 +394,8 @@ namespace FpsBase
             if (slots == null && total > shown)
             {
                 smallText.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
-                GUI.Label(new Rect(panel.x + 14 + shown * 26, panel.y + panel.height + 4, 120, 20),
-                    $"· {weaponController.CurrentIndex + 1}/{total} (scroll)", smallText);
+                GUI.Label(new Rect(panel.x + 14 + shown * 26, panel.y + panel.height + 4, 70, 20),
+                    $"· {weaponController.CurrentIndex + 1}/{total}", smallText);
             }
             smallText.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
         }
