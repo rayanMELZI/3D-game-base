@@ -193,11 +193,11 @@ namespace FpsBase
         // ------------------------------------------------------------------
 
         /// <summary>Positional 3D sound (gunshots, deaths, explosions).</summary>
-        public static void PlayAt(AudioClip clip, Vector3 position, float volume = 1f)
+        public static void PlayAt(AudioClip clip, Vector3 position, float volume = 1f, float pitch = 1f)
         {
             if (clip == null)
                 return;
-            var source = MakeSource(clip, volume);
+            var source = MakeSource(clip, volume, 0f, pitch);
             source.transform.position = position;
             source.spatialBlend = 1f;
             source.minDistance = 5f;
@@ -225,14 +225,15 @@ namespace FpsBase
             source.PlayDelayed(delay);
         }
 
-        private static AudioSource MakeSource(AudioClip clip, float volume, float delay = 0f)
+        private static AudioSource MakeSource(AudioClip clip, float volume, float delay = 0f, float pitch = 1f)
         {
             var go = new GameObject("Sfx_" + clip.name);
             var source = go.AddComponent<AudioSource>();
             source.clip = clip;
             source.volume = volume;
-            source.pitch = 1f + UnityEngine.Random.Range(-0.07f, 0.07f);
-            UnityEngine.Object.Destroy(go, delay + clip.length + 0.25f);
+            source.pitch = Mathf.Max(0.1f, pitch) * (1f + UnityEngine.Random.Range(-0.07f, 0.07f));
+            // A lower pitch plays the clip slower, so keep the source alive longer.
+            UnityEngine.Object.Destroy(go, delay + clip.length / source.pitch + 0.25f);
             return source;
         }
 
