@@ -378,12 +378,24 @@ namespace FpsBase
                 GUI.color = Color.white;
             }
 
-            // Weapon slot numbers.
-            for (int i = 0; i < weaponController.weapons.Length; i++)
+            // Weapon slot numbers: the class slots (1/2/3), or with the full
+            // arsenal the 1-9 hotkeys plus where the held weapon sits in the
+            // scroll order (the arsenal is ~30 weapons, too many to list).
+            var slots = weaponController.classSlots;
+            int total = weaponController.weapons.Length;
+            int shown = slots != null ? slots.Length : Mathf.Min(total, 9);
+            for (int i = 0; i < shown; i++)
             {
-                bool current = i == weaponController.CurrentIndex;
+                int weaponIndex = slots != null ? slots[i] : i;
+                bool current = weaponIndex == weaponController.CurrentIndex;
                 smallText.normal.textColor = current ? MenuWidgets.Accent : new Color(1f, 1f, 1f, 0.4f);
                 GUI.Label(new Rect(panel.x + 14 + i * 26, panel.y + panel.height + 4, 26, 20), (i + 1).ToString(), smallText);
+            }
+            if (slots == null && total > shown)
+            {
+                smallText.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
+                GUI.Label(new Rect(panel.x + 14 + shown * 26, panel.y + panel.height + 4, 120, 20),
+                    $"· {weaponController.CurrentIndex + 1}/{total} (scroll)", smallText);
             }
             smallText.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
         }
