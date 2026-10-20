@@ -43,8 +43,12 @@ namespace FpsBase
             Transform rightHandGrip = FindDeepChild(root.transform, "RightHandGrip");
             Transform leftHandGrip = FindDeepChild(root.transform, "LeftHandGrip");
             Transform muzzleSocket = FindDeepChild(root.transform, "MuzzleSocket");
-            Transform magazine = FindDeepChildEndingWith(root.transform, "_magazine");
-            Transform pull = FindDeepChildEndingWith(root.transform, "_pull");
+            // "Modern" pack parts end in _magazine/_pull; the AR_/SMG_/Recon_ packs
+            // name the same parts _Mag/_Bolt.
+            Transform magazine = FindDeepChildEndingWith(root.transform, "_magazine")
+                                 ?? FindDeepChildEndingWith(root.transform, "_Mag");
+            Transform pull = FindDeepChildEndingWith(root.transform, "_pull")
+                             ?? FindDeepChildEndingWith(root.transform, "_Bolt");
             if (muzzleSocket != null)
                 muzzlePos = root.transform.InverseTransformPoint(muzzleSocket.position);
 
