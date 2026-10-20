@@ -31,12 +31,27 @@ namespace FpsBase
 
         // Weapon names for the class builder (display only).
         private static readonly WeaponDefinition[] LoadoutInfo = WeaponDefinition.CreateDefaultLoadout();
-        private static readonly int[] PrimaryOptions = { 2, 3, 4, 5, 6, 7, 8 };
-        private static readonly int[] SecondaryOptions = { 1, 2, 3, 6, 8 };
-
-        // Gunsmith: which weapons can be customised (knife & RPG stay bare).
-        private static readonly int[] GunsmithWeapons = { 1, 2, 3, 4, 5, 7, 8 };
+        // Built from the weapon types, so appended weapons show up on their own:
+        // primary = anything but knife/pistol; secondary = sidearm-sized or
+        // launcher; gunsmith = everything that can mount add-ons (no knife/RPG).
+        private static readonly int[] PrimaryOptions = WeaponsWhere(m =>
+            m != WeaponModelType.Knife && m != WeaponModelType.Pistol);
+        private static readonly int[] SecondaryOptions = WeaponsWhere(m =>
+            m == WeaponModelType.Pistol || m == WeaponModelType.Smg || m == WeaponModelType.Shotgun
+            || m == WeaponModelType.Rpg || m == WeaponModelType.GrenadeLauncher);
+        private static readonly int[] GunsmithWeapons = WeaponsWhere(m =>
+            m != WeaponModelType.Knife && m != WeaponModelType.Rpg);
         private int gunsmithWeapon = 4; // rifle
+
+        // Weapon picker (replaces click-to-cycle now that the arsenal is ~30
+        // weapons): category tabs + a scrolling list with each weapon's stats.
+        private enum PickTarget { None, Primary, Secondary, Gunsmith }
+        private PickTarget pickTarget = PickTarget.None;
+        private int pickClass;
+        private string pickCategory;
+        private Vector2 pickScroll;
+        private static readonly string[] CategoryOrder =
+            { "RIFLES", "SMGS", "SHOTGUNS", "LMGS", "SNIPERS", "PISTOLS", "LAUNCHERS" };
 
         private bool NetworkRunning =>
             NetworkManager.Singleton != null
@@ -283,6 +298,12 @@ namespace FpsBase
         /// </summary>
         private void DrawClasses()
         {
+            if (pickTarget != PickTarget.None)
+            {
+                DrawWeaponPicker();
+                return;
+            }
+
             // The 2-weapons-vs-all rule is now the host's match-wide choice (set in
             // the lobby). This button picks what YOU'D host with + the offline/
             // practice default; in a game the host's lobby toggle wins for everyone.
@@ -315,10 +336,10 @@ namespace FpsBase
                     GameSettings.SelectedClass = i;
                 GUI.backgroundColor = prev;
 
-                if (MenuWidgets.MenuButton(LoadoutInfo[GameSettings.ClassPrimary[i]].displayName, 34f))
-                    GameSettings.ClassPrimary[i] = NextOption(PrimaryOptions, GameSettings.ClassPrimary[i]);
-                if (MenuWidgets.MenuButton(LoadoutInfo[GameSettings.ClassSecondary[i]].displayName, 34f))
-                    GameSettings.ClassSecondary[i] = NextOption(SecondaryOptions, GameSettings.ClassSecondary[i]);
+                if (MenuWidgets.CompactMenuButton(WeaponName(GameSettings.ClassPrimary[i]), 34f))
+                    OpenPicker(PickTarget.Primary, i);
+                if (MenuWidgets.CompactMenuButton(WeaponName(GameSettings.ClassSecondary[i]), 34f))
+                    OpenPicker(PickTarget.Secondary, i);
 
                 GUILayout.EndHorizontal();
                 GUILayout.Space(4);
@@ -349,8 +370,8 @@ namespace FpsBase
 
             GUILayout.BeginHorizontal();
             if (MenuWidgets.MenuButton("◀", 34f)) gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, -1);
-            if (MenuWidgets.MenuButton(LoadoutInfo[gunsmithWeapon].displayName, 34f))
-                gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, +1);
+            if (MenuWidgets.CompactMenuButton(WeaponName(gunsmithWeapon), 34f))
+                OpenPicker(PickTarget.Gunsmith, 0);
             if (MenuWidgets.MenuButton("▶", 34f)) gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, +1);
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
@@ -389,10 +410,139 @@ namespace FpsBase
             GUI.backgroundColor = prevBg;
         }
 
-        private static int NextOption(int[] options, int current)
+        private static int[] WeaponsWhere(System.Func<WeaponModelType, bool> keep)
         {
-            int at = System.Array.IndexOf(options, current);
-            return options[(at + 1) % options.Length];
+            var list = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < LoadoutInfo.Length; i++)
+                if (keep(LoadoutInfo[i].model))
+                    list.Add(i);
+            return list.ToArray();
+        }
+
+        private static string WeaponName(int index) =>
+            index >= 0 && index < LoadoutInfo.Length ? LoadoutInfo[index].displayName : "—";
+
+        private static string CategoryOf(WeaponModelType model)
+        {
+            switch (model)
+            {
+                case WeaponModelType.Rifle: return "RIFLES";
+                case WeaponModelType.Smg: return "SMGS";
+                case WeaponModelType.Shotgun: return "SHOTGUNS";
+                case WeaponModelType.Lmg: return "LMGS";
+                case WeaponModelType.Sniper: return "SNIPERS";
+                case WeaponModelType.Pistol: return "PISTOLS";
+                case WeaponModelType.Rpg:
+                case WeaponModelType.GrenadeLauncher: return "LAUNCHERS";
+                default: return "MELEE";
+            }
+        }
+
+        /// <summary>One-line stat summary shown under each weapon in the picker.</summary>
+        private static string StatLine(WeaponDefinition w)
+        {
+            string dmg = w.pellets > 1 ? $"{w.damage:0}×{w.pellets}" : $"{w.damage:0}";
+            string mode = w.isProjectile ? "explosive" : (w.automatic ? "auto" : "semi");
+            string mag = w.magazineSize > 0 ? $"MAG {w.magazineSize}" : "∞";
+            return $"DMG {dmg} · {w.fireRate * 60f:0} RPM · {mag} · RANGE {w.range:0} · {mode}"
+                   + (w.integralSuppressor ? " · suppressed" : "");
+        }
+
+        private int[] PickOptions() =>
+            pickTarget == PickTarget.Primary ? PrimaryOptions
+            : pickTarget == PickTarget.Secondary ? SecondaryOptions
+            : GunsmithWeapons;
+
+        private int PickCurrent() =>
+            pickTarget == PickTarget.Primary ? GameSettings.ClassPrimary[pickClass]
+            : pickTarget == PickTarget.Secondary ? GameSettings.ClassSecondary[pickClass]
+            : gunsmithWeapon;
+
+        private void OpenPicker(PickTarget target, int classIndex)
+        {
+            pickTarget = target;
+            pickClass = Mathf.Clamp(classIndex, 0, GameSettings.ClassCount - 1);
+            int current = PickCurrent();
+            pickCategory = current >= 0 && current < LoadoutInfo.Length ? CategoryOf(LoadoutInfo[current].model) : null;
+            pickScroll = Vector2.zero;
+        }
+
+        private void DrawWeaponPicker()
+        {
+            var options = PickOptions();
+            int current = PickCurrent();
+
+            string title = pickTarget == PickTarget.Primary ? $"CLASS {pickClass + 1} — PRIMARY"
+                : pickTarget == PickTarget.Secondary ? $"CLASS {pickClass + 1} — SECONDARY"
+                : "GUNSMITH — WEAPON";
+            GUILayout.Label(title, MenuWidgets.Label);
+            GUILayout.Space(4);
+
+            // Category tabs: only the ones that have weapons for this slot.
+            var categories = new System.Collections.Generic.List<string>();
+            foreach (var category in CategoryOrder)
+                foreach (int index in options)
+                    if (CategoryOf(LoadoutInfo[index].model) == category)
+                    {
+                        categories.Add(category);
+                        break;
+                    }
+            if (categories.Count == 0)
+            {
+                pickTarget = PickTarget.None;
+                return;
+            }
+            if (pickCategory == null || !categories.Contains(pickCategory))
+                pickCategory = categories[0];
+
+            const int tabsPerRow = 4;
+            for (int row = 0; row < categories.Count; row += tabsPerRow)
+            {
+                GUILayout.BeginHorizontal();
+                for (int c = row; c < Mathf.Min(row + tabsPerRow, categories.Count); c++)
+                {
+                    var prevTab = GUI.backgroundColor;
+                    if (categories[c] == pickCategory)
+                        GUI.backgroundColor = MenuWidgets.Accent;
+                    if (MenuWidgets.CompactMenuButton(categories[c], 28f))
+                    {
+                        pickCategory = categories[c];
+                        pickScroll = Vector2.zero;
+                    }
+                    GUI.backgroundColor = prevTab;
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.Space(6);
+
+            // Weapons of the selected category, scrollable.
+            pickScroll = GUILayout.BeginScrollView(pickScroll, GUILayout.Height(320));
+            foreach (int index in options)
+            {
+                var weapon = LoadoutInfo[index];
+                if (CategoryOf(weapon.model) != pickCategory)
+                    continue;
+
+                var prev = GUI.backgroundColor;
+                if (index == current)
+                    GUI.backgroundColor = MenuWidgets.Accent;
+                if (MenuWidgets.CompactMenuButton(index == current ? $"▶ {weapon.displayName}" : weapon.displayName, 30f))
+                {
+                    if (pickTarget == PickTarget.Primary) GameSettings.ClassPrimary[pickClass] = index;
+                    else if (pickTarget == PickTarget.Secondary) GameSettings.ClassSecondary[pickClass] = index;
+                    else gunsmithWeapon = index;
+                    GameSettings.Save();
+                    pickTarget = PickTarget.None;
+                }
+                GUI.backgroundColor = prev;
+                GUILayout.Label(StatLine(weapon), MenuWidgets.Small);
+                GUILayout.Space(2);
+            }
+            GUILayout.EndScrollView();
+
+            GUILayout.Space(6);
+            if (MenuWidgets.MenuButton("CANCEL", 32f))
+                pickTarget = PickTarget.None;
         }
 
         private static int Cycle(int[] options, int current, int dir)
