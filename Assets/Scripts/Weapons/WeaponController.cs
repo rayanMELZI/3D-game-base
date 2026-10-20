@@ -3,6 +3,14 @@ using UnityEngine;
 
 namespace FpsBase
 {
+    /// <summary>Reload moments other players hear (see NetworkWeapon).</summary>
+    public enum ReloadCue : byte
+    {
+        Magazine, // a full magazine reload starts
+        Shell,    // one shotgun shell goes into the tube
+        Rack      // the shotgun pump is racked after reloading from empty
+    }
+
     /// <summary>
     /// Manages the player's weapons: switching (1–7 / scroll), firing (hitscan,
     /// shotgun pellets, melee swings or rockets), reloading with a viewmodel
@@ -59,6 +67,12 @@ namespace FpsBase
         public Vector3 reloadPullOffset = new Vector3(0f, 0f, -0.075f);
         public Vector3 reloadPullRotation = new Vector3(0f, 0f, -5f);
 
+        [Header("Shotgun Shell Reload")]
+        [Tooltip("Seconds per shell pushed into the tube.")]
+        public float shellInsertTime = 0.58f;
+        [Tooltip("Pump rack at the end of a reload that started from empty.")]
+        public float shellRackTime = 0.42f;
+
         // Not serialized on purpose: the loadout always comes from
         // WeaponDefinition.CreateDefaultLoadout(), so balance edits in code apply
         // everywhere (including the baked multiplayer prefab).
@@ -82,6 +96,8 @@ namespace FpsBase
         public event Action<Vector3> ShotFired;
         /// <summary>Raised when a shot damaged something; true = headshot (HUD hit marker + sound).</summary>
         public event Action<bool> TargetHit;
+        /// <summary>Raised on each audible reload step (network replication of reload sounds).</summary>
+        public event Action<ReloadCue> ReloadCuePlayed;
         /// <summary>
         /// Grenade launched (muzzle, velocity). Online, NetworkWeapon handles it so
         /// the server owns the round; with no listener (offline) the shooter's own
@@ -95,9 +111,22 @@ namespace FpsBase
         /// <summary>Magazine size of the held weapon including its extended-mag add-on.</summary>
         public int CurrentMagSize => MagSize(CurrentIndex);
         public bool IsReloading => reloadPending;
-        /// <summary>0..1 while reloading (drives the HUD bar and viewmodel animation).</summary>
-        public float ReloadProgress =>
-            reloadPending ? 1f - Mathf.Clamp01((reloadEndTime - Time.time) / CurrentWeapon.reloadTime) : 0f;
+        /// <summary>
+        /// 0..1 while reloading (drives the HUD bar). Shell by shell it is how
+        /// full the tube is, the current shell counting as it goes in.
+        /// </summary>
+        public float ReloadProgress
+        {
+            get
+            {
+                if (!reloadPending)
+                    return 0f;
+                if (!shellReload)
+                    return 1f - Mathf.Clamp01((reloadEndTime - Time.time) / Mathf.Max(0.01f, CurrentWeapon.reloadTime));
+                float shell = shellRacking ? 0f : ReloadAnimationProgress();
+                return Mathf.Clamp01((ammo[CurrentIndex] + shell) / Mathf.Max(1f, CurrentMagSize));
+            }
+        }
         public bool IsZoomed { get; private set; }
 
         private WeaponModelInstance[] models;
@@ -109,6 +138,8 @@ namespace FpsBase
         private bool reloadPending;
         private bool shellReload;
         private float reloadStepDuration;
+        private bool shellRacking;     // shotgun: final pump after the last shell
+        private bool shellRackNeeded;  // shotgun: reload started with an empty tube
         private float flashOffTime;
         private float adsBlend;
         private Vector3 currentKick; // viewmodel kickback offset
@@ -196,9 +227,7 @@ namespace FpsBase
                 return;
             for (int i = 0; i < weapons.Length; i++)
                 ammo[i] = MagSize(i);
-            reloadPending = false;
-            shellReload = false;
-            ResetReloadParts(models[CurrentIndex]);
+            CancelReload();
         }
 
         /// <summary>Force a specific weapon (Gun Game level, sniper-only).</summary>
@@ -216,8 +245,7 @@ namespace FpsBase
         private void OnDisable()
         {
             SetZoom(false);
-            reloadPending = false;
-            shellReload = false;
+            CancelReload();
             pendingSwitchIndex = -1;
             switchSwapped = false;
             if (models != null && models[CurrentIndex].root != null)
@@ -264,17 +292,16 @@ namespace FpsBase
             if (reloadPending && Time.time >= reloadEndTime)
             {
                 if (shellReload)
-                {
-                    ammo[CurrentIndex]++;
-                    if (ammo[CurrentIndex] < MagSize(CurrentIndex)) reloadEndTime = Time.time + reloadStepDuration;
-                    else { reloadPending = false; shellReload = false; }
-                }
-                else { ammo[CurrentIndex] = MagSize(CurrentIndex); reloadPending = false; }
+                    AdvanceShellReload();
+                else { ammo[CurrentIndex] = MagSize(CurrentIndex); CancelReload(); }
             }
 
             // Sprinting always lowers ADS before the sprint pose is evaluated.
             if (sprinting || switching)
                 SetZoom(false);
+            // Sprinting stops a shell-by-shell reload; the shells already in stay in.
+            if (sprinting && shellReload)
+                CancelReload();
 
             AnimateViewmodel(weapon, model, sprinting);
 
@@ -299,10 +326,11 @@ namespace FpsBase
 
             if (reloadPending)
             {
-                if (!sprinting && !switching && shellReload && ammo[CurrentIndex] > 0 && Input.GetMouseButtonDown(0))
+                // CoD style: firing cuts a shell reload short once the tube holds a shell.
+                bool fireInterrupt = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.JoystickButton5);
+                if (!sprinting && !switching && shellReload && ammo[CurrentIndex] > 0 && fireInterrupt && Time.time >= nextFireTime)
                 {
-                    reloadPending = false;
-                    shellReload = false;
+                    CancelReload();
                     Shoot();
                 }
                 return;
@@ -324,7 +352,10 @@ namespace FpsBase
         }
 
         private bool CanReload(WeaponDefinition weapon) =>
-            !reloadPending && !IsSwitching && weapon.magazineSize > 0 && ammo[CurrentIndex] < CurrentMagSize;
+            !reloadPending && !IsSwitching && weapon.magazineSize > 0 && ammo[CurrentIndex] < CurrentMagSize
+            && !(IsShellReloaded(weapon) && movement != null && movement.IsSprinting); // sprint would cancel it at once
+
+        private static bool IsShellReloaded(WeaponDefinition weapon) => weapon.model == WeaponModelType.Shotgun;
 
         // ------------------------------------------------------------------
         // Viewmodel motion: idle sway, movement lag/bob, ADS, recoil and sprint pose
@@ -624,9 +655,7 @@ namespace FpsBase
             switchSwapped = false;
 
             SetZoom(false);
-            ResetReloadParts(models[CurrentIndex]);
-            reloadPending = false;
-            shellReload = false;
+            CancelReload();
             pendingSwitchIndex = index;
             switchAnimationStart = Time.time;
             nextFireTime = Time.time + Mathf.Max(0.1f, switchDuration) + 0.05f;
@@ -637,10 +666,59 @@ namespace FpsBase
             SetZoom(false);
             ResetReloadParts(models[CurrentIndex]);
             reloadPending = true;
-            shellReload = CurrentWeapon.model == WeaponModelType.Shotgun;
-            reloadStepDuration = shellReload ? 0.58f : CurrentWeapon.reloadTime;
+            shellReload = IsShellReloaded(CurrentWeapon);
+            shellRacking = false;
+            shellRackNeeded = shellReload && ammo[CurrentIndex] == 0;
+            reloadStepDuration = shellReload ? Mathf.Max(0.1f, shellInsertTime) : CurrentWeapon.reloadTime;
             reloadEndTime = Time.time + reloadStepDuration;
-            SfxSynth.PlayReload(CurrentWeapon.model, reloadStepDuration, 0.6f);
+            // Shell reloads sound each shell as it goes in (AdvanceShellReload).
+            if (!shellReload)
+            {
+                SfxSynth.PlayReload(CurrentWeapon.model, reloadStepDuration, 0.6f);
+                ReloadCuePlayed?.Invoke(ReloadCue.Magazine);
+            }
+        }
+
+        /// <summary>One shotgun step done: a shell is in, then the next one or the final pump.</summary>
+        private void AdvanceShellReload()
+        {
+            if (shellRacking)
+            {
+                CancelReload();
+                return;
+            }
+
+            ammo[CurrentIndex]++;
+            SfxSynth.Play2D(SfxSynth.ShellInsert(), 0.6f);
+            ReloadCuePlayed?.Invoke(ReloadCue.Shell);
+
+            if (ammo[CurrentIndex] < MagSize(CurrentIndex))
+            {
+                reloadEndTime = Time.time + reloadStepDuration;
+            }
+            else if (shellRackNeeded)
+            {
+                shellRacking = true;
+                reloadStepDuration = Mathf.Max(0.1f, shellRackTime);
+                reloadEndTime = Time.time + reloadStepDuration;
+                SfxSynth.Play2D(SfxSynth.PumpRack(), 0.6f);
+                ReloadCuePlayed?.Invoke(ReloadCue.Rack);
+            }
+            else
+            {
+                CancelReload();
+            }
+        }
+
+        /// <summary>Stop any reload (finished, interrupted, switched away, died) and park the moving parts.</summary>
+        private void CancelReload()
+        {
+            reloadPending = false;
+            shellReload = false;
+            shellRacking = false;
+            shellRackNeeded = false;
+            if (models != null && models[CurrentIndex].root != null)
+                ResetReloadParts(models[CurrentIndex]);
         }
 
         private void SetZoom(bool zoom)
