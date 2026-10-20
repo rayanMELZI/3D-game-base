@@ -60,7 +60,11 @@ is the onboarding brief for AI assistants working on the repo.
 - **Hitboxes never change with visuals**: imported character skins are overlaid
   and primitives hidden — their colliders (incl. the lethal head trigger) stay.
 - **Weapon indexes are global**: knife 0, pistol 1, smg 2, shotgun 3, rifle 4,
-  sniper 5, rpg 6. Classes restrict *switching*, never reorder.
+  sniper 5, rpg 6, lmg 7, grenade launcher 8, then 9–30 = the pack arsenal
+  (one weapon per unused pack model, `WeaponDefinition.modelName` +
+  `WeaponModelBuilder.FitForModel`). Classes restrict *switching*, never
+  reorder. CLASSES option lists are derived from weapon types, so appended
+  weapons appear automatically.
 - **Code-generated materials can't be saved in prefabs/scenes** — play-mode
   copies go pink. `BakeMapTool` saves material assets properly; `MapCatalog`
   gray-fallbacks missing ones at runtime.
