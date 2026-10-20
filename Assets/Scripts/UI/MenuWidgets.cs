@@ -17,6 +17,8 @@ namespace FpsBase
         public static GUIStyle Small { get; private set; }
         public static GUIStyle Button { get; private set; }
         public static GUIStyle Input { get; private set; }
+        /// <summary>Smaller-text button for dense rows (weapon names, category tabs).</summary>
+        public static GUIStyle CompactButton { get; private set; }
 
         private static Texture2D panelTex;
         private static bool ready;
@@ -61,6 +63,8 @@ namespace FpsBase
             Button.active.background = MakeTex(new Color(Accent.r * 0.8f, Accent.g * 0.8f, Accent.b * 0.8f, 1f));
             Button.active.textColor = Color.black;
 
+            CompactButton = new GUIStyle(Button) { fontSize = 13 };
+
             Input = new GUIStyle(GUI.skin.textField)
             {
                 fontSize = 15, alignment = TextAnchor.MiddleLeft,
@@ -82,6 +86,17 @@ namespace FpsBase
         public static bool MenuButton(string text, float height = 42f)
         {
             if (GUILayout.Button(text, Button, GUILayout.Height(height)))
+            {
+                SfxSynth.Play2D(SfxSynth.UiClick(), 0.8f);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Like MenuButton with smaller text, so long weapon names fit narrow cells.</summary>
+        public static bool CompactMenuButton(string text, float height = 30f)
+        {
+            if (GUILayout.Button(text, CompactButton, GUILayout.Height(height)))
             {
                 SfxSynth.Play2D(SfxSynth.UiClick(), 0.8f);
                 return true;
