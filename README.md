@@ -17,7 +17,8 @@ from code. Rename the game in `GameSettings.GameTitle`.
   synced to everyone
 - **Weapons (1–9):** Knife · Pistol · SMG · Shotgun (8 pellets) · Rifle ·
   Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
-  jumps) · LMG · grenade launcher — **aim-down-sights on right-click** for all, one-shot **headshots**,
+  jumps) · **LMG** (75-round belt, long reload, slower to move and aim) ·
+  **grenade launcher** (arcing 40 mm round, splash damage that hurts you too) — **aim-down-sights on right-click** for all, one-shot **headshots**,
   reload animation + bar, fresh ammo every respawn
 - **Pack arsenal (22 more):** every model of the imported weapon packs is its
   own weapon with its own stats and gunshot pitch — rifles (storm rifle, AK-47,
@@ -195,7 +196,7 @@ Assets/Scripts/
              PlayerFactory · PostFx · UpdateChecker
   Player/    PlayerMovement (crouch/slide/bhop) · MouseLook · LimbAnimator · DeathCam
   Weapons/   WeaponDefinition (balance!) · WeaponModelBuilder · WeaponController
-             RocketProjectile
+             RocketProjectile · GrenadeProjectile (server-owned arcing round)
   Combat/    Health · NetworkHealth · Hitbox · Effects · TargetDummy
   Audio/     SfxSynth (all sounds, synthesized)
   UI/        HudOverlay · MenuWidgets · Nametag · OfflineMenu
