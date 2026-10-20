@@ -51,9 +51,17 @@ namespace FpsBase
         public bool isProjectile = false;
         public float explosionRadius = 0f;
         public float projectileSpeed = 28f;
+        [Tooltip("Gravity on the projectile (m/s²). 0 = flies straight (RPG); > 0 = arcing grenade, simulated by the server.")]
+        public float projectileGravity = 0f;
 
         [Tooltip("The model has a built-in suppressor: always quiet, no radar ping, no extra can mounted.")]
         public bool integralSuppressor = false;
+
+        [Header("Handling")]
+        [Tooltip("Move speed multiplier while this weapon is held (1 = normal, heavy weapons < 1).")]
+        public float mobility = 1f;
+        [Tooltip("Aim-down-sights speed multiplier (1 = normal, heavy weapons aim slower).")]
+        public float adsSpeed = 1f;
 
         [Header("Aiming")]
         [Tooltip("Right-click FOV. Every weapon can aim; the sniper scopes.")]
@@ -154,14 +162,17 @@ namespace FpsBase
                     displayName = "LMG", model = WeaponModelType.Lmg,
                     damage = 19f, fireRate = 10.5f, range = 230f, magazineSize = 75,
                     reloadTime = 4.2f, automatic = true, recoil = 0.82f, zoomFov = 48f,
+                    mobility = 0.85f, adsSpeed = 0.55f, // heavy: slower to move and to aim
                     viewOffset = new Vector3(0.29f, -0.27f, 0.44f), adsOffset = new Vector3(0f, -0.18f, 0.48f),
                 },
                 new WeaponDefinition
                 {
                     displayName = "GRENADE LAUNCHER", model = WeaponModelType.GrenadeLauncher,
-                    damage = 95f, fireRate = 0.75f, range = 180f, magazineSize = 1,
+                    damage = 110f, fireRate = 0.75f, range = 180f, magazineSize = 1,
                     reloadTime = 2.8f, automatic = false, recoil = 2.1f, zoomFov = 50f,
-                    isProjectile = true, explosionRadius = 3.8f, projectileSpeed = 20f,
+                    // Arcing grenade: lethal at the centre, falls off toward the edge.
+                    isProjectile = true, explosionRadius = 3.8f, projectileSpeed = 30f, projectileGravity = 9.81f,
+                    mobility = 0.92f, adsSpeed = 0.8f,
                     viewOffset = new Vector3(0.28f, -0.25f, 0.42f), adsOffset = new Vector3(0f, -0.18f, 0.45f),
                 },
 
