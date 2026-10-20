@@ -1,0 +1,68 @@
+name: Compile Check
+
+# Fails if the C# scripts don't compile. No release, no packaging: a broken
+# script on beta shows up here instead of silently freezing Unity on the old
+# assembly.
+
+on:
+  push:
+    branches:
+      - beta
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push cancels the run still going for the same branch.
+concurrency:
+  group: compile-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-check:
+    name: Compile scripts (Windows64)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Delete pre-installed software to make room for Unity
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: false
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      # 2. Check out the repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # 3. Cache the Unity Library folder (same target as the release build)
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-StandaloneWindows64-
+            Library-
+
+      # 4. Build the player: any script compile error fails this step.
+      #    Same platform as build.yaml so the same define symbols
+      #    (FPSBASE_STEAM, STEAMWORKS_NET...) are compiled.
+      - name: Compile (Unity build)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          buildName: CompileCheck
+          # No tags on beta pushes: keep the project's own version.
+          versioning: None
