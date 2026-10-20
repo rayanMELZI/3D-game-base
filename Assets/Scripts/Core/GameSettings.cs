@@ -66,15 +66,16 @@ namespace FpsBase
             UseClassLoadout = PlayerPrefs.GetInt("useClassLoadout", 1) != 0;
             LethalType = Mathf.Clamp(PlayerPrefs.GetInt("lethalType", 0), 0, ThrowableController.Count - 1);   // frag
             TacticalType = Mathf.Clamp(PlayerPrefs.GetInt("tacticalType", 1), 0, ThrowableController.Count - 1); // flash
+            // Clamped to the arsenal so a pref from another build can't index past it.
+            var loadout = WeaponDefinition.CreateDefaultLoadout();
             for (int i = 0; i < ClassCount; i++)
             {
-                ClassPrimary[i] = PlayerPrefs.GetInt($"class{i}Primary", defaultPrimary[i]);
-                ClassSecondary[i] = PlayerPrefs.GetInt($"class{i}Secondary", defaultSecondary[i]);
+                ClassPrimary[i] = Mathf.Clamp(PlayerPrefs.GetInt($"class{i}Primary", defaultPrimary[i]), 0, loadout.Length - 1);
+                ClassSecondary[i] = Mathf.Clamp(PlayerPrefs.GetInt($"class{i}Secondary", defaultSecondary[i]), 0, loadout.Length - 1);
             }
 
             // Per-weapon add-ons, sized to the arsenal and sanitised against each
             // weapon's allowed set (so an old pref can't leave an illegal add-on on).
-            var loadout = WeaponDefinition.CreateDefaultLoadout();
             WeaponAttachments = new int[loadout.Length];
             WeaponColors = new int[loadout.Length];
             for (int i = 0; i < loadout.Length; i++)
