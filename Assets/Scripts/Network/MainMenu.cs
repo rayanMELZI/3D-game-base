@@ -447,7 +447,8 @@ namespace FpsBase
             string mode = w.isProjectile ? "explosive" : (w.automatic ? "auto" : "semi");
             string mag = w.magazineSize > 0 ? $"MAG {w.magazineSize}" : "∞";
             return $"DMG {dmg} · {w.fireRate * 60f:0} RPM · {mag} · RANGE {w.range:0} · {mode}"
-                   + (w.integralSuppressor ? " · suppressed" : "");
+                   + (w.integralSuppressor ? " · suppressed" : "")
+                   + (w.mobility < 1f ? $" · heavy (speed {w.mobility * 100f:0}%)" : "");
         }
 
         private int[] PickOptions() =>
