@@ -16,6 +16,8 @@ namespace FpsBase
         public float walkSpeed = 5f;
         public float sprintSpeed = 8.5f;
         public float crouchSpeed = 2.6f;
+        /// <summary>Set every frame by the held weapon (WeaponDefinition.mobility): heavy guns slow you down.</summary>
+        [System.NonSerialized] public float speedMultiplier = 1f;
 
         [Header("Slide")]
         public float slideSpeed = 10.5f;
@@ -135,6 +137,7 @@ namespace FpsBase
             else
             {
                 speed = IsProne ? proneSpeed : (IsCrouching ? crouchSpeed : (IsSprinting ? sprintSpeed : walkSpeed));
+                speed *= speedMultiplier;
                 horizontal = IsSprinting
                     ? transform.forward * speed
                     : moveDirection * speed;
