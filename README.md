@@ -19,7 +19,9 @@ from code. Rename the game in `GameSettings.GameTitle`.
   Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
   jumps) · **LMG** (75-round belt, long reload, slower to move and aim) ·
   **grenade launcher** (arcing 40 mm round, splash damage that hurts you too) — **aim-down-sights on right-click** for all, one-shot **headshots**,
-  reload animation + bar, fresh ammo every respawn
+  reload animation + bar, fresh ammo every respawn. Shotguns reload **shell
+  by shell**: fire to cut the reload short once a shell is in, sprint or
+  switch to stop it (loaded shells stay), pump rack when reloading from empty
 - **Pack arsenal (22 more):** every model of the imported weapon packs is its
   own weapon with its own stats and gunshot pitch — rifles (storm rifle, AK-47,
   battle rifle, marksman rifle, WHISPER with a built-in suppressor, field rifle,
