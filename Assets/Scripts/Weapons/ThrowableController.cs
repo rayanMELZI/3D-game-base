@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace FpsBase
@@ -150,6 +151,8 @@ namespace FpsBase
         private void Detonate()
         {
             float radius = type == 1 ? 15f : 5f; // flashbangs reach far
+            // A player has many colliders: damage each target once, from its closest one.
+            var falloffs = new Dictionary<IDamageable, float>();
             foreach (var hit in Physics.OverlapSphere(transform.position, radius,
                          Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
             {
@@ -170,11 +173,16 @@ namespace FpsBase
                 else if (authoritative)
                 {
                     var damageable = hit.GetComponentInParent<IDamageable>();
-                    if (damageable is NetworkHealth networkHealth)
-                        networkHealth.TakeDamageFrom(100f * falloff, false, transform.position); // arrow points at the blast
-                    else
-                        damageable?.TakeDamage(100f * falloff, false);
+                    if (damageable != null && (!falloffs.TryGetValue(damageable, out float previous) || falloff > previous))
+                        falloffs[damageable] = falloff;
                 }
+            }
+            foreach (var pair in falloffs)
+            {
+                if (pair.Key is NetworkHealth networkHealth)
+                    networkHealth.TakeDamageFrom(100f * pair.Value, false, transform.position); // arrow points at the blast
+                else
+                    pair.Key.TakeDamage(100f * pair.Value, false);
             }
             Effects.SpawnExplosion(transform.position);
             SfxSynth.PlayAt(SfxSynth.Explosion(), transform.position, type == 1 ? 0.5f : 0.9f);
