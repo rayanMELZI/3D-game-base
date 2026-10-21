@@ -81,6 +81,12 @@ is the onboarding brief for AI assistants working on the repo.
 - **Spawns**: server snaps candidates to ground from 1.5m up (higher raycasts
   land on roofs/ceilings), picks farthest-from-enemies, respawns everyone on
   map change, and gives 3s spawn protection that ends on the victim's first shot.
+- **XP / levels**: the server decides (kill 100, headshot 140 in `ReportKill`;
+  win 500 / match complete 150 in `EndMatch`, which returns early if the match
+  already ended) and sends `NetworkPlayer.AwardXpClientRpc` to the owner only.
+  The owner saves it (`GameSettings.AwardExperience`, PlayerPrefs `experience`)
+  and writes the owner-permission `CareerLevel` NetworkVariable that the lobby
+  and scoreboard read. Curve: level n at 100 × (n-1)² XP.
 - **Add-ons are per class**: `GameSettings.ClassAttachments[class][weapon]`
   (prefs `class{c}Att{i}`, migrated from the old global `weaponAtt{i}`).
   Full-arsenal mode uses the selected class's add-ons. `WeaponController`
