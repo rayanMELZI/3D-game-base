@@ -69,6 +69,12 @@ is the onboarding brief for AI assistants working on the repo.
 
 - **Hitboxes never change with visuals**: imported character skins are overlaid
   and primitives hidden — their colliders (incl. the lethal head trigger) stay.
+  The skin is parented to the player root, NOT inside `Body`: crouch/prone pose
+  the `Body` (`PlayerMovement.ApplyCrouchVisual`: squash for crouch, lying
+  full-length for prone) and the capsule height, for the owner AND on remote
+  proxies (NetworkPlayer, from `Crouched`/`Prone`) — the shooter's client hits
+  the proxy. Torso/hips triggers are added at runtime
+  (`HumanoidBuilder.EnsureTorsoHitboxes`) for the prone torso past the capsule.
 - **Weapon indexes are global**: knife 0, pistol 1, smg 2, shotgun 3, rifle 4,
   sniper 5, rpg 6, lmg 7, grenade launcher 8, then 9–30 = the pack arsenal
   (one weapon per unused pack model, `WeaponDefinition.modelName` +
@@ -111,8 +117,12 @@ is the onboarding brief for AI assistants working on the repo.
 - Imported asset packs: two low-poly weapon packs (incl. `*_PreSet` prefabs
   with attachments mounted, and separate attachment prefabs: optics, muzzles,
   grips, mags), Survivalist characters (4 skins, same mesh/size), Free Crawl
-  Animation (Generic rig — must be re-imported as Humanoid to retarget; crawl
-  feature not built yet).
+  Animation (Humanoid: the pack mesh `VoxelVision_Default_Charcter.fbx` creates
+  the avatar from an explicit UE5-skeleton bone map written in its .meta; the
+  clips copy that avatar). Prone uses its idle + forward loop in the
+  `Prone locomotion` state of `SurvivalistLocomotion.controller` (`Prone` bool,
+  MoveX/MoveY blend, backward = loop at time scale -1); the driver fades the
+  upper-body layer out while prone and `CharacterAimPose` lowers the aim pivot.
 
 ## Docs
 
