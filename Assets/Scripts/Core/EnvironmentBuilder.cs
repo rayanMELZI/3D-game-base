@@ -282,6 +282,153 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // Built-in map: NIGHTFALL — a walled village graveyard at night, made
+        // for zombie survival. 64 × 64 m, a roofless chapel ruin in the middle
+        // (survivors start inside), houses in the corners, wrecked cars, a
+        // graveyard to the east. Lighting comes from street lamps and fire
+        // barrels; NightfallAtmosphere dims the sky and adds the fog.
+        // Obstacles are straight walls and convex blocks with open corners, so
+        // the zombies' simple steering can always walk around them.
+        // ------------------------------------------------------------------
+
+        public static void BuildNightfall()
+        {
+            var root = new GameObject(MapRootName).transform;
+            const float half = 32f;
+
+            Ground(root, half * 2f, half * 2f, new Color(0.13f, 0.14f, 0.12f), new Color(0.11f, 0.12f, 0.1f));
+
+            var stone = SharedMaterial(new Color(0.3f, 0.3f, 0.33f), 0.05f, 0.3f);
+            var wood = SharedMaterial(new Color(0.24f, 0.17f, 0.11f), 0f, 0.25f);
+            var rust = SharedMaterial(new Color(0.32f, 0.16f, 0.1f), 0.4f, 0.3f);
+            var metal = SharedMaterial(new Color(0.18f, 0.19f, 0.2f), 0.7f, 0.5f);
+            var lampGlow = SharedMaterial(new Color(1f, 0.82f, 0.5f), 0f, 0.6f, 3f);
+            var fireGlow = SharedMaterial(new Color(1f, 0.45f, 0.1f), 0f, 0.6f, 3.2f);
+            var candleGlow = SharedMaterial(new Color(0.9f, 0.08f, 0.05f), 0f, 0.6f, 2.6f);
+
+            PerimeterWalls(root, half, half, 3.5f, stone);
+            SpawnStrips(root, 26f, 14f);
+
+            // Chapel ruin: four straight walls, doorways north/south, open corners.
+            void Wall(float x1, float z1, float x2, float z2) => WallSegment(root, x1, z1, x2, z2, 3.2f, stone);
+            Wall(-5f, 4.5f, -1.6f, 4.5f); Wall(1.6f, 4.5f, 5f, 4.5f);
+            Wall(-5f, -4.5f, -1.6f, -4.5f); Wall(1.6f, -4.5f, 5f, -4.5f);
+            Wall(-5.6f, -3f, -5.6f, 3f); Wall(5.6f, -3f, 5.6f, 3f);
+            Box(root, "Altar", new Vector3(0f, 0.5f, 3.2f), Vector3.zero, new Vector3(2.2f, 1f, 0.9f), stone);
+            Visual(Box(root, "Candle", new Vector3(-0.8f, 1.15f, 3.2f), Vector3.zero, new Vector3(0.08f, 0.3f, 0.08f), candleGlow));
+            Visual(Box(root, "Candle", new Vector3(0.8f, 1.15f, 3.2f), Vector3.zero, new Vector3(0.08f, 0.3f, 0.08f), candleGlow));
+            PointLight(root, "AltarLight", new Vector3(0f, 1.8f, 2.6f), new Color(1f, 0.25f, 0.15f), 1.6f, 9f);
+
+            // Houses in the corners: solid blocks with a roof and dim windows.
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sz in new[] { -1f, 1f })
+                {
+                    var c = new Vector3(19f * sx, 0f, 18f * sz);
+                    Box(root, "House", c + new Vector3(0f, 2.5f, 0f), Vector3.zero, new Vector3(8f, 5f, 7f), wood);
+                    Visual(Box(root, "Roof", c + new Vector3(0f, 5.4f, 0f), new Vector3(0f, 0f, 8f * sx), new Vector3(8.8f, 0.4f, 7.6f), metal));
+                    Visual(Box(root, "Window", c + new Vector3(-4.02f * sx, 2.6f, 1.4f), Vector3.zero, new Vector3(0.05f, 1f, 1.2f), lampGlow));
+                }
+
+            // Wrecked cars (convex cover).
+            void Car(float x, float z, float yaw)
+            {
+                Box(root, "WreckedCar", new Vector3(x, 0.7f, z), new Vector3(0f, yaw, 0f), new Vector3(4.2f, 1.4f, 1.9f), rust);
+                Visual(Box(root, "CarCabin", new Vector3(x, 1.65f, z), new Vector3(0f, yaw, 0f), new Vector3(2f, 0.6f, 1.7f), rust));
+            }
+            Car(-10f, 14f, 20f);
+            Car(12f, -12f, -35f);
+            Car(-14f, -13f, 70f);
+            Car(4f, 20f, 95f);
+
+            // Graveyard (east): low stones in loose rows.
+            for (int row = 0; row < 3; row++)
+                for (int col = 0; col < 5; col++)
+                {
+                    float x = 10f + col * 3f;
+                    float z = -2f + row * 3.4f + (col % 2) * 0.6f;
+                    float tilt = ((row * 7 + col * 3) % 5 - 2) * 4f;
+                    Box(root, "Gravestone", new Vector3(x, 0.5f, z), new Vector3(0f, 90f, tilt), new Vector3(0.7f, 1f, 0.22f), stone);
+                }
+
+            // Dead trees.
+            foreach (var p in new[] { new Vector2(-20f, 2f), new Vector2(-8f, -22f), new Vector2(22f, 8f), new Vector2(-24f, -24f), new Vector2(9f, 26f) })
+                Cylinder(root, "DeadTree", new Vector3(p.x, 2f, p.y), new Vector3(0.5f, 2f, 0.5f), wood);
+
+            // Street lamps: pools of warm light to fight in.
+            foreach (var p in new[]
+                     {
+                         new Vector2(-10f, 0f), new Vector2(7.8f, 0f), new Vector2(0f, -14f), new Vector2(0f, 14f),
+                         new Vector2(-22f, -5f), new Vector2(22f, -6f), new Vector2(-12f, 24f), new Vector2(14f, 24f),
+                         new Vector2(-14f, -24f), new Vector2(14f, -24f),
+                     })
+            {
+                Cylinder(root, "LampPost", new Vector3(p.x, 2f, p.y), new Vector3(0.18f, 2f, 0.18f), metal);
+                Visual(Sphere(root, "LampBulb", new Vector3(p.x, 4.1f, p.y), Vector3.one * 0.45f, lampGlow));
+                PointLight(root, "LampLight", new Vector3(p.x, 3.8f, p.y), new Color(1f, 0.78f, 0.5f), 1.8f, 13f);
+            }
+
+            var atmosphere = root.gameObject.AddComponent<NightfallAtmosphere>();
+
+            // Fire barrels: flickering orange light (flicker in NightfallAtmosphere).
+            foreach (var p in new[] { new Vector2(-3f, -9f), new Vector2(8f, 15f), new Vector2(-20f, 9f), new Vector2(20f, -11f), new Vector2(-25f, -11f) })
+            {
+                Cylinder(root, "FireBarrel", new Vector3(p.x, 0.5f, p.y), new Vector3(0.7f, 0.5f, 0.7f), rust);
+                Visual(Cylinder(root, "Fire", new Vector3(p.x, 1.05f, p.y), new Vector3(0.55f, 0.08f, 0.55f), fireGlow));
+                atmosphere.fireLights.Add(PointLight(root, "FireLight", new Vector3(p.x, 1.8f, p.y), new Color(1f, 0.5f, 0.15f), 2f, 10f));
+            }
+        }
+
+        private static Light PointLight(Transform root, string name, Vector3 pos, Color color, float intensity, float range)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root);
+            go.transform.position = pos;
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = color;
+            light.intensity = intensity;
+            light.range = range;
+            light.shadows = LightShadows.None;
+            return light;
+        }
+
+        /// <summary>NIGHTFALL team spawns: behind the spawn strips at each end (team modes / FFA).</summary>
+        public static Vector3[] NightfallSpawnCandidates(int side)
+        {
+            float s = side == 0 ? -1f : 1f;
+            return new[]
+            {
+                new Vector3(0f, 0.3f, 25f * s), new Vector3(-10f, 0.3f, 24f * s), new Vector3(10f, 0.3f, 24f * s),
+                new Vector3(-5f, 0.3f, 21f * s), new Vector3(5f, 0.3f, 21f * s),
+            };
+        }
+
+        /// <summary>NIGHTFALL zombie survival: the survivors start together inside the chapel.</summary>
+        public static Vector3[] NightfallSurvivorSpawns()
+        {
+            return new[]
+            {
+                new Vector3(0f, 0.3f, -1.5f), new Vector3(-2.5f, 0.3f, 0f), new Vector3(2.5f, 0.3f, 0f),
+                new Vector3(0f, 0.3f, 1.4f), new Vector3(-2.8f, 0.3f, -2.8f), new Vector3(2.8f, 0.3f, -2.8f),
+                new Vector3(-1.3f, 0.3f, -3.4f), new Vector3(1.3f, 0.3f, -3.4f),
+            };
+        }
+
+        /// <summary>NIGHTFALL zombie entry points along the outer wall (the director keeps the ones far from players).</summary>
+        public static Vector3[] NightfallZombieSpawns()
+        {
+            var list = new List<Vector3>();
+            foreach (float t in new[] { -24f, -8f, 8f, 24f })
+            {
+                list.Add(new Vector3(29f, 0.3f, t));
+                list.Add(new Vector3(-29f, 0.3f, t));
+                list.Add(new Vector3(t, 0.3f, 29f));
+                list.Add(new Vector3(t, 0.3f, -29f));
+            }
+            return list.ToArray();
+        }
+
+        // ------------------------------------------------------------------
         // Built-in map: SKYFREIGHT — inside a giant cargo plane in flight.
         // The plane flies toward +Z. Cargo deck y = 0 from the open rear ramp
         // (z = -30, team 0 end) to the front bulkhead (z = 22); an upper deck
