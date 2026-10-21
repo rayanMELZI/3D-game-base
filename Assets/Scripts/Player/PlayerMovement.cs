@@ -92,6 +92,14 @@ namespace FpsBase
                 spawnPoint = transform.position;
         }
 
+        // Disabled while dead / between matches: come back standing, not prone.
+        private void OnDisable()
+        {
+            proneToggle = false;
+            padCrouch = false;
+            IsProne = false;
+        }
+
         private void Update()
         {
             bool grounded = controller.isGrounded;
