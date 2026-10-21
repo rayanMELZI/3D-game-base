@@ -166,10 +166,15 @@ namespace FpsBase
 
         private bool IsSwitching => pendingSwitchIndex >= 0;
 
-        // Add-on helpers — the mask is chosen per weapon and lives in GameSettings.
-        private int MaskFor(int index) => Attachments.Effective(
-            GameSettings.GetAttachments(GameSettings.SelectedClass, index),
-            index >= 0 && index < weapons.Length ? weapons[index] : null);
+        // Add-on helpers — masks are chosen per class in GameSettings and
+        // snapshotted on spawn (RefreshAttachments), so editing a class mid-life
+        // only takes effect on the next spawn, like the weapons themselves.
+        private int[] activeMasks;
+        private int MaskFor(int index) =>
+            activeMasks != null && index >= 0 && index < activeMasks.Length ? activeMasks[index] : 0;
+
+        /// <summary>Effective add-on mask of the held weapon (replicated by NetworkWeapon).</summary>
+        public int CurrentAttachmentMask => MaskFor(CurrentIndex);
         private int MagSize(int index) => Attachments.MagazineSize(weapons[index].magazineSize, MaskFor(index));
 
         private void Awake()
@@ -180,6 +185,7 @@ namespace FpsBase
 
         private void Start()
         {
+            RefreshAttachments();
             ammo = new int[weapons.Length];
             models = new WeaponModelInstance[weapons.Length];
             for (int i = 0; i < weapons.Length; i++)
@@ -208,6 +214,8 @@ namespace FpsBase
         /// </summary>
         public void ApplySelectedClass()
         {
+            RefreshAttachments();
+
             // The 2-weapon-class vs all-unlocked rule is now the host's match-wide
             // choice (networked), so every player in a game plays the same way.
             if (!GameModeManager.ClassLoadoutActive)
@@ -225,6 +233,49 @@ namespace FpsBase
 
             if (models != null && !lockSwitching && CurrentIndex != primary)
                 SwitchTo(primary);
+        }
+
+        /// <summary>
+        /// Take the selected class's add-ons. That class rules in full-arsenal
+        /// mode too (every weapon wears what it has in the selected class).
+        /// Viewmodels whose add-ons changed are rebuilt and their magazine
+        /// refilled to the new size.
+        /// </summary>
+        private void RefreshAttachments()
+        {
+            int c = Mathf.Clamp(GameSettings.SelectedClass, 0, GameSettings.ClassCount - 1);
+            var next = new int[weapons.Length];
+            for (int i = 0; i < weapons.Length; i++)
+                next[i] = Attachments.Effective(GameSettings.GetAttachments(c, i), weapons[i]);
+
+            var previous = activeMasks;
+            activeMasks = next;
+            if (previous == null || models == null)
+                return;
+
+            bool currentChanged = false;
+            for (int i = 0; i < weapons.Length; i++)
+            {
+                if (i < previous.Length && previous[i] == next[i])
+                    continue;
+                if (ammo != null)
+                    ammo[i] = MagSize(i);
+                if (models[i].root == null)
+                    continue;
+                Destroy(models[i].root);
+                models[i] = default; // EnsureModel rebuilds it with the new add-ons
+                if (i == CurrentIndex)
+                    currentChanged = true;
+            }
+
+            if (currentChanged)
+            {
+                EnsureModel(CurrentIndex);
+                models[CurrentIndex].root.SetActive(isActiveAndEnabled);
+                RebuildShadowModel();
+                if (hasShadowModel && shadowModel.root != null)
+                    shadowModel.root.SetActive(isActiveAndEnabled); // still dead: stays hidden
+            }
         }
 
         /// <summary>Refill every magazine (called on respawn).</summary>
