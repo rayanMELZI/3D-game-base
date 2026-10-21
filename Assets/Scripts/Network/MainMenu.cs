@@ -205,6 +205,8 @@ namespace FpsBase
             GUILayout.FlexibleSpace();
             GUILayout.Label("WASD move · Shift sprint · Ctrl crouch/slide · Space jump · Mouse2 aim · Tab scores",
                 MenuWidgets.Small);
+            GUILayout.Label("Pad: RT fire · LT aim · L3 sprint · B crouch (hold prone) · A jump · X reload · Y swap · RB/LB throw · View scores · Menu pause",
+                MenuWidgets.Small);
             GUILayout.EndArea();
         }
 
