@@ -15,6 +15,9 @@ namespace FpsBase
         public PlayerMovement movement;
 
         public float sensitivity = 2.5f;
+        [Tooltip("Right-stick turn speed at full deflection, degrees per second (× controller sensitivity).")]
+        public float controllerYawSpeed = 200f;
+        public float controllerPitchSpeed = 140f;
         public float minPitch = -89f;
         public float maxPitch = 89f;
 
@@ -97,8 +100,12 @@ namespace FpsBase
             float effective = sensitivity * GameSettings.MouseSensitivity * Mathf.Min(zoomFactor, 1f);
             float mouseX = Input.GetAxis("Mouse X") * effective;
             float mouseY = Input.GetAxis("Mouse Y") * effective;
-            mouseX += Input.GetAxis("Controller Look X") * effective * 1.4f;
-            mouseY += Input.GetAxis("Controller Look Y") * effective * 1.4f;
+            // The stick is a position, not a delta: turn at a rate (degrees per
+            // second), slowed while zoomed exactly like the mouse.
+            Vector2 stick = GamepadInput.Look();
+            float padScale = GameSettings.ControllerSensitivity * Mathf.Min(zoomFactor, 1f) * Time.deltaTime;
+            mouseX += stick.x * controllerYawSpeed * padScale;
+            mouseY += stick.y * controllerPitchSpeed * padScale;
 
             // Yaw rotates the whole body so movement direction follows the view.
             if (playerBody != null)
