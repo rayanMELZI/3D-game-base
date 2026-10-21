@@ -508,6 +508,7 @@ namespace FpsBase
                     // The killer's currently-held weapon (replicated index), shown
                     // as a viewmodel in the replay so you see what killed you.
                     WeaponDefinition killerWeapon = null;
+                    int killerAttachments = 0, killerColor = 0;
                     var killerWep = player.GetComponent<NetworkWeapon>();
                     var killerRig = player.GetComponent<PlayerRigRefs>();
                     if (killerWep != null && killerRig != null && killerRig.weaponController != null)
@@ -515,12 +516,14 @@ namespace FpsBase
                         var weapons = killerRig.weaponController.weapons;
                         int idx = Mathf.Clamp(killerWep.WeaponIndex.Value, 0, weapons.Length - 1);
                         killerWeapon = weapons[idx];
+                        killerAttachments = killerWep.AttachmentMask.Value;
+                        killerColor = killerWep.ColorIndex.Value;
                     }
 
                     // Replay the killer's last seconds from their eyes (skippable),
                     // then fall back to the orbiting spectate until respawn.
                     DeathCam.BeginReplay(player.GetKillcamHistory(), player.transform,
-                        $"KILLCAM  —  {killerName}", killerWeapon);
+                        $"KILLCAM  —  {killerName}", killerWeapon, killerAttachments, killerColor);
                     return;
                 }
             }
