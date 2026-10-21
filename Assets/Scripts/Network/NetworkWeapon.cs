@@ -73,7 +73,7 @@ namespace FpsBase
 
                 var weapons = rig.weaponController.weapons;
                 int mask = Attachments.Effective(
-                    index >= 0 && index < GameSettings.WeaponAttachments.Length ? GameSettings.WeaponAttachments[index] : 0,
+                    GameSettings.GetAttachments(GameSettings.SelectedClass, index),
                     index >= 0 && index < weapons.Length ? weapons[index] : null);
                 if (AttachmentMask.Value != mask)
                     AttachmentMask.Value = mask;

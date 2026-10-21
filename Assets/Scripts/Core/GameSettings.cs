@@ -42,10 +42,13 @@ namespace FpsBase
         public static int LethalType;
         public static int TacticalType;
 
-        // Weapon add-ons: one bitmask per GLOBAL weapon index (see AttachmentType).
-        // Chosen per weapon, shared by every class, and persisted permanently.
-        // Applied by WeaponController and replicated by NetworkWeapon.
-        public static readonly int[] WeaponAttachments;
+        // Weapon add-ons: one bitmask per class AND global weapon index
+        // ([class][weapon], see AttachmentType), persisted permanently. Every
+        // class can kit out any weapon, so the same rifle can carry an optic in
+        // one class and a suppressor in another. In full-arsenal mode the
+        // SELECTED class's add-ons apply to every weapon. WeaponController
+        // snapshots them on spawn; NetworkWeapon replicates the held weapon's.
+        public static readonly int[][] ClassAttachments = new int[ClassCount][];
         public static readonly int[] WeaponColors;
 
         static GameSettings()
@@ -74,15 +77,23 @@ namespace FpsBase
                 ClassSecondary[i] = Mathf.Clamp(PlayerPrefs.GetInt($"class{i}Secondary", defaultSecondary[i]), 0, loadout.Length - 1);
             }
 
-            // Per-weapon add-ons, sized to the arsenal and sanitised against each
+            // Per-class add-ons, sized to the arsenal and sanitised against each
             // weapon's allowed set (so an old pref can't leave an illegal add-on on).
-            WeaponAttachments = new int[loadout.Length];
+            // Migration: before add-ons were per class they were global per weapon
+            // ("weaponAtt{i}"); a class with no saved value inherits that choice.
+            for (int c = 0; c < ClassCount; c++)
+            {
+                ClassAttachments[c] = new int[loadout.Length];
+                for (int i = 0; i < loadout.Length; i++)
+                {
+                    int legacy = PlayerPrefs.GetInt($"weaponAtt{i}", 0);
+                    ClassAttachments[c][i] = Attachments.Sanitize(
+                        PlayerPrefs.GetInt($"class{c}Att{i}", legacy), loadout[i].model);
+                }
+            }
             WeaponColors = new int[loadout.Length];
             for (int i = 0; i < loadout.Length; i++)
-            {
-                WeaponAttachments[i] = Attachments.Sanitize(PlayerPrefs.GetInt($"weaponAtt{i}", 0), loadout[i].model);
                 WeaponColors[i] = Mathf.Clamp(PlayerPrefs.GetInt($"weaponColor{i}", 0), 0, 5);
-            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -113,12 +124,30 @@ namespace FpsBase
                 PlayerPrefs.SetInt($"class{i}Primary", ClassPrimary[i]);
                 PlayerPrefs.SetInt($"class{i}Secondary", ClassSecondary[i]);
             }
-            for (int i = 0; i < WeaponAttachments.Length; i++)
-            {
-                PlayerPrefs.SetInt($"weaponAtt{i}", WeaponAttachments[i]);
+            for (int c = 0; c < ClassCount; c++)
+                for (int i = 0; i < ClassAttachments[c].Length; i++)
+                    PlayerPrefs.SetInt($"class{c}Att{i}", ClassAttachments[c][i]);
+            for (int i = 0; i < WeaponColors.Length; i++)
                 PlayerPrefs.SetInt($"weaponColor{i}", WeaponColors[i]);
-            }
             PlayerPrefs.Save();
+        }
+
+        /// <summary>Saved add-on mask of a weapon in a class (0 when out of range).</summary>
+        public static int GetAttachments(int classIndex, int weaponIndex)
+        {
+            if (classIndex < 0 || classIndex >= ClassCount)
+                return 0;
+            var masks = ClassAttachments[classIndex];
+            return weaponIndex >= 0 && weaponIndex < masks.Length ? masks[weaponIndex] : 0;
+        }
+
+        public static void SetAttachments(int classIndex, int weaponIndex, int mask)
+        {
+            if (classIndex < 0 || classIndex >= ClassCount)
+                return;
+            var masks = ClassAttachments[classIndex];
+            if (weaponIndex >= 0 && weaponIndex < masks.Length)
+                masks[weaponIndex] = mask;
         }
 
         public static void AwardExperience(int amount)

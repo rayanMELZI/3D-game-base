@@ -394,7 +394,7 @@ namespace FpsBase
             // A built-in suppressor (WHISPER) is always on and can't be removed.
             bool builtIn = type == AttachmentType.Suppressor && LoadoutInfo[gunsmithWeapon].integralSuppressor;
             bool allowed = Attachments.IsAllowed(model, type) && !builtIn;
-            int mask = GameSettings.WeaponAttachments[gunsmithWeapon];
+            int mask = GameSettings.GetAttachments(GameSettings.SelectedClass, gunsmithWeapon);
             bool on = Attachments.Has(mask, type) || builtIn;
 
             var prevBg = GUI.backgroundColor;
@@ -406,7 +406,7 @@ namespace FpsBase
                 : allowed ? $"{Attachments.Names[(int)type]}: {(on ? "ON" : "OFF")}"
                 : $"{Attachments.Names[(int)type]}: —";
             if (MenuWidgets.MenuButton(label, 30f) && allowed)
-                GameSettings.WeaponAttachments[gunsmithWeapon] = Attachments.Toggle(mask, type);
+                GameSettings.SetAttachments(GameSettings.SelectedClass, gunsmithWeapon, Attachments.Toggle(mask, type));
 
             GUI.enabled = prevEnabled;
             GUI.backgroundColor = prevBg;
