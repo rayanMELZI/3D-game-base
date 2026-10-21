@@ -115,6 +115,16 @@ namespace FpsBase
             return result;
         }
 
+        /// <summary>Controller look settings rows, shared by the main, pause and practice menus.</summary>
+        public static void ControllerSettings()
+        {
+            GameSettings.ControllerSensitivity = Slider("Pad look speed", GameSettings.ControllerSensitivity, 0.3f, 3f, "0.00");
+            GameSettings.ControllerDeadZone = Slider("Pad dead zone", GameSettings.ControllerDeadZone, 0.05f, 0.4f, "0.00");
+            GUILayout.Space(4);
+            if (CompactMenuButton(GameSettings.ControllerInvertY ? "PAD LOOK: INVERTED" : "PAD LOOK: NORMAL"))
+                GameSettings.ControllerInvertY = !GameSettings.ControllerInvertY;
+        }
+
         private static Texture2D MakeTex(Color color)
         {
             var tex = new Texture2D(1, 1);
