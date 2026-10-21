@@ -26,8 +26,19 @@ namespace FpsBase
         private float lastHitTime = -10f;
         private bool lastHitWasHeadshot;
         private bool subscribed;
-        private float damageIndicatorUntil;
-        private float damageAngle;
+        // One hit-direction arrow per damage source (player, bot, zombie, blast),
+        // stored in world space so it keeps pointing the right way as you turn.
+        private struct DamageIndicator
+        {
+            public ulong key;
+            public Vector3 source;
+            public float time;
+        }
+        private const float DamageIndicatorSeconds = 1.5f;
+        private const int MaxDamageIndicators = 8;
+        private Camera viewCamera;
+        private readonly System.Collections.Generic.List<DamageIndicator> damageIndicators =
+            new System.Collections.Generic.List<DamageIndicator>();
         private float lastHealth = -1f;
         private float breathingUntil;
         private AudioSource breathingSource;
@@ -45,12 +56,19 @@ namespace FpsBase
             if (Local == this) Local = null;
         }
 
-        public void NotifyDamage(Vector3 sourcePosition)
+        /// <param name="sourceKey">Identifies the source: a new hit from the same one refreshes its arrow.</param>
+        public void NotifyDamage(Vector3 sourcePosition, ulong sourceKey = ulong.MaxValue)
         {
-            Vector3 direction = sourcePosition - transform.position;
-            direction.y = 0f;
-            damageAngle = Vector3.SignedAngle(transform.forward, direction, Vector3.up);
-            damageIndicatorUntil = Time.time + 1.15f;
+            var indicator = new DamageIndicator { key = sourceKey, source = sourcePosition, time = Time.time };
+            int existing = damageIndicators.FindIndex(d => d.key == sourceKey);
+            if (existing >= 0)
+                damageIndicators[existing] = indicator;
+            else
+            {
+                if (damageIndicators.Count >= MaxDamageIndicators)
+                    damageIndicators.RemoveAt(0); // oldest goes first
+                damageIndicators.Add(indicator);
+            }
             breathingUntil = Time.time + 5f;
             EnsureBreathing();
         }
@@ -89,6 +107,8 @@ namespace FpsBase
             if (HealthSource != null)
             {
                 float hp = HealthSource.CurrentHealth;
+                if (hp <= 0f)
+                    damageIndicators.Clear();
                 if (lastHealth >= 0f && hp < lastHealth)
                 {
                     breathingUntil = Time.time + 5f;
@@ -123,7 +143,10 @@ namespace FpsBase
             // just float over someone else's view — draw nothing (NetworkGameHud
             // still shows the KILLCAM label and kill feed).
             if (DeathCam.CurrentLabel != null)
+            {
+                damageIndicators.Clear(); // don't carry old hits into the respawn
                 return;
+            }
 
             // The fullscreen scope overlay is a first-person thing; in the
             // third-person P Story view, keep the normal crosshair while aiming.
@@ -191,14 +214,41 @@ namespace FpsBase
 
         private void DrawDamageDirection()
         {
-            if (Time.time >= damageIndicatorUntil) return;
-            float alpha = Mathf.Clamp01((damageIndicatorUntil - Time.time) / 0.45f);
+            damageIndicators.RemoveAll(d => Time.time - d.time >= DamageIndicatorSeconds);
+            if (damageIndicators.Count == 0) return;
+
+            // Relative to where the camera looks (the third-person camera can
+            // orbit away from the body's facing), flattened onto the ground.
+            if (viewCamera == null)
+                viewCamera = GetComponentInChildren<Camera>();
+            var cam = viewCamera != null ? viewCamera : Camera.main;
+            Transform view = cam != null ? cam.transform : transform;
+            Vector3 forward = view.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.0001f)
+                forward = transform.forward;
+
             Vector2 center = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
             var old = GUI.matrix;
-            GUIUtility.RotateAroundPivot(damageAngle, center);
-            GUI.color = new Color(1f, 0.12f, 0.08f, alpha);
-            GUI.DrawTexture(new Rect(center.x - 28f, center.y - 170f, 56f, 7f), whiteTex);
-            GUI.DrawTexture(new Rect(center.x - 16f, center.y - 163f, 32f, 4f), whiteTex);
+            foreach (var indicator in damageIndicators)
+            {
+                Vector3 direction = indicator.source - view.position;
+                direction.y = 0f;
+                if (direction.sqrMagnitude < 0.04f)
+                    continue; // right on top of us (self-inflicted blast): no meaningful direction
+                float angle = Vector3.SignedAngle(forward, direction, Vector3.up);
+
+                // Solid for the first third, then fades out.
+                float age = Time.time - indicator.time;
+                float alpha = Mathf.Clamp01((DamageIndicatorSeconds - age) / (DamageIndicatorSeconds * 0.66f));
+
+                GUI.matrix = old;
+                GUIUtility.RotateAroundPivot(angle, center);
+                GUI.color = new Color(1f, 0.12f, 0.08f, 0.9f * alpha);
+                GUI.DrawTexture(new Rect(center.x - 34f, center.y - 172f, 68f, 8f), whiteTex);
+                GUI.DrawTexture(new Rect(center.x - 22f, center.y - 164f, 44f, 5f), whiteTex);
+                GUI.DrawTexture(new Rect(center.x - 10f, center.y - 159f, 20f, 4f), whiteTex);
+            }
             GUI.matrix = old;
             GUI.color = Color.white;
         }
