@@ -224,6 +224,9 @@ namespace FpsBase
         public static AudioClip WinJingle() =>
             Make("win", 1.2f, t => Note(t, 0f, 523f) + Note(t, 0.22f, 659f) + Note(t, 0.44f, 784f) + Note(t, 0.66f, 1047f));
 
+        public static AudioClip LevelUp() =>
+            Make("levelup", 0.9f, t => Note(t, 0f, 784f) + Note(t, 0.12f, 1047f) + Note(t, 0.24f, 1319f));
+
         private static float Note(float t, float start, float freq)
         {
             if (t < start)
