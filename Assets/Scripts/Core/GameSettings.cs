@@ -27,7 +27,20 @@ namespace FpsBase
         public static float Volume;           // 0–1
         public static int QualityLevel;
         public static int Experience;
-        public static int Level => 1 + Mathf.FloorToInt(Mathf.Sqrt(Experience / 100f));
+        public static int Level => LevelFor(Experience);
+
+        /// <summary>Level curve: level n needs 100 × (n-1)² XP (2 at 100, 3 at 400, 10 at 8100).</summary>
+        public static int LevelFor(int experience) => 1 + Mathf.FloorToInt(Mathf.Sqrt(Mathf.Max(0, experience) / 100f));
+        public static int ExperienceForLevel(int level) => 100 * (level - 1) * (level - 1);
+        /// <summary>0–1 progress from the current level to the next.</summary>
+        public static float LevelProgress
+        {
+            get
+            {
+                int from = ExperienceForLevel(Level), to = ExperienceForLevel(Level + 1);
+                return Mathf.Clamp01((Experience - from) / (float)Mathf.Max(1, to - from));
+            }
+        }
 
         // Weapon classes (CoD-style loadouts): 3 slots, each = primary +
         // secondary weapon index into the default loadout; the knife is always
