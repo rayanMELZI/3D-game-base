@@ -94,7 +94,11 @@ is the onboarding brief for AI assistants working on the repo.
   `CurrentAttachmentMask`, never re-reads GameSettings, so remotes see exactly
   what the owner wears.
 - **Legacy Input Manager**: `Fire1` also maps Left Ctrl — never use it for
-  firing (crouch would shoot); read mouse buttons directly.
+  firing (crouch would shoot); read mouse buttons directly. Controller input
+  goes through `Core/GamepadInput` (Xbox layout, Windows numbering): triggers
+  and D-pad are axes in `InputManager.asset` (9th/10th, 6th/7th) with press
+  edges tracked once per frame; right-stick look is rate-based (deg/s ×
+  `GameSettings.ControllerSensitivity`, radial dead zone in code).
 - **Steam**: everything behind `FPSBASE_STEAM`. Our own `SteamManager` is in
   the project (do NOT import the Steamworks.NET sample — duplicate class).
   Host AND join must switch Netcode onto `SteamNetworkingSocketsTransport`
