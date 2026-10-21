@@ -693,7 +693,7 @@ namespace FpsBase
             go.AddComponent<Nametag>(); // billboards toward the camera
         }
 
-        private static void Sphere(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
+        private static GameObject Sphere(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.name = name;
@@ -701,6 +701,7 @@ namespace FpsBase
             go.transform.position = pos;
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().material = mat;
+            return go;
         }
 
         // ------------------------------------------------------------------
@@ -745,7 +746,7 @@ namespace FpsBase
             Box(root, "SpawnZone1", new Vector3(0, 0.03f, z), Vector3.zero, new Vector3(width, 0.06f, 1.2f), MakeEmissiveMaterial(Team1Color, 1.4f));
         }
 
-        private static void Box(Transform parent, string name, Vector3 pos, Vector3 euler, Vector3 scale, Material mat)
+        private static GameObject Box(Transform parent, string name, Vector3 pos, Vector3 euler, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -754,9 +755,10 @@ namespace FpsBase
             go.transform.rotation = Quaternion.Euler(euler);
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().material = mat;
+            return go;
         }
 
-        private static void Cylinder(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
+        private static GameObject Cylinder(Transform parent, string name, Vector3 pos, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             go.name = name;
@@ -764,6 +766,7 @@ namespace FpsBase
             go.transform.position = pos;
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().material = mat;
+            return go;
         }
 
         public static Material MakeMaterial(Color color, float metallic = 0f, float smoothness = 0.5f)
