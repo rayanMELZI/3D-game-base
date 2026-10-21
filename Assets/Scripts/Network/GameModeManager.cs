@@ -388,13 +388,13 @@ namespace FpsBase
 
                     case GameMode.FreeForAll:
                         if (attacker.Kills.Value >= ScoreLimit)
-                            EndMatch(attacker.Team.Value, NameOf(attackerId));
+                            EndMatch(attacker.Team.Value, attacker);
                         break;
 
                     case GameMode.GunGame:
                         attacker.GunGameLevel.Value++;
                         if (attacker.GunGameLevel.Value >= GunGameOrder.Length)
-                            EndMatch(attacker.Team.Value, NameOf(attackerId));
+                            EndMatch(attacker.Team.Value, attacker);
                         break;
                 }
             }
@@ -411,12 +411,33 @@ namespace FpsBase
             return $"Player {clientId + 1}";
         }
 
-        private void EndMatch(int winnerTeam, string winnerName)
+        /// <param name="winner">The winning player in solo modes; null = the whole team won.</param>
+        private void EndMatch(int winnerTeam, NetworkPlayer winner)
         {
+            if (!MatchActive.Value)
+                return; // already ended: never award match XP twice
             MatchActive.Value = false;
             WinnerTeam.Value = winnerTeam;
-            WinnerName.Value = winnerName ?? "";
+            WinnerName.Value = winner != null ? NameOf(winner.OwnerClientId) : "";
+            AwardMatchXp(winnerTeam, winner);
             StartCoroutine(RestartRoutine());
+        }
+
+        public const int WinXp = 500;
+        public const int MatchCompleteXp = 150;
+
+        /// <summary>Everyone who played (spectators excluded) gets XP once per match end;
+        /// the winners get the bigger reward.</summary>
+        private void AwardMatchXp(int winnerTeam, NetworkPlayer winner)
+        {
+            ForEachPlayer(player =>
+            {
+                if (player.Spectating.Value)
+                    return;
+                bool won = winner != null ? player == winner : player.Team.Value == winnerTeam;
+                player.AwardXpClientRpc(won ? WinXp : MatchCompleteXp,
+                    won ? XpReason.Win : XpReason.MatchComplete, false, 0, OwnerOnly(player.OwnerClientId));
+            });
         }
 
         private IEnumerator RestartRoutine()
