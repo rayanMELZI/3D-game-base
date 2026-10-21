@@ -21,8 +21,11 @@ is the onboarding brief for AI assistants working on the repo.
 
 - **Core/**: `GameSettings` (persisted settings + weapon classes + version) ·
   `MapCatalog` (map list: built-ins + `Resources/Maps` prefabs, synced by index)
-  · `EnvironmentBuilder` (code-built maps: Arena, Backrooms, + Nuketown builder
-  used by the bake tool) · `PlayerFactory`/`PlayerRigRefs` (player rig assembly
+  · `EnvironmentBuilder` (code-built maps: Arena, Backrooms, SKYFREIGHT plane
+  interior, + Nuketown builder used by the bake tool) · `SkyfreightFlight`
+  (on the plane's map root: scrolling clouds, turbulence via
+  `MouseLook.MapShake`, owner reports falling out → server suicide, fog
+  restored on unload) · `PlayerFactory`/`PlayerRigRefs` (player rig assembly
   + imported character skins) · `HumanoidBuilder` (primitive body, now hidden
   under skins but its colliders ARE the hitboxes) · `SpawnPoint` (custom map
   spawn markers).
