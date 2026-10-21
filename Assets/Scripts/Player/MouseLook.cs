@@ -38,6 +38,13 @@ namespace FpsBase
         [Tooltip("Sideways shoulder offset. 0 = centered behind the head (crosshair tracks like FPS); higher = more over-the-shoulder.")]
         public float tpShoulder = 0.35f;
 
+        /// <summary>
+        /// Extra camera rotation in degrees (pitch, unused, roll) driven by the
+        /// current map, e.g. the SKYFREIGHT turbulence. Zero on every other map.
+        /// Visual only: CurrentPitch (replicated aim) ignores it.
+        /// </summary>
+        public static Vector3 MapShake;
+
         /// <summary>Current view pitch in degrees (up = negative). Replicated for remote aim pose.</summary>
         public float CurrentPitch => pitch;
 
@@ -142,6 +149,11 @@ namespace FpsBase
         /// </summary>
         private void ApplyCameraRig(float pitchNow, float roll)
         {
+            // Map shake, damped while aiming so scopes don't magnify it.
+            float shakeScale = zoomFov > 0f ? 0.35f : 1f;
+            pitchNow += MapShake.x * shakeScale;
+            roll += MapShake.z * shakeScale;
+
             bool wantThirdPerson = GameModeManager.Instance != null
                 && GameModeManager.Instance.IsSpawned
                 && GameModeManager.Instance.CurrentMode == GameMode.PStory;
