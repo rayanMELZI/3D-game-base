@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -44,6 +45,23 @@ namespace FpsBase
             else DamageShotRpc(amount, headshot, noScope);
         }
 
+        /// <summary>
+        /// Damage that comes from a point other than the attacker (rocket or
+        /// grenade blast), so the victim's hit indicator points at the blast.
+        /// </summary>
+        public void TakeDamageFrom(float amount, bool headshot, Vector3 sourcePosition)
+        {
+            if (!IsSpawned) return;
+            if (IsServer) ApplyDamageOnServer(amount, headshot, NetworkManager.LocalClientId, false, sourcePosition, true);
+            else DamageFromRpc(amount, headshot, sourcePosition);
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void DamageFromRpc(float amount, bool headshot, Vector3 sourcePosition, RpcParams rpcParams = default)
+        {
+            ApplyDamageOnServer(amount, headshot, rpcParams.Receive.SenderClientId, false, sourcePosition, true);
+        }
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
         private void DamageShotRpc(float amount, bool headshot, bool noScope, RpcParams rpcParams = default)
         {
@@ -56,7 +74,8 @@ namespace FpsBase
             ApplyDamageOnServer(amount, headshot, rpcParams.Receive.SenderClientId);
         }
 
-        private void ApplyDamageOnServer(float amount, bool headshot, ulong attackerId, bool noScope = false)
+        private void ApplyDamageOnServer(float amount, bool headshot, ulong attackerId, bool noScope = false,
+            Vector3 sourcePosition = default, bool hasSource = false, ulong sourceKey = ulong.MaxValue)
         {
             if (Hp.Value <= 0f)
                 return;
@@ -82,9 +101,22 @@ namespace FpsBase
 
             Hp.Value = Mathf.Max(0f, Hp.Value - amount);
 
-            var attacker = gameMode != null ? gameMode.PlayerOf(attackerId) : null;
-            DamageFeedbackClientRpc(attacker != null ? attacker.transform.position : transform.position,
-                new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } } });
+            // Hit indicator on the victim's screen: the blast point / bot / zombie
+            // when given, otherwise the attacking player's position.
+            if (!hasSource)
+            {
+                var attacker = gameMode != null ? gameMode.PlayerOf(attackerId) : null;
+                if (attacker != null)
+                {
+                    sourcePosition = attacker.transform.position;
+                    hasSource = true;
+                }
+            }
+            if (sourceKey == ulong.MaxValue)
+                sourceKey = attackerId;
+            if (hasSource && FeedbackDue(sourceKey))
+                DamageFeedbackClientRpc(sourcePosition, sourceKey,
+                    new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } } });
 
             if (Hp.Value <= 0f)
             {
@@ -94,10 +126,30 @@ namespace FpsBase
             }
         }
 
-        [ClientRpc]
-        private void DamageFeedbackClientRpc(Vector3 sourcePosition, ClientRpcParams rpcParams = default)
+        // Zombies hurt every frame and shotguns land 8 pellets at once: send at
+        // most one indicator update per source every FeedbackInterval seconds.
+        private const float FeedbackInterval = 0.12f;
+        private readonly Dictionary<ulong, float> nextFeedback = new Dictionary<ulong, float>();
+
+        private bool FeedbackDue(ulong sourceKey)
         {
-            HudOverlay.Local?.NotifyDamage(sourcePosition);
+            if (nextFeedback.TryGetValue(sourceKey, out float next) && Time.time < next)
+                return false;
+            if (nextFeedback.Count > 32)
+                nextFeedback.Clear();
+            nextFeedback[sourceKey] = Time.time + FeedbackInterval;
+            return true;
+        }
+
+        /// <summary>Key for a non-player damage source (bot, zombie), distinct from client ids.</summary>
+        private static ulong ObjectKey(Component source) =>
+            source != null ? (1UL << 40) | (uint)source.GetInstanceID() : ulong.MaxValue - 1;
+
+        [ClientRpc]
+        private void DamageFeedbackClientRpc(Vector3 sourcePosition, ulong sourceKey, ClientRpcParams rpcParams = default)
+        {
+            if (IsOwner)
+                HudOverlay.Local?.NotifyDamage(sourcePosition, sourceKey);
         }
 
         public void ServerResetHealth()
@@ -111,19 +163,23 @@ namespace FpsBase
         /// fired, so the attacker is passed in instead of read from an RPC sender.
         /// Hitting yourself is allowed (self-damage counts as a suicide).
         /// </summary>
-        public void ServerExplosionDamage(float amount, ulong attackerId)
+        public void ServerExplosionDamage(float amount, ulong attackerId, Vector3 blastPosition)
         {
-            if (IsServer) ApplyDamageOnServer(amount, false, attackerId);
+            if (IsServer) ApplyDamageOnServer(amount, false, attackerId, false, blastPosition, true);
         }
 
-        public void ServerZombieDamage(float amount)
+        public void ServerZombieDamage(float amount, Component zombie)
         {
-            if (IsServer) ApplyDamageOnServer(amount, false, ulong.MaxValue);
+            if (IsServer)
+                ApplyDamageOnServer(amount, false, ulong.MaxValue, false,
+                    zombie != null ? zombie.transform.position : default, zombie != null, ObjectKey(zombie));
         }
 
-        public void ServerBotDamage(float amount)
+        public void ServerBotDamage(float amount, Component bot)
         {
-            if (IsServer) ApplyDamageOnServer(amount, false, ulong.MaxValue);
+            if (IsServer)
+                ApplyDamageOnServer(amount, false, ulong.MaxValue, false,
+                    bot != null ? bot.transform.position : default, bot != null, ObjectKey(bot));
         }
     }
 }

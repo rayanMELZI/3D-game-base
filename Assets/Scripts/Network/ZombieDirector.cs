@@ -46,7 +46,7 @@ namespace FpsBase
                 delta.y = 0f;
                 zombie.transform.position += delta.normalized * (2.2f + wave * 0.08f) * Time.deltaTime;
                 if (delta.sqrMagnitude < 2.1f && NetworkManager.Singleton.IsServer)
-                    target.GetComponent<NetworkHealth>()?.ServerZombieDamage(18f * Time.deltaTime);
+                    target.GetComponent<NetworkHealth>()?.ServerZombieDamage(18f * Time.deltaTime, zombie.transform);
             }
         }
 

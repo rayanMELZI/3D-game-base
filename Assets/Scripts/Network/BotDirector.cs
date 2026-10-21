@@ -57,7 +57,7 @@ namespace FpsBase
             if (Time.time >= nextShot && delta.sqrMagnitude < 625f)
             {
                 nextShot = Time.time + 0.65f;
-                if (NetworkManager.Singleton.IsServer) target.GetComponent<NetworkHealth>()?.ServerBotDamage(9f);
+                if (NetworkManager.Singleton.IsServer) target.GetComponent<NetworkHealth>()?.ServerBotDamage(9f, this);
             }
         }
         public void TakeDamage(float amount, bool headshot = false)

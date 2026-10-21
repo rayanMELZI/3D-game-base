@@ -153,7 +153,7 @@ namespace FpsBase
                 float falloff = Mathf.Clamp01(1f - pair.Value / radius) * 0.75f + 0.25f;
                 float amount = damage * falloff;
                 if (mode == DamageMode.Server && pair.Key is NetworkHealth networkHealth)
-                    networkHealth.ServerExplosionDamage(amount, attackerId);
+                    networkHealth.ServerExplosionDamage(amount, attackerId, point);
                 else
                     pair.Key.TakeDamage(amount, false);
             }
