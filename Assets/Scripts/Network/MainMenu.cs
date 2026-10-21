@@ -333,7 +333,12 @@ namespace FpsBase
                 if (GameSettings.SelectedClass == i)
                     GUI.backgroundColor = MenuWidgets.Accent;
                 if (MenuWidgets.MenuButton($"CLASS {i + 1}", 34f))
+                {
                     GameSettings.SelectedClass = i;
+                    // Add-ons are per class: jump the gunsmith to this class's primary.
+                    if (System.Array.IndexOf(GunsmithWeapons, GameSettings.ClassPrimary[i]) >= 0)
+                        gunsmithWeapon = GameSettings.ClassPrimary[i];
+                }
                 GUI.backgroundColor = prev;
 
                 if (MenuWidgets.CompactMenuButton(WeaponName(GameSettings.ClassPrimary[i]), 34f))
@@ -360,13 +365,16 @@ namespace FpsBase
         }
 
         /// <summary>
-        /// Per-weapon add-ons, chosen once and shared by every class. Pick a
+        /// Add-ons of the SELECTED class: each class kits out its own weapons
+        /// (the same rifle can wear different add-ons in two classes). Pick a
         /// weapon, then toggle its four add-ons (illegal ones show as "—").
+        /// With all weapons unlocked, the selected class's add-ons apply.
         /// </summary>
         private void DrawGunsmith()
         {
             GUILayout.Space(8);
-            GUILayout.Label("GUNSMITH — add-ons stick to this weapon in every class:", MenuWidgets.Small);
+            GUILayout.Label($"GUNSMITH — CLASS {GameSettings.SelectedClass + 1} add-ons (each class has its own; " +
+                "all-weapons mode uses the selected class):", MenuWidgets.Small);
 
             GUILayout.BeginHorizontal();
             if (MenuWidgets.MenuButton("◀", 34f)) gunsmithWeapon = Cycle(GunsmithWeapons, gunsmithWeapon, -1);
