@@ -80,6 +80,12 @@ is the onboarding brief for AI assistants working on the repo.
 - **Spawns**: server snaps candidates to ground from 1.5m up (higher raycasts
   land on roofs/ceilings), picks farthest-from-enemies, respawns everyone on
   map change, and gives 3s spawn protection that ends on the victim's first shot.
+- **Add-ons are per class**: `GameSettings.ClassAttachments[class][weapon]`
+  (prefs `class{c}Att{i}`, migrated from the old global `weaponAtt{i}`).
+  Full-arsenal mode uses the selected class's add-ons. `WeaponController`
+  snapshots them on spawn (`RefreshAttachments`); `NetworkWeapon` publishes
+  `CurrentAttachmentMask`, never re-reads GameSettings, so remotes see exactly
+  what the owner wears.
 - **Legacy Input Manager**: `Fire1` also maps Left Ctrl — never use it for
   firing (crouch would shoot); read mouse buttons directly.
 - **Steam**: everything behind `FPSBASE_STEAM`. Our own `SteamManager` is in
