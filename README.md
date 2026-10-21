@@ -71,6 +71,24 @@ from code. Rename the game in `GameSettings.GameTitle`.
 | Tab (hold) | Scoreboard |
 | Escape | Pause (resume · switch team · settings · leave) |
 
+**Xbox controller** (legacy Input Manager, Windows numbering; triggers are
+read as axes, see `Core/GamepadInput.cs`):
+
+| Input | Action |
+|---|---|
+| Left stick / click | Move (tilt = speed) / sprint (latched until you stop, aim or fire) |
+| Right stick / click | Look / knife |
+| RT / LT | Shoot / aim |
+| A | Jump (also skips the killcam) |
+| B | Tap: crouch toggle · hold: prone · while sprinting: slide |
+| X / Y | Reload / next weapon |
+| D-pad left / right | Previous / next weapon |
+| RB / LB | Throw lethal / tactical (your class picks) |
+| View (hold) / Menu | Scoreboard / pause menu open-close |
+
+Settings → *Pad look speed*, *Pad dead zone*, *Pad look: inverted*. Menus are
+still mouse-only (Menu toggles pause, but the buttons need the mouse).
+
 ## Making your own map (no code)
 
 The maps are now designer-friendly — build them by dragging objects in the
