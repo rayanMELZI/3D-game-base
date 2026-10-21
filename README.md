@@ -59,6 +59,22 @@ from code. Rename the game in `GameSettings.GameTitle`.
 3. Play the Multiplayer scene (or Build And Run) → PLAY → pick map/mode →
    HOST GAME. Second player joins via IP (LAN) or `127.0.0.1` (same PC).
 
+**Prone/crawl animation check.** The Free Crawl Animation FBXs are set to
+Humanoid in their `.meta` files (the pack mesh builds the avatar, the clips copy
+it). If a prone player shows the standing pose or the Console warns about the
+avatar, redo it by hand:
+1. Select `Assets/Free Crawl Animation/Assets/Meshes/VoxelVision_Default_Charcter.fbx`
+   → Rig → Animation Type **Humanoid**, Avatar Definition **Create From This
+   Model** → Apply. Click **Configure…** and check every bone is green
+   (Hips = pelvis, Chest = spine_03, Upper Chest = spine_05); if the arms are
+   not in a T-pose, Pose → Enforce T-Pose, then Done.
+2. Select every FBX in `Assets/Free Crawl Animation/Assets/Animations/` →
+   Rig → **Humanoid**, Avatar Definition **Copy From Other Avatar**, Source =
+   `VoxelVision_Default_CharcterAvatar` → Apply.
+3. On `anim_Prone_Idle`, `anim_Prone_Fwd_Loop_L` and `_R` → Animation tab:
+   Root Transform Rotation **Bake Into Pose** (Based Upon: Original), Root
+   Transform Position (Y) **Bake Into Pose** (Original) → Apply.
+
 ## Controls
 
 | Input | Action |
