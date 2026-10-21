@@ -13,8 +13,10 @@ from code. Rename the game in `GameSettings.GameTitle`.
   through all 9 weapons, knife kill wins) — plus a **Snipers Only** toggle for
   any mode · **Zombie Survival** with escalating waves on Nightfall
 - **Maps:** Arena · **Nuketown-style** (two houses, street, bus) ·
-  **Backrooms** (yellow maze, humming light panels) — picked when hosting,
-  synced to everyone
+  **Backrooms** (yellow maze, humming light panels) · **Skyfreight** (inside a
+  giant cargo plane in flight: cargo deck, upper deck, cockpit, open rear ramp
+  with clouds streaming past, light turbulence — fall out the ramp and you
+  die) — picked when hosting, synced to everyone
 - **Weapons (1–9):** Knife · Pistol · SMG · Shotgun (8 pellets) · Rifle ·
   Sniper (one-shot, scope) · **RPG** (real rocket, splash damage, rocket
   jumps) · **LMG** (75-round belt, long reload, slower to move and aim) ·
