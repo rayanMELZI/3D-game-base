@@ -37,7 +37,10 @@ from code. Rename the game in `GameSettings.GameTitle`.
   (hold Space), synced to other players
 - **Kill cam:** on death you spectate your killer; at match end everyone
   watches the final killer (live spectate, BO2-style presentation)
-- **Scoreboard (hold Tab):** K/D, team colors, Gun Game levels
+- **Scoreboard (hold Tab):** K/D, team colors, Gun Game levels, player levels
+- **XP and levels:** kills (+100, headshot +140), wins (+500) and finished
+  matches (+150) earn XP, saved on your machine; a LEVEL UP banner shows when
+  you reach a new level, and your level appears in the lobby, scoreboard and main menu
 - **Team switching** from the pause menu (server keeps teams balanced)
 - **HUD:** big panel-based ammo/health blocks, low-HP vignette, kill feed
   top-right, hit markers (red = headshot), red arrows around the crosshair
