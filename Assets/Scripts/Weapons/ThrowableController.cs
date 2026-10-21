@@ -169,7 +169,11 @@ namespace FpsBase
                 }
                 else if (authoritative)
                 {
-                    hit.GetComponentInParent<IDamageable>()?.TakeDamage(100f * falloff, false);
+                    var damageable = hit.GetComponentInParent<IDamageable>();
+                    if (damageable is NetworkHealth networkHealth)
+                        networkHealth.TakeDamageFrom(100f * falloff, false, transform.position); // arrow points at the blast
+                    else
+                        damageable?.TakeDamage(100f * falloff, false);
                 }
             }
             Effects.SpawnExplosion(transform.position);
