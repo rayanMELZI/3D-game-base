@@ -744,17 +744,22 @@ namespace FpsBase
                     target = slots != null ? slots[i] : i;
             }
 
+            // Controller: Y / D-pad right = next, D-pad left = previous (same as
+            // the scroll wheel), right-stick click = knife (slot 1).
+            int step = 0;
             float scroll = Input.GetAxis("Mouse ScrollWheel");
-            if (slots != null)
+            if (scroll > 0.01f || Input.GetKeyDown(GamepadInput.Y)) step = 1;
+            if (scroll < -0.01f) step = -1;
+            int dpad = GamepadInput.DPadXDown;
+            if (dpad != 0) step = dpad;
+            if (step != 0)
             {
-                if (scroll > 0.01f) target = slots[(currentSlot + 1) % slots.Length];
-                if (scroll < -0.01f) target = slots[(currentSlot - 1 + slots.Length) % slots.Length];
+                target = slots != null
+                    ? slots[(currentSlot + step + slots.Length) % slots.Length]
+                    : (CurrentIndex + step + weapons.Length) % weapons.Length;
             }
-            else
-            {
-                if (scroll > 0.01f) target = (CurrentIndex + 1) % weapons.Length;
-                if (scroll < -0.01f) target = (CurrentIndex - 1 + weapons.Length) % weapons.Length;
-            }
+            if (Input.GetKeyDown(GamepadInput.RightStick))
+                target = slots != null ? slots[0] : 0;
 
             if (target >= 0 && target < weapons.Length && target != CurrentIndex)
                 SwitchTo(target);
