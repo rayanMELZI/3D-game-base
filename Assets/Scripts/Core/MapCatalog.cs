@@ -101,7 +101,7 @@ namespace FpsBase
                     break;
                 case Kind.Western: EnvironmentBuilder.BuildThemeArena("Western", new Color(0.58f, 0.3f, 0.12f), new Color(0.9f, 0.68f, 0.3f), false); break;
                 case Kind.Underwater: EnvironmentBuilder.BuildThemeArena("Underwater", new Color(0.02f, 0.18f, 0.24f), new Color(0.1f, 0.75f, 0.8f), false); break;
-                case Kind.FlyingPlane: EnvironmentBuilder.BuildThemeArena("FlyingPlane", new Color(0.18f, 0.2f, 0.24f), new Color(0.75f, 0.78f, 0.82f), false); break;
+                case Kind.FlyingPlane: EnvironmentBuilder.BuildSkyfreight(); break;
                 case Kind.Dark: EnvironmentBuilder.BuildThemeArena("Dark", new Color(0.025f, 0.025f, 0.035f), new Color(0.55f, 0.05f, 0.03f), true); break;
                 case Kind.PStory: EnvironmentBuilder.BuildPStoryIsland(); break;
                 default:
@@ -167,7 +167,9 @@ namespace FpsBase
             // Built-in maps.
             if (entry.kind == Kind.PStory)
                 return EnvironmentBuilder.PStorySpawnCandidates();
-            Vector3[] ForSide(int s) => EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
+            Vector3[] ForSide(int s) => entry.kind == Kind.FlyingPlane
+                ? EnvironmentBuilder.SkyfreightSpawnCandidates(s)
+                : EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
             if (side < 0)
             {
                 var a = ForSide(0);
