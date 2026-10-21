@@ -21,6 +21,8 @@ namespace FpsBase
         [SerializeField, Min(0.01f)] private float crouchBackwardAuthoredSpeed = 1f;
         [SerializeField, Min(0.01f)] private float crouchLeftAuthoredSpeed = 1f;
         [SerializeField, Min(0.01f)] private float crouchRightAuthoredSpeed = 1f;
+        [Tooltip("Ground speed the crawl loop was authored at (Free Crawl Animation); MotionSpeed = actual / this.")]
+        [SerializeField, Min(0.01f)] private float proneAuthoredSpeed = 1.45f;
 
         [Header("Motion Speed Matching")]
         [SerializeField, Min(0f)] private float motionSpeedDampTime = 0.08f;
@@ -60,6 +62,15 @@ namespace FpsBase
         private static readonly int AimingHash =
             Animator.StringToHash("Aiming");
 
+        private static readonly int ProneHash =
+            Animator.StringToHash("Prone");
+
+        // The upper-body layer holds standing ADS/reload poses; it is faded out
+        // while prone so the crawl animation owns the whole body.
+        private const string UpperBodyLayerName = "Upper Body Layer";
+        private int upperBodyLayer = -2; // -2 = not looked up yet
+        private float upperBodyWeight = 1f;
+
         private Vector3 lastPosition;
         private float smoothedSpeed;
         private Vector2 smoothedDirection;
@@ -76,6 +87,7 @@ namespace FpsBase
         private bool networkSliding;
         private bool networkReloading;
         private bool networkAiming;
+        private bool networkProne;
 
 
         public void ConfigureAuthoredSpeeds(
@@ -121,7 +133,8 @@ namespace FpsBase
             bool sprinting,
             bool sliding,
             bool reloading,
-            bool aiming)
+            bool aiming,
+            bool prone = false)
         {
             targetNetworkMoveInput = moveInput;
             targetNetworkSpeed = speed;
@@ -133,6 +146,7 @@ namespace FpsBase
             networkSliding = sliding;
             networkReloading = reloading;
             networkAiming = aiming;
+            networkProne = prone;
         }
         private void Update()
         {
@@ -164,7 +178,8 @@ namespace FpsBase
                     networkGrounded,
                     networkCrouching,
                     networkSprinting,
-                    networkSliding);
+                    networkSliding,
+                    networkProne);
                 animator.SetFloat(
                     MotionSpeedHash,
                     networkMotionSpeed,
@@ -182,6 +197,7 @@ namespace FpsBase
                 animator.SetBool(SlidingHash, networkSliding);
                 animator.SetBool(ReloadingHash, networkReloading);
                 animator.SetBool(AimingHash, networkAiming);
+                ApplyProne(networkProne);
 
                 return;
             }
@@ -245,7 +261,8 @@ namespace FpsBase
                 movement == null || movement.IsGrounded,
                 movement != null && movement.IsCrouching,
                 movement != null && movement.IsSprinting,
-                movement != null && movement.IsSliding);
+                movement != null && movement.IsSliding,
+                movement != null && movement.IsProne);
             animator.SetFloat(
                 MotionSpeedHash,
                 localMotionSpeed,
@@ -264,6 +281,7 @@ namespace FpsBase
                 animator.SetBool(SprintingHash, movement.IsSprinting);
                 animator.SetBool(SlidingHash, movement.IsSliding);
             }
+            ApplyProne(movement != null && movement.IsProne);
 
             if (weaponController != null)
             {
@@ -273,6 +291,18 @@ namespace FpsBase
                 );
                 animator.SetBool(AimingHash, weaponController.IsZoomed);
             }
+        }
+
+        private void ApplyProne(bool prone)
+        {
+            animator.SetBool(ProneHash, prone);
+
+            if (upperBodyLayer == -2)
+                upperBodyLayer = animator.GetLayerIndex(UpperBodyLayerName);
+            if (upperBodyLayer < 0)
+                return;
+            upperBodyWeight = Mathf.MoveTowards(upperBodyWeight, prone ? 0f : 1f, 4f * Time.deltaTime);
+            animator.SetLayerWeight(upperBodyLayer, upperBodyWeight);
         }
 
         private float CalculateAuthoredReferenceSpeed(
@@ -321,7 +351,8 @@ namespace FpsBase
             bool grounded,
             bool crouching,
             bool sprinting,
-            bool sliding)
+            bool sliding,
+            bool prone = false)
         {
             if (sliding || !grounded)
                 return 1f;
@@ -329,10 +360,12 @@ namespace FpsBase
             if (actualHorizontalSpeed < motionSpeedIdleThreshold)
                 return 1f;
 
-            float referenceSpeed = CalculateAuthoredReferenceSpeed(
-                moveInput,
-                crouching,
-                sprinting);
+            float referenceSpeed = prone
+                ? proneAuthoredSpeed
+                : CalculateAuthoredReferenceSpeed(
+                    moveInput,
+                    crouching,
+                    sprinting);
             if (referenceSpeed <= Mathf.Epsilon
                 || float.IsNaN(referenceSpeed)
                 || float.IsInfinity(referenceSpeed))
