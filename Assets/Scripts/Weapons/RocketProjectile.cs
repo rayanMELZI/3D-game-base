@@ -131,7 +131,10 @@ namespace FpsBase
 
                 float distance = Vector3.Distance(col.transform.position, point);
                 float falloff = Mathf.Clamp01(1f - distance / radius) * 0.75f + 0.25f;
-                damageable.TakeDamage(damage * falloff, false);
+                if (damageable is NetworkHealth networkHealth)
+                    networkHealth.TakeDamageFrom(damage * falloff, false, point); // victim's arrow points at the blast
+                else
+                    damageable.TakeDamage(damage * falloff, false);
             }
 
             Destroy(gameObject);
