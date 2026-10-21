@@ -56,6 +56,16 @@ namespace FpsBase
             return 0;
         }
 
+        /// <summary>Index of NIGHTFALL, the dark map zombie survival is played on.</summary>
+        public static int DarkMapIndex()
+        {
+            EnsureLoaded();
+            for (int i = 0; i < entries.Count; i++)
+                if (entries[i].kind == Kind.Dark)
+                    return i;
+            return 0;
+        }
+
         private static void EnsureLoaded()
         {
             if (entries != null)
@@ -102,7 +112,7 @@ namespace FpsBase
                 case Kind.Western: EnvironmentBuilder.BuildThemeArena("Western", new Color(0.58f, 0.3f, 0.12f), new Color(0.9f, 0.68f, 0.3f), false); break;
                 case Kind.Underwater: EnvironmentBuilder.BuildThemeArena("Underwater", new Color(0.02f, 0.18f, 0.24f), new Color(0.1f, 0.75f, 0.8f), false); break;
                 case Kind.FlyingPlane: EnvironmentBuilder.BuildSkyfreight(); break;
-                case Kind.Dark: EnvironmentBuilder.BuildThemeArena("Dark", new Color(0.025f, 0.025f, 0.035f), new Color(0.55f, 0.05f, 0.03f), true); break;
+                case Kind.Dark: EnvironmentBuilder.BuildNightfall(); break;
                 case Kind.PStory: EnvironmentBuilder.BuildPStoryIsland(); break;
                 default:
                     var root = new GameObject(EnvironmentBuilder.MapRootName);
@@ -169,7 +179,9 @@ namespace FpsBase
                 return EnvironmentBuilder.PStorySpawnCandidates();
             Vector3[] ForSide(int s) => entry.kind == Kind.FlyingPlane
                 ? EnvironmentBuilder.SkyfreightSpawnCandidates(s)
-                : EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
+                : entry.kind == Kind.Dark
+                    ? EnvironmentBuilder.NightfallSpawnCandidates(s)
+                    : EnvironmentBuilder.BuiltinSpawnCandidates(entry.kind == Kind.Backrooms, s);
             if (side < 0)
             {
                 var a = ForSide(0);
@@ -180,6 +192,31 @@ namespace FpsBase
                 return all;
             }
             return ForSide(side);
+        }
+
+        /// <summary>
+        /// Zombie survival: where the players start (together). NIGHTFALL puts
+        /// them in the chapel; other maps use their normal spawns.
+        /// </summary>
+        public static Vector3[] SurvivorSpawnCandidates(int index)
+        {
+            EnsureLoaded();
+            return entries[Clamp(index)].kind == Kind.Dark
+                ? EnvironmentBuilder.NightfallSurvivorSpawns()
+                : SpawnCandidates(index, -1);
+        }
+
+        /// <summary>
+        /// Zombie survival: where zombies may appear. NIGHTFALL has entry points
+        /// along its outer wall; other maps reuse every player spawn (the
+        /// director keeps the ones far from the players).
+        /// </summary>
+        public static Vector3[] ZombieSpawnCandidates(int index)
+        {
+            EnsureLoaded();
+            return entries[Clamp(index)].kind == Kind.Dark
+                ? EnvironmentBuilder.NightfallZombieSpawns()
+                : SpawnCandidates(index, -1);
         }
 
         private static Vector3[] DefaultRing()
