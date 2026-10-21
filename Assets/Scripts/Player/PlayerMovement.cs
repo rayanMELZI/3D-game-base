@@ -37,9 +37,11 @@ namespace FpsBase
         public float proneHeight = 0.55f;
         public float proneEyeHeight = 0.58f;
         public float proneSpeed = 1.45f;
+        [Tooltip("Prone: the eye slides this far forward, over the lying head.")]
+        public float proneEyeForward = 0.25f;
 
         [Header("Crouch Visual")]
-        [Tooltip("Apply the legacy procedural body squash used by the primitive character.")]
+        [Tooltip("Pose the Body (primitive meshes + hitboxes) for crouch/prone. The imported skin is not under the Body, so this only moves what is hit.")]
         public bool useProceduralBodyCrouch = true;
 
         [Header("References (wired by PlayerFactory)")]
@@ -63,6 +65,8 @@ namespace FpsBase
         public float CrouchBlend { get; private set; }
         /// <summary>0..1 while sliding, for camera roll.</summary>
         public float SlideBlend { get; private set; }
+        /// <summary>0 = up, 1 = lying flat — drives the hitbox pose, capsule and eye.</summary>
+        public float ProneBlend { get; private set; }
 
         private CharacterController controller;
         private float verticalVelocity;
@@ -205,20 +209,19 @@ namespace FpsBase
             }
             horizontalVelocity = horizontal;
 
-            // --- Crouch dimensions (controller + camera + visual squash) ---
+            // --- Crouch dimensions (controller + camera + hitbox pose) ---
             CrouchBlend = Mathf.MoveTowards(CrouchBlend, IsCrouching ? 1f : 0f, 8f * Time.deltaTime);
-            float targetHeight = IsProne ? proneHeight : crouchHeight;
-            float height = Mathf.Lerp(standHeight, targetHeight, CrouchBlend);
-            controller.height = height;
-            controller.center = new Vector3(0, height / 2f, 0);
+            ProneBlend = Mathf.MoveTowards(ProneBlend, IsProne ? 1f : 0f, 3.5f * Time.deltaTime);
+            ApplyControllerHeight(controller, CrouchBlend, ProneBlend);
             if (cameraTransform != null)
             {
                 var camPos = cameraTransform.localPosition;
-                camPos.y = Mathf.Lerp(standEyeHeight, IsProne ? proneEyeHeight : crouchEyeHeight, CrouchBlend);
+                camPos.y = EyeHeight(CrouchBlend, ProneBlend);
+                camPos.z = proneEyeForward * ProneBlend;
                 cameraTransform.localPosition = camPos;
             }
             if (useProceduralBodyCrouch)
-                ApplyCrouchVisual(bodyVisual, CrouchBlend, IsProne);
+                ApplyCrouchVisual(bodyVisual, CrouchBlend, ProneBlend);
 
             // --- Jump (hold Space to bunny hop) + gravity ---
             if (grounded && verticalVelocity < 0f)
@@ -238,13 +241,43 @@ namespace FpsBase
                 Respawn();
         }
 
-        /// <summary>Squash the visual body when crouching (also used for remote players).</summary>
-        public static void ApplyCrouchVisual(Transform body, float blend, bool prone = false)
+        /// <summary>Capsule height for a crouch/prone blend (remote players use it too: the capsule is the torso hitbox).</summary>
+        public float HeightFor(float crouchBlend, float proneBlend) =>
+            Mathf.Lerp(Mathf.Lerp(standHeight, crouchHeight, crouchBlend), proneHeight, proneBlend);
+
+        /// <summary>Eye height for a crouch/prone blend.</summary>
+        public float EyeHeight(float crouchBlend, float proneBlend) =>
+            Mathf.Lerp(Mathf.Lerp(standEyeHeight, crouchEyeHeight, crouchBlend), proneEyeHeight, proneBlend);
+
+        public void ApplyControllerHeight(CharacterController cc, float crouchBlend, float proneBlend)
+        {
+            if (cc == null)
+                return;
+            float height = HeightFor(crouchBlend, proneBlend);
+            cc.height = height;
+            cc.center = new Vector3(0, height / 2f, 0);
+        }
+
+        // Prone hitbox pose: the Body tips forward around the feet and slides back
+        // so the hips sit over the capsule — head ~0.75m in front, feet ~0.9m
+        // behind, chest just off the ground, like the crawl animation.
+        private const float ProneTilt = 80f;
+        private static readonly Vector3 ProneBodyOffset = new Vector3(0f, 0.1f, -0.93f);
+
+        /// <summary>
+        /// Pose the Body (primitive meshes + every limb/head hitbox) for crouch
+        /// and prone. Used for the local player and for remote players, so the
+        /// hitboxes everyone shoots at match the pose they see.
+        /// </summary>
+        public static void ApplyCrouchVisual(Transform body, float crouchBlend, float proneBlend = 0f)
         {
             if (body != null)
             {
-                body.localScale = new Vector3(1f, Mathf.Lerp(1f, prone ? 0.38f : 0.68f, blend), 1f);
-                body.localRotation = Quaternion.Euler(Mathf.Lerp(0f, prone ? 78f : 0f, blend), 0f, 0f);
+                // Crouch squashes; prone lies the full-length body down instead.
+                float squash = Mathf.Lerp(Mathf.Lerp(1f, 0.68f, crouchBlend), 1f, proneBlend);
+                body.localScale = new Vector3(1f, squash, 1f);
+                body.localRotation = Quaternion.Euler(ProneTilt * proneBlend, 0f, 0f);
+                body.localPosition = ProneBodyOffset * proneBlend;
             }
         }
 

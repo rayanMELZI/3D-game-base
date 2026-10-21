@@ -58,6 +58,7 @@ namespace FpsBase
         private NetworkTransform netTransform;
         private CharacterController characterController;
         private float remoteCrouchBlend;
+        private float remoteProneBlend;
         private bool respawning;
         private bool wasInLobby;
 
@@ -222,13 +223,15 @@ namespace FpsBase
                         NetworkAiming.Value);
                 }
 
-                // Preserve the primitive-character crouch squash, but do not
-                // distort an imported animated character unless explicitly enabled.
+                // Crouch/prone the hitboxes the shooter aims at: the Body (limb +
+                // head triggers; the imported skin lives outside it) and the
+                // capsule, which is the torso hitbox.
                 remoteCrouchBlend = Mathf.MoveTowards(remoteCrouchBlend, Crouched.Value ? 1f : 0f, 8f * Time.deltaTime);
-                bool useLegacyCrouchVisual = rig.characterAnimator == null
-                    || (rig.movement != null && rig.movement.useProceduralBodyCrouch);
-                if (useLegacyCrouchVisual)
-                    PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, Prone.Value);
+                remoteProneBlend = Mathf.MoveTowards(remoteProneBlend, Prone.Value ? 1f : 0f, 3.5f * Time.deltaTime);
+                if (rig.movement == null || rig.movement.useProceduralBodyCrouch)
+                    PlayerMovement.ApplyCrouchVisual(rig.bodyRoot, remoteCrouchBlend, remoteProneBlend);
+                if (rig.movement != null)
+                    rig.movement.ApplyControllerHeight(characterController, remoteCrouchBlend, remoteProneBlend);
 
                 // Feed replicated aim pitch, slide and reload into the body pose.
                 if (rig.characterPose != null)

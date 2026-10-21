@@ -118,14 +118,15 @@ namespace FpsBase
 
             skinApplied = true;
 
-            var instance = Instantiate(prefab, bodyRoot);
+            // Parented next to the Body, not inside it: crouch/prone pose the
+            // Body's hitboxes (PlayerMovement.ApplyCrouchVisual) while the skin
+            // is posed by its own animations. The Body sits at the root origin,
+            // so the skin keeps the same placement.
+            var instance = Instantiate(prefab, bodyRoot.parent != null ? bodyRoot.parent : bodyRoot);
             instance.name = "CharacterSkin";
             instance.transform.localPosition = characterOffset;
             instance.transform.localRotation = Quaternion.Euler(0f, characterYaw, 0f);
             instance.transform.localScale = Vector3.one * characterScale;
-
-            if (movement != null)
-                movement.useProceduralBodyCrouch = false;
 
             var animator = instance.GetComponent<Animator>();
             if (animator != null)
