@@ -24,6 +24,11 @@ namespace FpsBase
         public static string PlayerName;
         public static float MouseSensitivity; // multiplier, 0.2–3
         public static float Fov;              // 50–90
+        // Gamepad right stick: look speed multiplier (0.3–3), radial dead zone
+        // (0.05–0.4 of the stick throw) and inverted vertical look.
+        public static float ControllerSensitivity;
+        public static float ControllerDeadZone;
+        public static bool ControllerInvertY;
         public static float Volume;           // 0–1
         public static int QualityLevel;
         public static int Experience;
@@ -69,6 +74,9 @@ namespace FpsBase
             PlayerName = PlayerPrefs.GetString("playerName", "Player" + Random.Range(100, 999));
             MouseSensitivity = PlayerPrefs.GetFloat("sensitivity", 1f);
             Fov = PlayerPrefs.GetFloat("fov", 60f);
+            ControllerSensitivity = Mathf.Clamp(PlayerPrefs.GetFloat("padSensitivity", 1f), 0.3f, 3f);
+            ControllerDeadZone = Mathf.Clamp(PlayerPrefs.GetFloat("padDeadZone", 0.15f), 0.05f, 0.4f);
+            ControllerInvertY = PlayerPrefs.GetInt("padInvertY", 0) != 0;
             Volume = PlayerPrefs.GetFloat("volume", 0.8f);
             QualityLevel = Mathf.Clamp(
                 PlayerPrefs.GetInt("quality", QualitySettings.GetQualityLevel()),
@@ -125,6 +133,9 @@ namespace FpsBase
             PlayerPrefs.SetString("playerName", PlayerName);
             PlayerPrefs.SetFloat("sensitivity", MouseSensitivity);
             PlayerPrefs.SetFloat("fov", Fov);
+            PlayerPrefs.SetFloat("padSensitivity", ControllerSensitivity);
+            PlayerPrefs.SetFloat("padDeadZone", ControllerDeadZone);
+            PlayerPrefs.SetInt("padInvertY", ControllerInvertY ? 1 : 0);
             PlayerPrefs.SetFloat("volume", Volume);
             PlayerPrefs.SetInt("quality", QualityLevel);
             PlayerPrefs.SetInt("experience", Experience);
