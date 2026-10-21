@@ -375,17 +375,17 @@ namespace FpsBase
             switching = IsSwitching;
 
             // Aim down sights (every weapon; sniper scopes).
-            SetZoom((Input.GetMouseButton(1) || Input.GetKey(KeyCode.JoystickButton4))
+            SetZoom((Input.GetMouseButton(1) || GamepadInput.AimHeld)
                 && weapon.zoomFov > 0f && !reloadPending && !sprinting && !switching);
 
             // Manual reload.
-            if (!switching && (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.JoystickButton2)) && CanReload(weapon))
+            if (!switching && (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(GamepadInput.X)) && CanReload(weapon))
                 StartReload();
 
             if (reloadPending)
             {
                 // CoD style: firing cuts a shell reload short once the tube holds a shell.
-                bool fireInterrupt = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.JoystickButton5);
+                bool fireInterrupt = Input.GetMouseButtonDown(0) || GamepadInput.FireDown;
                 if (!sprinting && !switching && shellReload && ammo[CurrentIndex] > 0 && fireInterrupt && Time.time >= nextFireTime)
                 {
                     CancelReload();
@@ -394,12 +394,11 @@ namespace FpsBase
                 return;
             }
 
-            // Left mouse only — the legacy "Fire1" axis also maps Left Ctrl,
-            // which made crouching fire the weapon.
-            bool controllerFire = Input.GetKey(KeyCode.JoystickButton5);
+            // Left mouse or the right trigger axis — never the legacy "Fire1"
+            // axis: it also maps Left Ctrl, which made crouching fire the weapon.
             bool firePressed = weapon.automatic
-                ? (Input.GetMouseButton(0) || controllerFire)
-                : (Input.GetMouseButtonDown(0) || (controllerFire && Time.time >= nextFireTime));
+                ? (Input.GetMouseButton(0) || GamepadInput.FireHeld)
+                : (Input.GetMouseButtonDown(0) || GamepadInput.FireDown);
             if (!sprinting && !switching && firePressed && Time.time >= nextFireTime)
             {
                 if (weapon.magazineSize <= 0 || ammo[CurrentIndex] > 0)
