@@ -71,10 +71,9 @@ namespace FpsBase
                 if (WeaponIndex.Value != index)
                     WeaponIndex.Value = index;
 
-                var weapons = rig.weaponController.weapons;
-                int mask = Attachments.Effective(
-                    GameSettings.GetAttachments(GameSettings.SelectedClass, index),
-                    index >= 0 && index < weapons.Length ? weapons[index] : null);
+                // The controller's spawn snapshot of the class add-ons: exactly what
+                // the owner's own viewmodel wears, whatever the class or mode.
+                int mask = rig.weaponController.CurrentAttachmentMask;
                 if (AttachmentMask.Value != mask)
                     AttachmentMask.Value = mask;
                 int color = index >= 0 && index < GameSettings.WeaponColors.Length ? GameSettings.WeaponColors[index] : 0;
