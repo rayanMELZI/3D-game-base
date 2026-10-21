@@ -8,6 +8,7 @@ namespace FpsBase
     /// Equipment throwing. In the class loadout: G throws your chosen lethal,
     /// E your chosen tactical. When the host unlocks all weapons, every throwable
     /// gets its own key instead (G frag · F flash · V sticky · X knife).
+    /// Controller: RB throws the lethal pick, LB the tactical pick, in both modes.
     /// Only the local OWNER reads input (added to every player object, so an
     /// un-gated Update used to fire on every remote copy at once — that was the
     /// "everyone throws when only I pressed" bug). Throws are replicated through
@@ -47,6 +48,9 @@ namespace FpsBase
                 return;
             if (Cursor.lockState != CursorLockMode.Locked || viewCamera == null)
                 return;
+
+            if (Input.GetKeyDown(GamepadInput.RB)) TryThrow(Mathf.Clamp(GameSettings.LethalType, 0, Count - 1));
+            if (Input.GetKeyDown(GamepadInput.LB)) TryThrow(Mathf.Clamp(GameSettings.TacticalType, 0, Count - 1));
 
             if (GameModeManager.ClassLoadoutActive)
             {
