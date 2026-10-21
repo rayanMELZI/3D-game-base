@@ -5,7 +5,9 @@ namespace FpsBase
     /// <summary>
     /// FPS movement on a CharacterController:
     /// WASD move · Left Shift sprint · Space jump (hold to bunny hop) ·
-    /// Left Ctrl crouch · sprint+Ctrl slide.
+    /// Left Ctrl crouch · sprint+Ctrl slide. Controller (see GamepadInput):
+    /// left-stick click sprint (latched) · A jump · B tap crouch / hold prone /
+    /// sprint+B slide.
     /// Uses the legacy Input Manager so it works out of the box.
     /// </summary>
     [DefaultExecutionOrder(-100)]
@@ -69,6 +71,13 @@ namespace FpsBase
         private bool proneToggle;
         private Vector2 moveInput;
         private Vector3 horizontalVelocity;
+        // Controller state: a stick click can't be held while steering, so sprint
+        // is latched and crouch is a toggle; B held this long goes prone.
+        private const float ProneHoldTime = 0.4f;
+        private bool padSprint;
+        private bool padCrouch;
+        private bool padBUsed = true;
+        private float padBHeldSince;
 
 
         
@@ -88,14 +97,58 @@ namespace FpsBase
             Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
-            if (Input.GetKeyDown(KeyCode.Z) || Input.GetKeyDown(KeyCode.JoystickButton8))
+            if (Input.GetKeyDown(KeyCode.Z))
                 proneToggle = !proneToggle;
-            if (Input.GetButtonDown("Jump")) proneToggle = false;
+            if (Input.GetButtonDown("Jump"))
+            {
+                proneToggle = false;
+                padCrouch = false;
+            }
+
+            // --- Controller sprint latch + B crouch/prone/slide ---
+            bool padSlide = false;
+            if (Input.GetKeyDown(KeyCode.LeftShift))
+                padCrouch = false;
+            if (Input.GetKeyDown(GamepadInput.LeftStick))
+            {
+                padSprint = true; // also stands up, CoD style
+                padCrouch = false;
+                proneToggle = false;
+            }
+            if (inputZ <= 0.1f || GamepadInput.AimHeld || GamepadInput.FireHeld)
+                padSprint = false; // stopping, aiming or firing ends the sprint
+            if (Input.GetKeyDown(GamepadInput.B))
+            {
+                padBHeldSince = Time.time;
+                padBUsed = false;
+                if (padSprint && grounded && slideTimer <= 0f && moving)
+                {
+                    padSlide = true;
+                    padBUsed = true;
+                }
+            }
+            if (!padBUsed && Input.GetKey(GamepadInput.B) && Time.time - padBHeldSince >= ProneHoldTime)
+            {
+                padBUsed = true;
+                proneToggle = !proneToggle;
+                padCrouch = !proneToggle; // getting up from prone stops at crouch
+            }
+            if (!padBUsed && Input.GetKeyUp(GamepadInput.B))
+            {
+                padBUsed = true;
+                if (proneToggle)
+                {
+                    proneToggle = false;
+                    padCrouch = true;
+                }
+                else
+                    padCrouch = !padCrouch;
+            }
+
             IsProne = proneToggle;
             bool wantCrouch = !IsProne && (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C)
-                || Input.GetKey(KeyCode.JoystickButton1));
-            bool sprintHeld = Input.GetKey(KeyCode.LeftShift)
-                || Input.GetKey(KeyCode.JoystickButton9);
+                || padCrouch);
+            bool sprintHeld = Input.GetKey(KeyCode.LeftShift) || padSprint;
             IsSprinting = sprintHeld && inputZ > 0.1f
                 && moving && !wantCrouch && !IsProne && !IsSliding;
 
@@ -109,10 +162,16 @@ namespace FpsBase
             // --- Slide: press crouch while sprinting on the ground ---
             if (grounded && slideTimer <= 0f
                 && sprintHeld && inputZ > 0.1f && moving
-                && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C)))
+                && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C) || padSlide))
             {
                 slideTimer = slideDuration;
                 slideDirection = moveDirection;
+                if (padSlide)
+                {
+                    // CoD style: a controller slide ends crouched.
+                    padSprint = false;
+                    padCrouch = true;
+                }
             }
             if (slideTimer > 0f)
             {
