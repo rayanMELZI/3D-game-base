@@ -49,7 +49,8 @@ is the onboarding brief for AI assistants working on the repo.
   3s spawn protection, killcam ring buffer, replicated `Pitch`/`Sliding`/
   `Crouched`) · `NetworkWeapon` (third-person weapon + shot replication +
   `LastShotTime` for radar) · `NetworkHealth` (server-authoritative HP;
-  headshots lethal) · `GameModeManager` (modes, scores, spawn picking,
+  headshots lethal; sends the victim a hit-direction source: attacker, blast
+  point via `TakeDamageFrom`, or bot/zombie → `HudOverlay.NotifyDamage`) · `GameModeManager` (modes, scores, spawn picking,
   `RadarMode`) · `MainMenu` (IMGUI menus incl. CLASSES screen) ·
   `MultiplayerBootstrap` (map build + menu camera) · `SteamLobbyService` +
   `SteamManager` (behind `FPSBASE_STEAM` define).
