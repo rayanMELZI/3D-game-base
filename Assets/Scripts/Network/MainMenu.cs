@@ -213,6 +213,8 @@ namespace FpsBase
                 GUILayout.Label($"Update available: {UpdateChecker.LatestVersion} (you have {Application.version})",
                     MenuWidgets.Label);
 
+            DrawCareerLevel();
+
             if (MenuWidgets.MenuButton("PLAY"))
                 screen = MenuScreen.Play;
             GUILayout.Space(8);
@@ -233,6 +235,21 @@ namespace FpsBase
                 GUILayout.Space(10);
                 GUILayout.Label(status, MenuWidgets.Label);
             }
+        }
+
+        /// <summary>Saved level + progress bar to the next one (XP comes from kills and match ends).</summary>
+        private static void DrawCareerLevel()
+        {
+            int level = GameSettings.Level;
+            int next = GameSettings.ExperienceForLevel(level + 1);
+            GUILayout.Label($"LEVEL {level}   ·   {GameSettings.Experience} / {next} XP", MenuWidgets.Small);
+            var bar = GUILayoutUtility.GetRect(1f, 6f, GUILayout.ExpandWidth(true));
+            GUI.color = new Color(1f, 1f, 1f, 0.15f);
+            GUI.DrawTexture(bar, Texture2D.whiteTexture);
+            GUI.color = MenuWidgets.Accent;
+            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * GameSettings.LevelProgress, bar.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUILayout.Space(10);
         }
 
         private void DrawPlay()
