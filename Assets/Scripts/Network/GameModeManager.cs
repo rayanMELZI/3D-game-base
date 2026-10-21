@@ -370,8 +370,8 @@ namespace FpsBase
                 LastKillerId.Value = attackerId;
                 int streak = attacker.KillStreak.Value;
                 bool milestone = streak >= 5 && streak % 5 == 0;
-                attacker.AwardXpClientRpc(headshot ? 140 : 100, milestone, streak,
-                    new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { attackerId } } });
+                attacker.AwardXpClientRpc(headshot ? 140 : 100, headshot ? XpReason.Headshot : XpReason.Kill,
+                    milestone, streak, OwnerOnly(attackerId));
                 if (milestone)
                     KillFeedClientRpc($"{NameOf(attackerId)}  KILLSTREAK  {streak}");
 
@@ -450,6 +450,9 @@ namespace FpsBase
                 return client.PlayerObject.GetComponent<NetworkPlayer>();
             return null;
         }
+
+        private static ClientRpcParams OwnerOnly(ulong clientId) =>
+            new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } } };
 
         private void ForEachPlayer(System.Action<NetworkPlayer> action)
         {

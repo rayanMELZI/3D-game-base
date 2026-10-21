@@ -6,6 +6,9 @@ using UnityEngine;
 
 namespace FpsBase
 {
+    /// <summary>Why XP was awarded (shown in the HUD toast).</summary>
+    public enum XpReason : byte { Kill, Headshot, Win, MatchComplete }
+
     /// <summary>
     /// The multiplayer brain of the player prefab: owner setup (input, camera,
     /// HUD), team colors and switching, crouch replication, per-mode weapon
@@ -427,14 +430,29 @@ namespace FpsBase
             else ServerRespawn();
         }
 
+        /// <summary>Sent by the server to this player's owner only (TargetClientIds),
+        /// once per kill / match end; the owner saves it and republishes CareerLevel.</summary>
         [ClientRpc]
-        public void AwardXpClientRpc(int amount, bool playStreakSound, int streak,
+        public void AwardXpClientRpc(int amount, XpReason reason, bool playStreakSound, int streak,
             ClientRpcParams rpcParams = default)
         {
             if (!IsOwner) return;
+            int levelBefore = GameSettings.Level;
             GameSettings.AwardExperience(amount);
             CareerLevel.Value = GameSettings.Level;
+            NetworkGameHud.ShowXp(amount, XpReasonLabel(reason), levelBefore, GameSettings.Level);
             if (playStreakSound) SfxSynth.Play2D(SfxSynth.Killstreak(streak), 0.9f);
+        }
+
+        private static string XpReasonLabel(XpReason reason)
+        {
+            switch (reason)
+            {
+                case XpReason.Headshot: return "HEADSHOT";
+                case XpReason.Win: return "VICTORY";
+                case XpReason.MatchComplete: return "MATCH COMPLETE";
+                default: return "KILL";
+            }
         }
 
         [ServerRpc]
