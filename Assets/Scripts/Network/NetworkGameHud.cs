@@ -27,6 +27,34 @@ namespace FpsBase
         private float nextPlayerRefresh;
         private NetworkPlayer cachedLocal;
 
+        // XP feedback for the local player: small "+100 KILL" lines under the
+        // crosshair, and a LEVEL UP banner when a level is crossed.
+        private struct XpToast
+        {
+            public string text;
+            public float time;
+        }
+        private const float XpToastSeconds = 2.2f;
+        private const float LevelUpSeconds = 3.5f;
+        private static readonly System.Collections.Generic.List<XpToast> xpToasts =
+            new System.Collections.Generic.List<XpToast>();
+        private static float levelUpTime = -10f;
+        private static int levelUpLevel;
+        private GUIStyle xpStyle;
+
+        public static void ShowXp(int amount, string reason, int levelBefore, int levelAfter)
+        {
+            xpToasts.Add(new XpToast { text = $"+{amount}  {reason}", time = Time.unscaledTime });
+            if (xpToasts.Count > 5)
+                xpToasts.RemoveAt(0);
+            if (levelAfter > levelBefore)
+            {
+                levelUpTime = Time.unscaledTime;
+                levelUpLevel = levelAfter;
+                SfxSynth.Play2D(SfxSynth.LevelUp(), 0.85f);
+            }
+        }
+
         private NetworkPlayer[] Players()
         {
             if (Time.unscaledTime >= nextPlayerRefresh || cachedPlayers.Length == 0)
@@ -84,6 +112,37 @@ namespace FpsBase
             if (Input.GetKey(KeyCode.Tab))
                 DrawScoreboard(gameMode);
             DrawBanners(nm, gameMode);
+            DrawXp();
+        }
+
+        private void DrawXp()
+        {
+            if (xpStyle == null)
+                xpStyle = new GUIStyle(feedStyle) { alignment = TextAnchor.MiddleCenter, fontSize = 18 };
+            float now = Time.unscaledTime;
+            xpToasts.RemoveAll(t => now - t.time >= XpToastSeconds);
+            float y = Screen.height * 0.5f + 70f;
+            for (int i = xpToasts.Count - 1; i >= 0; i--)
+            {
+                float age = now - xpToasts[i].time;
+                float alpha = Mathf.Clamp01((XpToastSeconds - age) / 0.6f);
+                xpStyle.normal.textColor = new Color(1f, 0.86f, 0.3f, alpha);
+                GUI.Label(new Rect(0, y - Mathf.Min(age, 0.4f) * 20f, Screen.width, 24), xpToasts[i].text, xpStyle);
+                y += 24f;
+            }
+
+            float levelAge = now - levelUpTime;
+            if (levelAge >= 0f && levelAge < LevelUpSeconds)
+            {
+                float alpha = Mathf.Clamp01((LevelUpSeconds - levelAge) / 0.8f);
+                var color = MenuWidgets.Accent;
+                color.a = alpha;
+                bannerStyle.normal.textColor = color;
+                float top = Screen.height * 0.30f;
+                GUI.Label(new Rect(0, top, Screen.width, 56), "LEVEL UP", bannerStyle);
+                subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.9f * alpha);
+                GUI.Label(new Rect(0, top + 54, Screen.width, 24), $"You reached level {levelUpLevel}", subStyle);
+            }
         }
 
         private void DrawLobby(NetworkManager nm, GameModeManager gameMode)
