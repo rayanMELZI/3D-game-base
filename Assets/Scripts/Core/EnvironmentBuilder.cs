@@ -266,14 +266,8 @@ namespace FpsBase
             for (int i = -2; i <= 2; i++)
                 Box(root, "Cover", new Vector3(i * 8f, 0.85f, (i % 2) * 8f), new Vector3(0, i * 13f, 0), new Vector3(3f, 1.7f, 2f), accent);
 
-            if (dark)
-            {
-                RenderSettings.ambientLight = new Color(0.025f, 0.025f, 0.04f);
-                RenderSettings.fog = true;
-                RenderSettings.fogColor = new Color(0.015f, 0.015f, 0.025f);
-                RenderSettings.fogDensity = 0.025f;
-            }
-            else if (theme == "Underwater")
+            // (NIGHTFALL has its own builder + NightfallAtmosphere now.)
+            if (theme == "Underwater")
             {
                 RenderSettings.fog = true;
                 RenderSettings.fogColor = new Color(0.02f, 0.2f, 0.25f);
