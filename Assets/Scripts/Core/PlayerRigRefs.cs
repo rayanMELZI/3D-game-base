@@ -91,6 +91,7 @@ namespace FpsBase
                 chestStripeRenderer, allRenderers, EnvironmentBuilder.Team0Color);
 
             PostFx.Attach(playerCamera);
+            HumanoidBuilder.EnsureTorsoHitboxes(bodyRoot);
         }
 
         /// <summary>Tint the body with a team color (multiplayer).</summary>

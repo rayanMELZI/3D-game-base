@@ -83,6 +83,7 @@ namespace FpsBase
                     limb.AddComponent<BoxCollider>().isTrigger = true;
                 handL.AddComponent<SphereCollider>().isTrigger = true;
                 handR.AddComponent<SphereCollider>().isTrigger = true;
+                EnsureTorsoHitboxes(t);
             }
 
             parts.headRenderer = head.GetComponent<Renderer>();
@@ -140,6 +141,31 @@ namespace FpsBase
             {
                 chestStripeRenderer.material.color = teamColor;
                 chestStripeRenderer.material.SetColor("_EmissionColor", teamColor * 2.4f);
+            }
+        }
+
+        /// <summary>
+        /// Torso + hips triggers. Standing they sit inside the controller capsule
+        /// (no change); prone, the lying torso reaches past the capsule and these
+        /// keep it hittable. Also called at runtime so prefabs baked before they
+        /// existed get them without a re-bake.
+        /// </summary>
+        public static void EnsureTorsoHitboxes(Transform body)
+        {
+            if (body == null)
+                return;
+            foreach (var name in new[] { "Torso", "Hips" })
+            {
+                var part = body.Find(name);
+                if (part == null)
+                    continue;
+                // At runtime the primitive's own collider is only destroyed at the
+                // end of the frame, so look for a trigger, not for any collider.
+                bool hasTrigger = false;
+                foreach (var c in part.GetComponents<Collider>())
+                    hasTrigger |= c.isTrigger;
+                if (!hasTrigger)
+                    part.gameObject.AddComponent<BoxCollider>().isTrigger = true;
             }
         }
 
