@@ -75,6 +75,17 @@ namespace FpsBase
             // Escape opens the pause menu (the menu's RESUME button re-locks).
             if (Input.GetKeyDown(KeyCode.Escape))
                 LockCursor(false);
+            // Controller Menu button toggles the pause menu (it can't click RESUME).
+            // Not in the pre-game lobby or the class editor: those need the cursor.
+            else if (Input.GetKeyDown(GamepadInput.Menu))
+            {
+                bool inLobby = GameModeManager.Instance != null && GameModeManager.Instance.IsSpawned
+                    && GameModeManager.Instance.LobbyOpen.Value;
+                if (Cursor.lockState == CursorLockMode.Locked)
+                    LockCursor(false);
+                else if (!inLobby && !MainMenu.ShowClassesOverlay)
+                    LockCursor(true);
+            }
 
             // Aiming (right-click) blend, used to tighten the third-person camera.
             aimBlend = Mathf.MoveTowards(aimBlend, zoomFov > 0f ? 1f : 0f, 6f * zoomSpeedScale * Time.deltaTime);
