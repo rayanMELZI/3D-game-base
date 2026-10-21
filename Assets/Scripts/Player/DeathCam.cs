@@ -151,9 +151,10 @@ namespace FpsBase
 
         private void UpdateReplay()
         {
-            // Skippable with click or space → drop to the orbit spectate.
+            // Skippable with click, space or controller A → drop to the orbit spectate.
             bool finished = replayClock >= replay[replay.Length - 1].time;
-            if (finished || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space))
+            if (finished || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)
+                || Input.GetKeyDown(GamepadInput.A))
             {
                 replaying = false;
                 replay = null;
