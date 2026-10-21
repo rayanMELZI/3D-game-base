@@ -28,6 +28,7 @@ namespace FpsBase
         private WeaponModelInstance thirdPersonModel;
         private bool hasThirdPersonModel;
         private bool visible = true;
+        private bool modelDirty;
 
         private void Awake()
         {
@@ -85,10 +86,20 @@ namespace FpsBase
         // Third-person weapon model (what other players see)
         // ------------------------------------------------------------------
 
-        private void OnWeaponChanged(int previous, int next) => RebuildThirdPersonModel();
+        // Weapon, add-ons and color usually change in the same network tick and
+        // each fires its own callback: rebuild once, after all of them landed,
+        // so the model never pairs the new weapon with the old weapon's add-ons.
+        private void OnWeaponChanged(int previous, int next) => modelDirty = true;
+
+        private void LateUpdate()
+        {
+            if (modelDirty && IsSpawned)
+                RebuildThirdPersonModel();
+        }
 
         private void RebuildThirdPersonModel()
         {
+            modelDirty = false;
             if (hasThirdPersonModel)
             {
                 Destroy(thirdPersonModel.root);
