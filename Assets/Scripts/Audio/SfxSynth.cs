@@ -204,6 +204,17 @@ namespace FpsBase
                 Mathf.Sin(Tau * (110f - 120f * t) * t) * Mathf.Exp(-t * 7f) * 0.75f
                 + Noise() * Mathf.Exp(-t * 22f) * 0.4f);
 
+        /// <summary>Low raspy moan: a wobbling growl under filtered noise (zombie spawn / swipe).</summary>
+        public static AudioClip ZombieGrowl() =>
+            Make("zombie_growl", 0.9f, t =>
+            {
+                float envelope = Mathf.Sin(Mathf.Clamp01(t / 0.9f) * Mathf.PI);
+                float pitch = 72f + Mathf.Sin(Tau * 5.5f * t) * 9f;
+                float voice = Mathf.Sin(Tau * pitch * t) + 0.5f * Mathf.Sin(Tau * pitch * 2.03f * t);
+                float rasp = Noise() * (0.5f + 0.5f * Mathf.Sin(Tau * pitch * t));
+                return (voice * 0.22f + rasp * 0.2f) * envelope;
+            });
+
         public static AudioClip HeavyBreathing() =>
             Make("heavy_breathing", 2.4f, t =>
             {
