@@ -109,7 +109,7 @@ namespace FpsBase
             }
             DrawScores(gameMode);
             DrawKillFeed(gameMode);
-            if (Input.GetKey(KeyCode.Tab))
+            if (Input.GetKey(KeyCode.Tab) || Input.GetKey(GamepadInput.View))
                 DrawScoreboard(gameMode);
             DrawBanners(nm, gameMode);
             DrawXp();
