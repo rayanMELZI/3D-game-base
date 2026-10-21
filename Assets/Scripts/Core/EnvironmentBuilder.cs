@@ -282,6 +282,295 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
+        // Built-in map: SKYFREIGHT — inside a giant cargo plane in flight.
+        // The plane flies toward +Z. Cargo deck y = 0 from the open rear ramp
+        // (z = -30, team 0 end) to the front bulkhead (z = 22); an upper deck
+        // (y = 4.2) covers the front half and leads to the cockpit (z 22..29,
+        // team 1 end); side catwalks run back along the walls. The ramp is
+        // down and open: clouds stream past behind it, and anyone who falls
+        // out dies (SkyfreightFlight). Exterior wings/tail are visual only.
+        // ------------------------------------------------------------------
+
+        public static void BuildSkyfreight()
+        {
+            var root = new GameObject(MapRootName).transform;
+
+            const float halfW = 6.4f;     // inner wall line
+            const float rearZ = -30f;     // ramp hinge
+            const float frontZ = 22f;     // front bulkhead
+            const float holdLen = frontZ - rearZ;
+            const float holdMid = (frontZ + rearZ) / 2f;
+            const float deckY = 4.2f;     // upper deck / catwalk floor height
+            const float ceilY = 8.6f;
+
+            var hull = SharedMaterial(new Color(0.42f, 0.45f, 0.46f), 0.55f, 0.4f);
+            var hullDark = SharedMaterial(new Color(0.24f, 0.26f, 0.27f), 0.6f, 0.45f);
+            var deck = SharedMaterial(new Color(0.3f, 0.31f, 0.3f), 0.5f, 0.35f);
+            var rail = SharedMaterial(new Color(0.55f, 0.5f, 0.2f), 0.4f, 0.4f);
+            var crate = SharedMaterial(new Color(0.5f, 0.37f, 0.22f), 0.05f, 0.3f);
+            var crateDark = SharedMaterial(new Color(0.4f, 0.29f, 0.17f), 0.05f, 0.3f);
+            var container = SharedMaterial(new Color(0.28f, 0.36f, 0.26f), 0.35f, 0.35f);
+            var containerTan = SharedMaterial(new Color(0.55f, 0.48f, 0.34f), 0.3f, 0.35f);
+            var exterior = SharedMaterial(new Color(0.62f, 0.65f, 0.67f), 0.5f, 0.5f);
+            var skyGlass = SharedMaterial(new Color(0.62f, 0.78f, 0.95f), 0f, 0.9f, 1.3f);
+            var lamp = SharedMaterial(new Color(1f, 0.93f, 0.8f), 0f, 0.6f, 2.4f);
+            var jumpLight = SharedMaterial(new Color(1f, 0.15f, 0.1f), 0f, 0.6f, 2.6f);
+            var hazardYellow = SharedMaterial(new Color(0.95f, 0.75f, 0.1f), 0f, 0.4f);
+            var hazardBlack = SharedMaterial(new Color(0.08f, 0.08f, 0.08f), 0f, 0.4f);
+
+            // ---------------- Fuselage shell ----------------
+            // Cargo deck: tiled metal floor plates.
+            var floorMat = MakeMaterial(Color.white, 0.45f, 0.35f);
+            floorMat.mainTexture = MakeTileTexture(new Color(0.34f, 0.35f, 0.35f), new Color(0.3f, 0.31f, 0.31f));
+            floorMat.mainTextureScale = new Vector2(3f, 13f);
+            Box(root, "CargoDeck", new Vector3(0f, -0.15f, holdMid), Vector3.zero, new Vector3(halfW * 2f, 0.3f, holdLen), floorMat);
+
+            // Straight lower walls, then panels slanting in to a narrower ceiling.
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Box(root, "FuselageWall", new Vector3(halfW * s, 2.8f, holdMid), Vector3.zero, new Vector3(0.4f, 5.6f, holdLen), hull);
+                Box(root, "FuselageUpper", new Vector3(5.3f * s, 7.1f, holdMid), new Vector3(0f, 0f, 36.25f * s),
+                    new Vector3(0.4f, 3.9f, holdLen), hull);
+            }
+            Box(root, "FuselageCeiling", new Vector3(0f, ceilY + 0.15f, holdMid), Vector3.zero, new Vector3(8.8f, 0.3f, holdLen), hull);
+
+            // Ribs (frames) every 4 m — visual, so they never snag on the catwalks.
+            for (float z = rearZ + 2f; z < frontZ; z += 4f)
+            {
+                foreach (float s in new[] { -1f, 1f })
+                    Visual(Box(root, "Rib", new Vector3(6.1f * s, 2.8f, z), Vector3.zero, new Vector3(0.25f, 5.6f, 0.3f), hullDark));
+                Visual(Box(root, "RibCeiling", new Vector3(0f, ceilY - 0.05f, z), Vector3.zero, new Vector3(8.4f, 0.15f, 0.3f), hullDark));
+            }
+
+            // Portholes (bright sky glass), lower deck and upper level.
+            for (float z = rearZ + 4f; z < frontZ - 1f; z += 4f)
+                foreach (float s in new[] { -1f, 1f })
+                {
+                    Visual(Box(root, "Porthole", new Vector3(6.17f * s, 2f, z), Vector3.zero, new Vector3(0.1f, 0.55f, 0.55f), skyGlass));
+                    Visual(Box(root, "Porthole", new Vector3(6.17f * s, 5.05f, z), Vector3.zero, new Vector3(0.1f, 0.5f, 0.5f), skyGlass));
+                }
+
+            // Front bulkhead: solid below the upper deck, cockpit door above.
+            Box(root, "Bulkhead", new Vector3(0f, deckY / 2f, frontZ + 0.2f), Vector3.zero, new Vector3(halfW * 2f, deckY, 0.4f), hull);
+            foreach (float s in new[] { -1f, 1f })
+                Box(root, "Bulkhead", new Vector3(3.7f * s, 6.4f, frontZ + 0.2f), Vector3.zero, new Vector3(5.4f, 4.4f, 0.4f), hull);
+            Box(root, "BulkheadDoorTop", new Vector3(0f, 7.55f, frontZ + 0.2f), Vector3.zero, new Vector3(2f, 2.1f, 0.4f), hull);
+
+            // ---------------- Upper level ----------------
+            Box(root, "UpperDeck", new Vector3(0f, deckY - 0.15f, 13f), Vector3.zero, new Vector3(halfW * 2f, 0.3f, 18f), deck);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                // Catwalk along the wall, z -18..4, joined to the upper deck.
+                Box(root, "Catwalk", new Vector3(5.6f * s, deckY - 0.15f, -7f), Vector3.zero, new Vector3(1.6f, 0.3f, 22f), deck);
+                Box(root, "CatwalkRail", new Vector3(4.85f * s, deckY + 0.5f, -7f), Vector3.zero, new Vector3(0.1f, 1f, 22f), rail);
+                Box(root, "CatwalkRail", new Vector3(5.6f * s, deckY + 0.5f, -18f), Vector3.zero, new Vector3(1.6f, 1f, 0.1f), rail);
+
+                // Stairs from the cargo deck (z -4) up to the upper deck edge (z 4).
+                Box(root, "Stairs", new Vector3(2.6f * s, 2f, 0f), new Vector3(-27.7f, 0f, 0f), new Vector3(1.8f, 0.25f, 9.1f), deck);
+
+                // Rail along the upper deck edge between the stairs and the catwalk.
+                Box(root, "DeckRail", new Vector3(4.15f * s, deckY + 0.5f, 4.1f), Vector3.zero, new Vector3(1.3f, 1f, 0.1f), rail);
+
+                // Troop benches along the upper deck walls.
+                Box(root, "Bench", new Vector3(5.9f * s, deckY + 0.25f, 13f), Vector3.zero, new Vector3(0.6f, 0.5f, 14f), hullDark);
+            }
+            Box(root, "DeckRail", new Vector3(0f, deckY + 0.5f, 4.1f), Vector3.zero, new Vector3(3.4f, 1f, 0.1f), rail);
+
+            // ---------------- Cockpit (upper level, z 22..29) ----------------
+            Box(root, "CockpitFloor", new Vector3(0f, deckY - 0.15f, 25.5f), Vector3.zero, new Vector3(7.4f, 0.3f, 7f), deck);
+            Box(root, "NoseBody", new Vector3(0f, 1.95f, 25.5f), Vector3.zero, new Vector3(7.4f, 3.9f, 7f), exterior);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Box(root, "CockpitWall", new Vector3(3.7f * s, 6.1f, 25.5f), Vector3.zero, new Vector3(0.3f, 3.8f, 7f), hull);
+                Visual(Box(root, "CockpitWindow", new Vector3(3.56f * s, 6.4f, 26.8f), Vector3.zero, new Vector3(0.05f, 0.9f, 2.4f), skyGlass));
+                Box(root, "PilotSeat", new Vector3(1.4f * s, deckY + 0.4f, 26f), Vector3.zero, new Vector3(0.9f, 0.8f, 0.9f), hullDark);
+                Box(root, "PilotSeatBack", new Vector3(1.4f * s, deckY + 1.1f, 25.5f), new Vector3(-8f, 0f, 0f), new Vector3(0.9f, 1.4f, 0.2f), hullDark);
+            }
+            Box(root, "CockpitRoof", new Vector3(0f, 8.15f, 25.5f), Vector3.zero, new Vector3(7.7f, 0.3f, 7f), hull);
+            Box(root, "Dashboard", new Vector3(0f, 5f, 29.1f), Vector3.zero, new Vector3(7.4f, 1.6f, 0.3f), hull);
+            Box(root, "Windshield", new Vector3(0f, 6.9f, 28.75f), new Vector3(-20f, 0f, 0f), new Vector3(7.4f, 2.4f, 0.2f), skyGlass);
+            Visual(Box(root, "WindshieldFrame", new Vector3(0f, 6.9f, 28.62f), new Vector3(-20f, 0f, 0f), new Vector3(0.15f, 2.4f, 0.1f), hullDark));
+            Box(root, "Console", new Vector3(0f, deckY + 0.6f, 28.1f), Vector3.zero, new Vector3(6f, 1.2f, 1.2f), hullDark);
+            Visual(Box(root, "Instruments", new Vector3(0f, deckY + 1.22f, 28f), Vector3.zero, new Vector3(5.4f, 0.05f, 0.8f),
+                SharedMaterial(new Color(0.3f, 1f, 0.55f), 0f, 0.6f, 1.8f)));
+            Box(root, "Throttles", new Vector3(0f, deckY + 0.45f, 27.1f), Vector3.zero, new Vector3(0.45f, 0.9f, 0.6f), hullDark);
+            Visual(Box(root, "NoseCone", new Vector3(0f, 3.1f, 30.4f), Vector3.zero, new Vector3(6.4f, 5f, 2.4f), exterior));
+
+            // ---------------- Rear: the open ramp ----------------
+            // 9 m ramp hinged at the deck edge, down 15° into the open sky.
+            Box(root, "Ramp", new Vector3(0f, -1.315f, rearZ - 4.35f), new Vector3(-15f, 0f, 0f), new Vector3(11.6f, 0.3f, 9f), deck);
+            // Yellow/black hazard stripes on the hinge line.
+            for (int i = 0; i < 12; i++)
+                Visual(Box(root, "HazardStripe", new Vector3(-5.5f + i, 0.01f, rearZ + 0.3f), Vector3.zero, new Vector3(1f, 0.02f, 0.5f),
+                    i % 2 == 0 ? hazardYellow : hazardBlack));
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Visual(Box(root, "RampArm", new Vector3(5.9f * s, 0.6f, rearZ - 1.6f), new Vector3(-50f, 0f, 0f), new Vector3(0.18f, 0.18f, 4.6f), hullDark));
+                Visual(Box(root, "JumpLight", new Vector3(5.95f * s, 6.4f, rearZ + 0.25f), Vector3.zero, new Vector3(0.3f, 0.3f, 0.15f), jumpLight));
+            }
+            // Upper cargo door swung up under the tail; tail cone, fin and T-tail.
+            Visual(Box(root, "CargoDoor", new Vector3(0f, 8.3f, rearZ - 2f), new Vector3(12f, 0f, 0f), new Vector3(8.4f, 0.25f, 4f), hull));
+            Visual(Box(root, "TailCone", new Vector3(0f, 9.7f, rearZ - 7f), new Vector3(-8f, 0f, 0f), new Vector3(9f, 1.6f, 14f), exterior));
+            Visual(Box(root, "TailFin", new Vector3(0f, 14f, rearZ - 10.5f), new Vector3(-20f, 0f, 0f), new Vector3(0.5f, 8f, 6f), exterior));
+            Visual(Box(root, "Stabilizer", new Vector3(0f, 17.6f, rearZ - 12.5f), Vector3.zero, new Vector3(22f, 0.35f, 4.5f), exterior));
+
+            // ---------------- Exterior: wings and engines (visual) ----------------
+            foreach (float s in new[] { -1f, 1f })
+            {
+                Visual(Box(root, "Wing", new Vector3(21.4f * s, 7.2f, 4f), new Vector3(0f, 8f * s, -3f * s), new Vector3(32.2f, 0.6f, 8f), exterior));
+                foreach (float x in new[] { 13f, 24f })
+                {
+                    var engine = Cylinder(root, "Engine", new Vector3(x * s, 5.9f, 6.5f - (x - 13f) * 0.12f), new Vector3(1.9f, 2.4f, 1.9f), hullDark);
+                    engine.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                    Visual(engine);
+                }
+            }
+
+            // ---------------- Cargo (cover) ----------------
+            void Crate(float x, float y, float z, float size, float yaw, Material mat) =>
+                Box(root, "Crate", new Vector3(x, y + size / 2f, z), new Vector3(0f, yaw, 0f), Vector3.one * size, mat);
+
+            // Rear (team 0 end): spawn cover, a pallet guarding the ramp.
+            Crate(-4.6f, 0f, -22f, 1.2f, 6f, crate);
+            Crate(4.6f, 0f, -24f, 1.2f, -4f, crate);
+            Crate(4.6f, 1.2f, -24f, 1f, 20f, crateDark);
+            Box(root, "Pallet", new Vector3(0f, 0.45f, -27.6f), Vector3.zero, new Vector3(2.2f, 0.9f, 1.2f), crateDark);
+
+            // Middle hold: staggered containers, side crates, a strapped jeep.
+            Box(root, "Container", new Vector3(-2.4f, 1.3f, -13f), Vector3.zero, new Vector3(2.6f, 2.6f, 6f), container);
+            Box(root, "Container", new Vector3(2.4f, 1.3f, -9f), Vector3.zero, new Vector3(2.6f, 2.6f, 5.5f), containerTan);
+            Crate(4.9f, 0f, -14f, 1.1f, 12f, crate);
+            Crate(-4.9f, 0f, -6f, 1.1f, -8f, crate);
+            Crate(-4.6f, 0f, -4.6f, 1f, 18f, crateDark);
+            Crate(0f, 0f, -1f, 1.2f, 0f, crate);
+
+            Box(root, "JeepBody", new Vector3(-4.6f, 0.85f, 0f), Vector3.zero, new Vector3(2f, 1.1f, 3.8f), container);
+            Box(root, "JeepCab", new Vector3(-4.6f, 1.75f, -0.3f), Vector3.zero, new Vector3(1.8f, 0.7f, 1.6f), hullDark);
+            foreach (float wx in new[] { -5.65f, -3.55f })
+                foreach (float wz in new[] { -1.3f, 1.3f })
+                {
+                    var wheel = Cylinder(root, "JeepWheel", new Vector3(wx, 0.4f, wz), new Vector3(0.8f, 0.15f, 0.8f), hazardBlack);
+                    wheel.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
+                    Visual(wheel);
+                }
+            Crate(4.6f, 0f, 0.6f, 1.2f, 3f, crate);
+            Crate(4.6f, 0f, -0.8f, 1.2f, -5f, crateDark);
+            Crate(4.6f, 1.2f, 0f, 1f, 25f, crate);
+
+            // Under the upper deck (front, team 1 end).
+            Crate(-3.5f, 0f, 7f, 1.2f, 10f, crate);
+            Crate(3.2f, 0f, 9f, 1.2f, -6f, crateDark);
+            Crate(3.6f, 0f, 10.2f, 1f, 15f, crate);
+            Box(root, "Container", new Vector3(-2f, 0.9f, 12.5f), Vector3.zero, new Vector3(2.4f, 1.8f, 3f), containerTan);
+            Crate(2.5f, 0f, 14f, 1.2f, 0f, crate);
+            Crate(4.6f, 0f, 18f, 1.2f, 8f, crateDark);
+
+            // Upper deck cover.
+            Crate(-3f, deckY, 11f, 1.2f, 5f, crate);
+            Crate(3f, deckY, 16f, 1f, -10f, crateDark);
+            Crate(2.4f, deckY, 16.8f, 1f, 12f, crate);
+            Crate(0f, deckY, 8f, 1.2f, 0f, crateDark);
+
+            // ---------------- Lights ----------------
+            void Lamp(Vector3 pos, Color color, float intensity, float range)
+            {
+                var go = new GameObject("CabinLight");
+                go.transform.SetParent(root);
+                go.transform.position = pos;
+                var light = go.AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = color;
+                light.intensity = intensity;
+                light.range = range;
+                light.shadows = LightShadows.None;
+            }
+            var warm = new Color(1f, 0.92f, 0.78f);
+            foreach (float z in new[] { -26f, -17f, -8f, 1f })
+                Lamp(new Vector3(0f, 7.6f, z), warm, 1.3f, 12f);
+            foreach (float z in new[] { 9f, 17f })
+            {
+                Lamp(new Vector3(0f, 3.4f, z), warm, 1.1f, 9f);
+                Lamp(new Vector3(0f, 7.6f, z), warm, 1.1f, 10f);
+            }
+            Lamp(new Vector3(0f, 7.2f, 25.5f), new Color(0.7f, 0.9f, 1f), 0.9f, 7f);
+            Lamp(new Vector3(0f, 6.5f, rearZ + 1f), new Color(1f, 0.25f, 0.2f), 1.2f, 8f); // red jump light glow
+            Visual(Box(root, "LightStrip", new Vector3(0f, ceilY - 0.02f, holdMid), Vector3.zero, new Vector3(0.35f, 0.06f, holdLen - 2f), lamp));
+            Visual(Box(root, "LightStrip", new Vector3(0f, deckY - 0.33f, 13f), Vector3.zero, new Vector3(0.35f, 0.06f, 17f), lamp));
+
+            // ---------------- Sky: a cloud sea below, clouds streaming past ----------------
+            var cloudMat = SharedMaterial(new Color(0.96f, 0.97f, 1f), 0f, 0.05f, 0.35f);
+            var cloudSea = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            cloudSea.name = "CloudSea";
+            cloudSea.transform.SetParent(root);
+            cloudSea.transform.position = new Vector3(0f, -70f, 0f);
+            cloudSea.transform.localScale = new Vector3(120f, 1f, 120f);
+            cloudSea.GetComponent<Renderer>().material = SharedMaterial(new Color(0.86f, 0.9f, 0.97f), 0f, 0.1f, 0.25f);
+            Visual(cloudSea);
+
+            var clouds = new GameObject("Clouds").transform;
+            clouds.SetParent(root);
+            var rng = new System.Random(1337); // same sky on every client
+            float R(float min, float max) => min + (float)rng.NextDouble() * (max - min);
+            for (int i = 0; i < 70; i++)
+            {
+                Vector3 c;
+                if (i % 10 < 7)
+                    c = new Vector3(R(-160f, 160f), R(-40f, -18f), R(-320f, 320f)); // layer below
+                else
+                    c = new Vector3((i % 2 == 0 ? 1f : -1f) * R(55f, 150f), R(-12f, 18f), R(-320f, 320f)); // passing alongside
+                var cloud = new GameObject("Cloud").transform;
+                cloud.SetParent(clouds);
+                cloud.position = c;
+                float w = R(14f, 38f), d = R(14f, 38f);
+                var main = Sphere(cloud, "Puff", c, new Vector3(w, R(4f, 8f), d), cloudMat);
+                var puff = Sphere(cloud, "Puff", c + new Vector3(R(-w, w) * 0.3f, R(1f, 3f), R(-d, d) * 0.3f),
+                    new Vector3(w * 0.6f, R(5f, 9f), d * 0.6f), cloudMat);
+                foreach (var go in new[] { main, puff })
+                {
+                    var r = go.GetComponent<Renderer>();
+                    r.shadowCastingMode = ShadowCastingMode.Off;
+                    r.receiveShadows = false;
+                    Visual(go);
+                }
+            }
+
+            root.gameObject.AddComponent<SkyfreightFlight>().clouds = clouds;
+        }
+
+        /// <summary>
+        /// SKYFREIGHT spawns: team 0 in the rear hold by the ramp (kept clear of
+        /// the edge), team 1 at the front, on the cargo deck and the upper deck.
+        /// </summary>
+        public static Vector3[] SkyfreightSpawnCandidates(int side)
+        {
+            if (side == 0)
+                return new[]
+                {
+                    new Vector3(-3.5f, 0.3f, -25.5f), new Vector3(3f, 0.3f, -25.5f), new Vector3(0f, 0.3f, -23f),
+                    new Vector3(-4.5f, 0.3f, -19f), new Vector3(4.3f, 0.3f, -18.5f), new Vector3(1.8f, 0.3f, -20.5f),
+                };
+            return new[]
+            {
+                new Vector3(-3f, 0.3f, 19f), new Vector3(2.5f, 0.3f, 19.5f), new Vector3(0f, 0.3f, 16.5f),
+                new Vector3(-3.5f, 4.5f, 18f), new Vector3(3.5f, 4.5f, 13f), new Vector3(0f, 4.5f, 20.5f),
+            };
+        }
+
+        /// <summary>
+        /// Decoration only: drop the collider (disabled at once so this frame's
+        /// spawn raycasts already ignore it). Works in edit mode for the bake tool.
+        /// </summary>
+        private static void Visual(GameObject go)
+        {
+            var col = go.GetComponent<Collider>();
+            if (col == null)
+                return;
+            col.enabled = false;
+            if (Application.isPlaying) Object.Destroy(col);
+            else Object.DestroyImmediate(col);
+        }
+
+        // ------------------------------------------------------------------
         // Built-in map: Nuketown 2025 — low-poly homage to the BO2 layout.
         // Real map: ~3,000 m² playable, two 2-story houses facing a central
         // street (bus + truck + cars as cover), a garage beside each house,
