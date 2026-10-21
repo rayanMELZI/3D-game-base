@@ -94,7 +94,9 @@ namespace FpsBase
 
             float inputX = Input.GetAxisRaw("Horizontal");
             float inputZ = Input.GetAxisRaw("Vertical");
-            Vector3 moveDirection = (transform.right * inputX + transform.forward * inputZ).normalized;
+            // Clamped, not normalized: keys still give full speed, a half-tilted
+            // left stick walks slower.
+            Vector3 moveDirection = Vector3.ClampMagnitude(transform.right * inputX + transform.forward * inputZ, 1f);
             bool moving = moveDirection.sqrMagnitude > 0.1f;
 
             if (Input.GetKeyDown(KeyCode.Z))
@@ -165,7 +167,7 @@ namespace FpsBase
                 && (Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.C) || padSlide))
             {
                 slideTimer = slideDuration;
-                slideDirection = moveDirection;
+                slideDirection = moveDirection.normalized;
                 if (padSlide)
                 {
                     // CoD style: a controller slide ends crouched.
