@@ -183,7 +183,8 @@ namespace FpsBase
         {
             float w = 460f;
             float h = screen == MenuScreen.Play ? 640f
-                : screen == MenuScreen.Classes ? 660f : 470f;
+                : screen == MenuScreen.Classes ? 660f
+                : screen == MenuScreen.Settings ? 580f : 470f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -586,6 +587,8 @@ namespace FpsBase
             GameSettings.Fov = Mathf.Round(MenuWidgets.Slider("Field of view", GameSettings.Fov, 50f, 90f, "0"));
             GameSettings.Volume = MenuWidgets.Slider("Volume", GameSettings.Volume, 0f, 1f, "0%");
             AudioListener.volume = GameSettings.Volume; // live
+            GUILayout.Space(6);
+            MenuWidgets.ControllerSettings();
 
             GUILayout.Space(8);
             if (MenuWidgets.MenuButton(UnityEngine.Screen.fullScreen ? "WINDOWED" : "FULLSCREEN", 32f))
@@ -607,7 +610,7 @@ namespace FpsBase
 
         private void DrawPauseMenu()
         {
-            float w = 380f, h = screen == MenuScreen.Settings ? 430f : 350f;
+            float w = 380f, h = screen == MenuScreen.Settings ? 540f : 350f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
