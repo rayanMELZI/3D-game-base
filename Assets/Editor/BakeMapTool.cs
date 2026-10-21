@@ -6,7 +6,7 @@ namespace FpsBase.EditorTools
 {
     /// <summary>
     /// "Tools > FPS Base > Bake Built-in Map > ..." — turns a code-built map
-    /// (Arena / Backrooms / Nuketown 2025) into a regular prefab you can edit
+    /// (Arena / Backrooms / Nuketown 2025 / Skyfreight) into a regular prefab you can edit
     /// visually, saved into Assets/Resources/Maps/ so it appears in the game's
     /// map list automatically.
     ///
@@ -35,6 +35,12 @@ namespace FpsBase.EditorTools
             EnvironmentBuilder.BuildNuketown,
             EnvironmentBuilder.NuketownSpawnCandidates(0),
             EnvironmentBuilder.NuketownSpawnCandidates(1));
+
+        [MenuItem("Tools/FPS Base/Bake Built-in Map/Skyfreight")]
+        public static void BakeSkyfreight() => Bake("My Skyfreight",
+            EnvironmentBuilder.BuildSkyfreight,
+            EnvironmentBuilder.SkyfreightSpawnCandidates(0),
+            EnvironmentBuilder.SkyfreightSpawnCandidates(1));
 
         // ------------------------------------------------------------------
 
