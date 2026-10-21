@@ -174,8 +174,14 @@ namespace FpsBase
             float span = Mathf.Max(0.0001f, b.time - a.time);
             float t = Mathf.Clamp01((replayClock - a.time) / span);
 
-            Vector3 pos = Vector3.Lerp(a.position, b.position, t) + Vector3.up * EyeHeight;
             float yaw = Mathf.LerpAngle(a.yaw, b.yaw, t);
+            // Crouched/prone killers are replayed from their real eye position.
+            float eyeHeight = a.eyeHeight > 0f && b.eyeHeight > 0f
+                ? Mathf.Lerp(a.eyeHeight, b.eyeHeight, t)
+                : EyeHeight;
+            float eyeForward = Mathf.Lerp(a.eyeForward, b.eyeForward, t);
+            Vector3 pos = Vector3.Lerp(a.position, b.position, t) + Vector3.up * eyeHeight
+                + Quaternion.Euler(0f, yaw, 0f) * Vector3.forward * eyeForward;
             float pitch = Mathf.Lerp(a.pitch, b.pitch, t);
 
             cam.transform.position = pos;

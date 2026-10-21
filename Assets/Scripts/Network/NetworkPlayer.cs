@@ -348,6 +348,10 @@ namespace FpsBase
             public Vector3 position;
             public float yaw;
             public float pitch;
+            /// <summary>Eye height above the feet (crouch/prone aware); 0 = unknown.</summary>
+            public float eyeHeight;
+            /// <summary>Eye offset forward along the yaw (prone).</summary>
+            public float eyeForward;
         }
 
         private const float KillcamKeep = 6f;      // seconds of history
@@ -362,12 +366,17 @@ namespace FpsBase
                 return;
             nextKillcamSample = Time.time + KillcamInterval;
 
+            float crouchNow = IsOwner && rig.movement != null ? rig.movement.CrouchBlend : remoteCrouchBlend;
+            float proneNow = IsOwner && rig.movement != null ? rig.movement.ProneBlend : remoteProneBlend;
+
             killcamBuffer.Add(new KillcamSample
             {
                 time = Time.time,
                 position = transform.position,
                 yaw = transform.eulerAngles.y,
                 pitch = IsOwner && rig.mouseLook != null ? rig.mouseLook.CurrentPitch : Pitch.Value,
+                eyeHeight = rig.movement != null ? rig.movement.EyeHeight(crouchNow, proneNow) : 0f,
+                eyeForward = rig.movement != null ? rig.movement.proneEyeForward * proneNow : 0f,
             });
             while (killcamBuffer.Count > 0 && killcamBuffer[0].time < Time.time - KillcamKeep)
                 killcamBuffer.RemoveAt(0);
