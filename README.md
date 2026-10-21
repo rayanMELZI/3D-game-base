@@ -40,7 +40,8 @@ from code. Rename the game in `GameSettings.GameTitle`.
 - **Scoreboard (hold Tab):** K/D, team colors, Gun Game levels
 - **Team switching** from the pause menu (server keeps teams balanced)
 - **HUD:** big panel-based ammo/health blocks, low-HP vignette, kill feed
-  top-right, hit markers (red = headshot)
+  top-right, hit markers (red = headshot), red arrows around the crosshair
+  pointing at whoever (or whatever blast) is hurting you, one per source
 - **Full-body hitboxes:** head (lethal), neck, torso, arms, hands, legs, feet
 - Layered synthesized gunshots per weapon, explosions, join-wait window with
   cancel/timeout, floating nametags, humanoid characters with walk animation
