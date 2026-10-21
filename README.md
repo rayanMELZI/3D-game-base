@@ -29,6 +29,10 @@ from code. Rename the game in `GameSettings.GameTitle`.
   tactical), pump shotgun, snipers (semi-auto, recon, heavy .50) and pistols
   (auto pistol, tactical pistol, hand cannon, revolver). Picked in **CLASSES**
   through category tabs and a scrolling list with stats
+- **Add-ons per class:** optic, suppressor, foregrip, extended mag chosen in
+  the CLASSES gunsmith for the selected class — the same rifle can be kitted
+  differently in each class; with all weapons unlocked, the selected class's
+  add-ons apply. Other players (and your killcam) see them on your gun
 - **Movement:** sprint, crouch (Ctrl), **slide** (sprint+Ctrl), **bunny hop**
   (hold Space), synced to other players
 - **Kill cam:** on death you spectate your killer; at match end everyone
