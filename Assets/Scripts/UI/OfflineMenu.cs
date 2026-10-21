@@ -21,7 +21,7 @@ namespace FpsBase
 
             MenuWidgets.EnsureStyles();
 
-            float w = 380f, h = showSettings ? 420f : 300f;
+            float w = 380f, h = showSettings ? 530f : 300f;
             var panel = new Rect((Screen.width - w) / 2f, (Screen.height - h) / 2f, w, h);
             MenuWidgets.Panel(panel);
 
@@ -35,6 +35,8 @@ namespace FpsBase
                 GameSettings.Fov = Mathf.Round(MenuWidgets.Slider("Field of view", GameSettings.Fov, 50f, 90f, "0"));
                 GameSettings.Volume = MenuWidgets.Slider("Volume", GameSettings.Volume, 0f, 1f, "0%");
                 AudioListener.volume = GameSettings.Volume;
+                GUILayout.Space(6);
+                MenuWidgets.ControllerSettings();
 
                 GUILayout.Space(10);
                 if (MenuWidgets.MenuButton("BACK", 32f))
