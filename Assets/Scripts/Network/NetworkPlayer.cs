@@ -241,6 +241,8 @@ namespace FpsBase
                     rig.characterPose.remotePitch = Pitch.Value;
                     rig.characterPose.remoteSlide = Sliding.Value ? 1f : 0f;
                     rig.characterPose.remoteReloading = NetworkReloading.Value;
+                    rig.characterPose.remoteProne = Prone.Value;
+                    rig.characterPose.remoteMoving = NetworkMoveSpeed.Value > 0.1f;
                 }
                 return;
             }
