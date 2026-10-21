@@ -220,7 +220,8 @@ namespace FpsBase
                         NetworkSprinting.Value,
                         Sliding.Value,
                         NetworkReloading.Value,
-                        NetworkAiming.Value);
+                        NetworkAiming.Value,
+                        Prone.Value);
                 }
 
                 // Crouch/prone the hitboxes the shooter aims at: the Body (limb +
