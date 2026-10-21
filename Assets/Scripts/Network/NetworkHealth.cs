@@ -143,7 +143,7 @@ namespace FpsBase
 
         /// <summary>Key for a non-player damage source (bot, zombie), distinct from client ids.</summary>
         private static ulong ObjectKey(Component source) =>
-            source != null ? (1UL << 40) | (uint)source.GetInstanceID() : ulong.MaxValue - 1;
+            source != null ? (1UL << 40) | (uint)source.GetHashCode() : ulong.MaxValue - 1;
 
         [ClientRpc]
         private void DamageFeedbackClientRpc(Vector3 sourcePosition, ulong sourceKey, ClientRpcParams rpcParams = default)
