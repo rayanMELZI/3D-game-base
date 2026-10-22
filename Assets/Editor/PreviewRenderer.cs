@@ -330,7 +330,8 @@ namespace FpsBase.EditorTools
         }
 
         private static Texture2D NewSheet(int cols, int rows) =>
-            new Texture2D(cols * CellW, rows * CellH, TextureFormat.RGB24, false);
+            // Survives the scene switches between map shots.
+            new Texture2D(cols * CellW, rows * CellH, TextureFormat.RGB24, false) { hideFlags = HideFlags.HideAndDontSave };
 
         private static void DrawCell(Camera cam, Texture2D sheet, int col, int row)
         {
