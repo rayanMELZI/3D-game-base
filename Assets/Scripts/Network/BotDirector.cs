@@ -4,66 +4,149 @@ using UnityEngine;
 
 namespace FpsBase
 {
+    /// <summary>
+    /// Server-only, on the GameModeManager object: keeps the match filled with
+    /// the host's number of networked bots (GameModeManager.BotCount), capped by
+    /// the free player slots, keeps team modes balanced, and re-bakes the bots'
+    /// NavMesh whenever the map changes. No bots in the lobby, in Zombie
+    /// Survival or in P Story.
+    /// </summary>
     public class BotDirector : MonoBehaviour
     {
-        private readonly List<BotTarget> bots = new List<BotTarget>();
-        private float nextFill;
-        private void Update()
+        private static readonly string[] Names =
         {
-            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
-                return;
-            if (Time.time < nextFill) return;
-            nextFill = Time.time + 1f;
-            bots.RemoveAll(b => b == null);
-            int humans = FindObjectsByType<NetworkPlayer>().Length;
-            while (bots.Count + humans < 6) Spawn(bots.Count);
-        }
-        private void Spawn(int index)
-        {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = "BOT " + (index + 1);
-            go.transform.position = GameModeManager.Instance.GetSpawnPoint(index % 2);
-            go.GetComponent<Renderer>().sharedMaterial = EnvironmentBuilder.SharedMaterial(EnvironmentBuilder.TeamColor(index % 2));
-            var bot = go.AddComponent<BotTarget>();
-            bot.team = index % 2;
-            bots.Add(bot);
-        }
-    }
+            "VIPER", "GHOST", "RAVEN", "NOMAD", "SABLE", "FALCON", "BISHOP", "ECHO", "HAWK", "ONYX",
+        };
 
-    public class BotTarget : MonoBehaviour, IDamageable
-    {
-        public int team;
-        private float health = 100f;
-        private float nextShot;
+        private float nextCheck;
+        private GameObject prefab;
+        private bool warnedMissingPrefab;
+
         private void Update()
         {
+            var nm = NetworkManager.Singleton;
             var gameMode = GameModeManager.Instance;
-            if (gameMode == null || !NetworkManager.Singleton || !NetworkManager.Singleton.IsServer)
+            if (nm == null || !nm.IsServer || gameMode == null || !gameMode.IsSpawned)
                 return;
-            NetworkPlayer target = null;
-            float best = float.MaxValue;
-            foreach (var player in FindObjectsByType<NetworkPlayer>())
+
+            UpdateNavigation(gameMode);
+
+            if (Time.time < nextCheck)
+                return;
+            nextCheck = Time.time + 1f;
+
+            int desired = DesiredBots(gameMode);
+            var bots = new List<BotAgent>();
+            foreach (var bot in BotAgent.All)
+                if (bot != null && bot.IsSpawned)
+                    bots.Add(bot);
+
+            if (bots.Count < desired)
+                Spawn(gameMode, bots);
+            else if (bots.Count > desired && bots.Count > 0)
+                bots[bots.Count - 1].NetworkObject.Despawn(true);
+            else if (gameMode.IsTeamMode)
+                Rebalance(bots);
+        }
+
+        private static int DesiredBots(GameModeManager gameMode)
+        {
+            if (gameMode.LobbyOpen.Value || gameMode.CurrentMode == GameMode.ZombieSurvival
+                || gameMode.CurrentMode == GameMode.PStory)
+                return 0;
+            // Spectators don't take a slot; bots never push a human out.
+            int humans = 0;
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
             {
-                if (player == null || !player.IsSpawned || player.IsDead.Value || player.Spectating.Value
-                    || (gameMode.IsTeamMode && player.Team.Value == team)) continue;
-                float d = (player.transform.position - transform.position).sqrMagnitude;
-                if (d < best) { best = d; target = player; }
+                var player = client.PlayerObject != null ? client.PlayerObject.GetComponent<NetworkPlayer>() : null;
+                if (player != null && !player.Spectating.Value)
+                    humans++;
             }
-            if (target == null) return;
-            Vector3 delta = target.transform.position - transform.position;
-            delta.y = 0f;
-            if (delta.sqrMagnitude > 45f) transform.position += delta.normalized * 3.4f * Time.deltaTime;
-            transform.rotation = Quaternion.LookRotation(delta.normalized);
-            if (Time.time >= nextShot && delta.sqrMagnitude < 625f)
+            int free = GameModeManager.MaxPlayersFor(gameMode.CurrentMode) - humans;
+            return Mathf.Clamp(gameMode.BotCount.Value, 0, Mathf.Max(0, free));
+        }
+
+        private void UpdateNavigation(GameModeManager gameMode)
+        {
+            var boot = MultiplayerBootstrap.Instance;
+            if (boot == null || BotNavigation.BuiltMap == boot.CurrentMap
+                || (BotAgent.All.Count == 0 && DesiredBots(gameMode) == 0))
+                return;
+            if (GameObject.Find(EnvironmentBuilder.MapRootName) == null)
+                return; // the new map isn't built yet
+            BotNavigation.Rebuild(boot.CurrentMap);
+        }
+
+        private GameObject Prefab()
+        {
+            if (prefab != null)
+                return prefab;
+            foreach (var entry in NetworkManager.Singleton.NetworkConfig.Prefabs.Prefabs)
+                if (entry.Prefab != null && entry.Prefab.GetComponent<BotAgent>() != null)
+                    return prefab = entry.Prefab;
+            if (!warnedMissingPrefab)
             {
-                nextShot = Time.time + 0.65f;
-                if (NetworkManager.Singleton.IsServer) target.GetComponent<NetworkHealth>()?.ServerBotDamage(9f, this);
+                warnedMissingPrefab = true;
+                Debug.LogWarning("[Bots] NetworkBot prefab missing from the network prefab list " +
+                                 "(Assets/DefaultNetworkPrefabs.asset): run Tools/FPS Base/Setup Multiplayer.");
+            }
+            return null;
+        }
+
+        private void Spawn(GameModeManager gameMode, List<BotAgent> existing)
+        {
+            var source = Prefab();
+            if (source == null)
+                return;
+
+            // First free name, so a replaced bot doesn't duplicate a living one's name.
+            string name = null;
+            foreach (var candidate in Names)
+            {
+                bool taken = false;
+                foreach (var bot in existing)
+                    if (bot.DisplayName == "BOT " + candidate) { taken = true; break; }
+                if (!taken) { name = "BOT " + candidate; break; }
+            }
+
+            var go = Instantiate(source);
+            var agent = go.GetComponent<BotAgent>();
+            agent.pendingTeam = gameMode.AssignTeam(ulong.MaxValue);
+            agent.pendingName = name ?? $"BOT {existing.Count + 1}";
+            go.GetComponent<NetworkObject>().Spawn(true);
+        }
+
+        /// <summary>Team modes: move one bot at a time until the teams differ by one at most.</summary>
+        private static void Rebalance(List<BotAgent> bots)
+        {
+            int team0 = 0, team1 = 0;
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                var player = client.PlayerObject != null ? client.PlayerObject.GetComponent<NetworkPlayer>() : null;
+                if (player == null || player.Spectating.Value)
+                    continue;
+                if (player.Team.Value == 0) team0++; else team1++;
+            }
+            foreach (var bot in bots)
+            {
+                if (bot.Team.Value == 0) team0++; else team1++;
+            }
+            if (Mathf.Abs(team0 - team1) <= 1)
+                return;
+            int from = team0 > team1 ? 0 : 1;
+            for (int i = bots.Count - 1; i >= 0; i--)
+            {
+                if (bots[i].Team.Value == from)
+                {
+                    bots[i].ServerSetTeam(1 - from);
+                    return;
+                }
             }
         }
-        public void TakeDamage(float amount, bool headshot = false)
+
+        private void OnDestroy()
         {
-            health -= headshot ? amount * 2f : amount;
-            if (health <= 0f) Destroy(gameObject);
+            BotNavigation.Clear();
         }
     }
 }
