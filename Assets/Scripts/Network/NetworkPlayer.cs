@@ -568,6 +568,17 @@ namespace FpsBase
                     return;
                 }
             }
+
+            // Killed by a networked bot: same replay from the bot's buffered eyes.
+            foreach (var bot in BotAgent.All)
+            {
+                if (bot != null && bot.IsSpawned && bot.BotId == killerId)
+                {
+                    DeathCam.BeginReplay(bot.GetKillcamHistory(), bot.transform,
+                        $"KILLCAM  —  {bot.DisplayName}", bot.CurrentWeapon);
+                    return;
+                }
+            }
         }
 
         private IEnumerator RespawnAfterDelay()
