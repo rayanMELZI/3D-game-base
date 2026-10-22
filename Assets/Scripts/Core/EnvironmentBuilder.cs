@@ -57,6 +57,56 @@ namespace FpsBase
             return mat;
         }
 
+        // ------------------------------------------------------------------
+        // Map surfaces: Sundown/WorldSurface adds world-space grain, broad
+        // blotches and darker wall bases to the flat code-built geometry
+        // (falls back to Standard if the shader is missing).
+        // ------------------------------------------------------------------
+
+        private static Shader worldSurface;
+        private static bool worldSurfaceLooked;
+        private static readonly Dictionary<long, Material> mapMaterials = new Dictionary<long, Material>();
+
+        private static Shader WorldSurface
+        {
+            get
+            {
+                if (!worldSurfaceLooked)
+                {
+                    worldSurface = Shader.Find("Sundown/WorldSurface");
+                    if (worldSurface != null && !worldSurface.isSupported)
+                        worldSurface = null;
+                    worldSurfaceLooked = true;
+                }
+                return worldSurface;
+            }
+        }
+
+        public static Material MapMaterial(Color color, float metallic = 0f, float smoothness = 0.5f)
+        {
+            if (WorldSurface == null)
+                return MakeMaterial(color, metallic, smoothness);
+            var mat = new Material(WorldSurface);
+            mat.color = color;
+            mat.SetFloat("_Metallic", metallic);
+            mat.SetFloat("_Glossiness", smoothness);
+            return mat;
+        }
+
+        /// <summary>Cached map surface (emissive ones stay on the shared Standard path).</summary>
+        public static Material MapShared(Color color, float metallic = 0f, float smoothness = 0.5f, float emission = 0f)
+        {
+            if (emission > 0f || WorldSurface == null)
+                return SharedMaterial(color, metallic, smoothness, emission);
+            long key = Quant(color.r) | (Quant(color.g) << 8) | (Quant(color.b) << 16)
+                       | ((long)Quant(metallic) << 24) | ((long)Quant(smoothness) << 32);
+            if (mapMaterials.TryGetValue(key, out var cached) && cached != null)
+                return cached;
+            var mat = MapMaterial(color, metallic, smoothness);
+            mapMaterials[key] = mat;
+            return mat;
+        }
+
         private static long Quant(float v) => (long)Mathf.Clamp(Mathf.RoundToInt(v * 255f), 0, 255);
 
         // ------------------------------------------------------------------
@@ -101,10 +151,12 @@ namespace FpsBase
             var lightGo = new GameObject("Directional Light");
             var sun = lightGo.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.intensity = 1.25f;
-            sun.color = new Color(1f, 0.87f, 0.7f);
+            // Warm low sun against a cooler sky fill: stronger light/shadow
+            // contrast than a flat grey ambient.
+            sun.intensity = 1.5f;
+            sun.color = new Color(1f, 0.84f, 0.64f);
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.8f;
+            sun.shadowStrength = 0.88f;
             lightGo.transform.rotation = Quaternion.Euler(28f, -40f, 0f);
 
             var sky = new Material(Shader.Find("Skybox/Procedural"));
@@ -118,14 +170,22 @@ namespace FpsBase
             RenderSettings.sun = sun;
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.6f, 0.56f, 0.62f);
-            RenderSettings.ambientEquatorColor = new Color(0.48f, 0.42f, 0.44f);
-            RenderSettings.ambientGroundColor = new Color(0.26f, 0.21f, 0.2f);
+            RenderSettings.ambientSkyColor = new Color(0.47f, 0.5f, 0.62f);
+            RenderSettings.ambientEquatorColor = new Color(0.4f, 0.37f, 0.38f);
+            RenderSettings.ambientGroundColor = new Color(0.2f, 0.17f, 0.16f);
 
+            // Light haze only: the old density washed out everything past 30 m.
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Exponential;
-            RenderSettings.fogDensity = 0.008f;
-            RenderSettings.fogColor = new Color(0.76f, 0.64f, 0.6f);
+            RenderSettings.fogDensity = 0.0045f;
+            RenderSettings.fogColor = new Color(0.72f, 0.63f, 0.6f);
+
+            // Bake the sky into the reflection/ambient probe now: a skybox set
+            // from code is otherwise never captured, so metal (guns, hulls)
+            // reflected nothing and looked flat black.
+            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
+            RenderSettings.reflectionIntensity = 0.85f;
+            DynamicGI.UpdateEnvironment();
         }
 
         // ------------------------------------------------------------------
@@ -140,7 +200,7 @@ namespace FpsBase
             Ground(root, size, size, new Color(0.46f, 0.43f, 0.41f), new Color(0.4f, 0.38f, 0.37f));
 
             // Perimeter walls with an emissive trim on top.
-            var wallMat = MakeMaterial(new Color(0.5f, 0.52f, 0.55f), 0.1f, 0.35f);
+            var wallMat = MapMaterial(new Color(0.5f, 0.52f, 0.55f), 0.1f, 0.35f);
             var trimMat = MakeEmissiveMaterial(new Color(0.2f, 0.8f, 0.9f), 2.4f);
             float wallH = 4f;
             for (int i = 0; i < 4; i++)
@@ -155,8 +215,8 @@ namespace FpsBase
             }
 
             // Center platform with ramps and pillars.
-            var platMat = MakeMaterial(new Color(0.44f, 0.46f, 0.5f), 0.15f, 0.4f);
-            var pillarMat = MakeMaterial(new Color(0.38f, 0.4f, 0.44f), 0.2f, 0.5f);
+            var platMat = MapMaterial(new Color(0.44f, 0.46f, 0.5f), 0.15f, 0.4f);
+            var pillarMat = MapMaterial(new Color(0.38f, 0.4f, 0.44f), 0.2f, 0.5f);
             Box(root, "CenterPlatform", new Vector3(0, 0.5f, 0), Vector3.zero, new Vector3(12f, 1f, 12f), platMat);
             Box(root, "RampSouth", new Vector3(0, 0.45f, -9f), new Vector3(-8f, 0, 0), new Vector3(5f, 0.3f, 7f), platMat);
             Box(root, "RampNorth", new Vector3(0, 0.45f, 9f), new Vector3(8f, 0, 0), new Vector3(5f, 0.3f, 7f), platMat);
@@ -165,8 +225,8 @@ namespace FpsBase
                     Cylinder(root, "Pillar", new Vector3(5f * sx, 2f, 5f * sz), new Vector3(1f, 2f, 1f), pillarMat);
 
             // Mirrored cover and crates.
-            var coverMat = MakeMaterial(new Color(0.55f, 0.5f, 0.42f), 0.05f, 0.3f);
-            var crateMat = MakeMaterial(new Color(0.55f, 0.4f, 0.25f), 0.05f, 0.3f);
+            var coverMat = MapMaterial(new Color(0.55f, 0.5f, 0.42f), 0.05f, 0.3f);
+            var crateMat = MapMaterial(new Color(0.55f, 0.4f, 0.25f), 0.05f, 0.3f);
             foreach (float sz in new[] { -1f, 1f })
             {
                 Box(root, "Cover", new Vector3(-10f, 0.8f, 10f * sz), Vector3.zero, new Vector3(5f, 1.6f, 0.5f), coverMat);
@@ -199,8 +259,8 @@ namespace FpsBase
 
             Ground(root, half * 2f, half * 2f, new Color(0.56f, 0.5f, 0.3f), new Color(0.5f, 0.45f, 0.27f));
 
-            var wallMat = MakeMaterial(new Color(0.78f, 0.71f, 0.42f), 0f, 0.25f);
-            var ceilMat = MakeMaterial(new Color(0.82f, 0.8f, 0.72f), 0f, 0.2f);
+            var wallMat = MapMaterial(new Color(0.78f, 0.71f, 0.42f), 0f, 0.25f);
+            var ceilMat = MapMaterial(new Color(0.82f, 0.8f, 0.72f), 0f, 0.2f);
             var lightMat = MakeEmissiveMaterial(new Color(1f, 0.97f, 0.85f), 2.6f);
 
             PerimeterWalls(root, half, half, ceilingH, wallMat);
@@ -238,7 +298,7 @@ namespace FpsBase
             Wall(-3, -3, 3, -3); Wall(3, 3, -3, 3);
 
             // Support pillars at wall crossings.
-            var pillarMat = MakeMaterial(new Color(0.7f, 0.64f, 0.38f), 0f, 0.3f);
+            var pillarMat = MapMaterial(new Color(0.7f, 0.64f, 0.38f), 0f, 0.3f);
             foreach (float x in new[] { -8f, 8f })
                 foreach (float z in new[] { -8f, 8f })
                     Box(root, "Pillar", new Vector3(x, ceilingH / 2f, z), Vector3.zero, new Vector3(0.8f, ceilingH, 0.8f), pillarMat);
@@ -250,8 +310,8 @@ namespace FpsBase
         {
             var root = new GameObject(MapRootName).transform;
             Ground(root, 58f, 58f, baseColor * 0.75f, baseColor);
-            var wall = SharedMaterial(baseColor, 0.05f, 0.42f);
-            var accent = SharedMaterial(accentColor, 0.15f, 0.55f, dark ? 2.2f : 0.25f);
+            var wall = MapShared(baseColor, 0.05f, 0.42f);
+            var accent = MapShared(accentColor, 0.15f, 0.55f, dark ? 2.2f : 0.25f);
             PerimeterWalls(root, 29f, 29f, 4f, wall);
             SpawnStrips(root, 24f, 18f);
 
@@ -292,13 +352,13 @@ namespace FpsBase
 
             Ground(root, half * 2f, half * 2f, new Color(0.13f, 0.14f, 0.12f), new Color(0.11f, 0.12f, 0.1f));
 
-            var stone = SharedMaterial(new Color(0.3f, 0.3f, 0.33f), 0.05f, 0.3f);
-            var wood = SharedMaterial(new Color(0.24f, 0.17f, 0.11f), 0f, 0.25f);
-            var rust = SharedMaterial(new Color(0.32f, 0.16f, 0.1f), 0.4f, 0.3f);
-            var metal = SharedMaterial(new Color(0.18f, 0.19f, 0.2f), 0.7f, 0.5f);
-            var lampGlow = SharedMaterial(new Color(1f, 0.82f, 0.5f), 0f, 0.6f, 3f);
-            var fireGlow = SharedMaterial(new Color(1f, 0.45f, 0.1f), 0f, 0.6f, 3.2f);
-            var candleGlow = SharedMaterial(new Color(0.9f, 0.08f, 0.05f), 0f, 0.6f, 2.6f);
+            var stone = MapShared(new Color(0.3f, 0.3f, 0.33f), 0.05f, 0.3f);
+            var wood = MapShared(new Color(0.24f, 0.17f, 0.11f), 0f, 0.25f);
+            var rust = MapShared(new Color(0.32f, 0.16f, 0.1f), 0.4f, 0.3f);
+            var metal = MapShared(new Color(0.18f, 0.19f, 0.2f), 0.7f, 0.5f);
+            var lampGlow = MapShared(new Color(1f, 0.82f, 0.5f), 0f, 0.6f, 3f);
+            var fireGlow = MapShared(new Color(1f, 0.45f, 0.1f), 0f, 0.6f, 3.2f);
+            var candleGlow = MapShared(new Color(0.9f, 0.08f, 0.05f), 0f, 0.6f, 2.6f);
 
             PerimeterWalls(root, half, half, 3.5f, stone);
             SpawnStrips(root, 26f, 14f);
@@ -444,24 +504,24 @@ namespace FpsBase
             const float deckY = 4.2f;     // upper deck / catwalk floor height
             const float ceilY = 8.6f;
 
-            var hull = SharedMaterial(new Color(0.42f, 0.45f, 0.46f), 0.55f, 0.4f);
-            var hullDark = SharedMaterial(new Color(0.24f, 0.26f, 0.27f), 0.6f, 0.45f);
-            var deck = SharedMaterial(new Color(0.3f, 0.31f, 0.3f), 0.5f, 0.35f);
-            var rail = SharedMaterial(new Color(0.55f, 0.5f, 0.2f), 0.4f, 0.4f);
-            var crate = SharedMaterial(new Color(0.5f, 0.37f, 0.22f), 0.05f, 0.3f);
-            var crateDark = SharedMaterial(new Color(0.4f, 0.29f, 0.17f), 0.05f, 0.3f);
-            var container = SharedMaterial(new Color(0.28f, 0.36f, 0.26f), 0.35f, 0.35f);
-            var containerTan = SharedMaterial(new Color(0.55f, 0.48f, 0.34f), 0.3f, 0.35f);
-            var exterior = SharedMaterial(new Color(0.62f, 0.65f, 0.67f), 0.5f, 0.5f);
-            var skyGlass = SharedMaterial(new Color(0.62f, 0.78f, 0.95f), 0f, 0.9f, 1.3f);
-            var lamp = SharedMaterial(new Color(1f, 0.93f, 0.8f), 0f, 0.6f, 2.4f);
-            var jumpLight = SharedMaterial(new Color(1f, 0.15f, 0.1f), 0f, 0.6f, 2.6f);
-            var hazardYellow = SharedMaterial(new Color(0.95f, 0.75f, 0.1f), 0f, 0.4f);
-            var hazardBlack = SharedMaterial(new Color(0.08f, 0.08f, 0.08f), 0f, 0.4f);
+            var hull = MapShared(new Color(0.42f, 0.45f, 0.46f), 0.55f, 0.4f);
+            var hullDark = MapShared(new Color(0.24f, 0.26f, 0.27f), 0.6f, 0.45f);
+            var deck = MapShared(new Color(0.3f, 0.31f, 0.3f), 0.5f, 0.35f);
+            var rail = MapShared(new Color(0.55f, 0.5f, 0.2f), 0.4f, 0.4f);
+            var crate = MapShared(new Color(0.5f, 0.37f, 0.22f), 0.05f, 0.3f);
+            var crateDark = MapShared(new Color(0.4f, 0.29f, 0.17f), 0.05f, 0.3f);
+            var container = MapShared(new Color(0.28f, 0.36f, 0.26f), 0.35f, 0.35f);
+            var containerTan = MapShared(new Color(0.55f, 0.48f, 0.34f), 0.3f, 0.35f);
+            var exterior = MapShared(new Color(0.62f, 0.65f, 0.67f), 0.5f, 0.5f);
+            var skyGlass = MapShared(new Color(0.62f, 0.78f, 0.95f), 0f, 0.9f, 1.3f);
+            var lamp = MapShared(new Color(1f, 0.93f, 0.8f), 0f, 0.6f, 2.4f);
+            var jumpLight = MapShared(new Color(1f, 0.15f, 0.1f), 0f, 0.6f, 2.6f);
+            var hazardYellow = MapShared(new Color(0.95f, 0.75f, 0.1f), 0f, 0.4f);
+            var hazardBlack = MapShared(new Color(0.08f, 0.08f, 0.08f), 0f, 0.4f);
 
             // ---------------- Fuselage shell ----------------
             // Cargo deck: tiled metal floor plates.
-            var floorMat = MakeMaterial(Color.white, 0.45f, 0.35f);
+            var floorMat = MapMaterial(Color.white, 0.45f, 0.35f);
             floorMat.mainTexture = MakeTileTexture(new Color(0.34f, 0.35f, 0.35f), new Color(0.3f, 0.31f, 0.31f));
             floorMat.mainTextureScale = new Vector2(3f, 13f);
             Box(root, "CargoDeck", new Vector3(0f, -0.15f, holdMid), Vector3.zero, new Vector3(halfW * 2f, 0.3f, holdLen), floorMat);
@@ -533,7 +593,7 @@ namespace FpsBase
             Visual(Box(root, "WindshieldFrame", new Vector3(0f, 6.9f, 28.62f), new Vector3(-20f, 0f, 0f), new Vector3(0.15f, 2.4f, 0.1f), hullDark));
             Box(root, "Console", new Vector3(0f, deckY + 0.6f, 28.1f), Vector3.zero, new Vector3(6f, 1.2f, 1.2f), hullDark);
             Visual(Box(root, "Instruments", new Vector3(0f, deckY + 1.22f, 28f), Vector3.zero, new Vector3(5.4f, 0.05f, 0.8f),
-                SharedMaterial(new Color(0.3f, 1f, 0.55f), 0f, 0.6f, 1.8f)));
+                MapShared(new Color(0.3f, 1f, 0.55f), 0f, 0.6f, 1.8f)));
             Box(root, "Throttles", new Vector3(0f, deckY + 0.45f, 27.1f), Vector3.zero, new Vector3(0.45f, 0.9f, 0.6f), hullDark);
             Visual(Box(root, "NoseCone", new Vector3(0f, 3.1f, 30.4f), Vector3.zero, new Vector3(6.4f, 5f, 2.4f), exterior));
 
@@ -639,13 +699,13 @@ namespace FpsBase
             Visual(Box(root, "LightStrip", new Vector3(0f, deckY - 0.33f, 13f), Vector3.zero, new Vector3(0.35f, 0.06f, 17f), lamp));
 
             // ---------------- Sky: a cloud sea below, clouds streaming past ----------------
-            var cloudMat = SharedMaterial(new Color(0.96f, 0.97f, 1f), 0f, 0.05f, 0.35f);
+            var cloudMat = MapShared(new Color(0.96f, 0.97f, 1f), 0f, 0.05f, 0.35f);
             var cloudSea = GameObject.CreatePrimitive(PrimitiveType.Plane);
             cloudSea.name = "CloudSea";
             cloudSea.transform.SetParent(root);
             cloudSea.transform.position = new Vector3(0f, -70f, 0f);
             cloudSea.transform.localScale = new Vector3(120f, 1f, 120f);
-            cloudSea.GetComponent<Renderer>().material = SharedMaterial(new Color(0.86f, 0.9f, 0.97f), 0f, 0.1f, 0.25f);
+            cloudSea.GetComponent<Renderer>().material = MapShared(new Color(0.86f, 0.9f, 0.97f), 0f, 0.1f, 0.25f);
             Visual(cloudSea);
 
             var clouds = new GameObject("Clouds").transform;
@@ -727,40 +787,40 @@ namespace FpsBase
 
             // Suburban grass lot + central asphalt street.
             Ground(root, halfX * 2f, halfZ * 2f, new Color(0.36f, 0.42f, 0.23f), new Color(0.33f, 0.39f, 0.21f));
-            var asphalt = MakeMaterial(new Color(0.16f, 0.16f, 0.17f), 0f, 0.25f);
+            var asphalt = MapMaterial(new Color(0.16f, 0.16f, 0.17f), 0f, 0.25f);
             Box(root, "Street", new Vector3(0, 0.02f, 0), Vector3.zero, new Vector3(20f, 0.04f, 26f), asphalt);
-            var sidewalk = MakeMaterial(new Color(0.55f, 0.53f, 0.5f), 0f, 0.3f);
+            var sidewalk = MapMaterial(new Color(0.55f, 0.53f, 0.5f), 0f, 0.3f);
             Box(root, "Sidewalk", new Vector3(-10.6f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 26f), sidewalk);
             Box(root, "Sidewalk", new Vector3(10.6f, 0.03f, 0), Vector3.zero, new Vector3(1.2f, 0.06f, 26f), sidewalk);
 
             // Perimeter fence.
-            var fenceMat = MakeMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
+            var fenceMat = MapMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
             PerimeterWalls(root, halfX, halfZ, 3f, fenceMat);
 
             // --- The two sides (house + garage + yard), 180° rotational twins ---
-            var yellowWall = MakeMaterial(new Color(0.85f, 0.68f, 0.22f), 0f, 0.35f);
-            var tealWall = MakeMaterial(new Color(0.3f, 0.52f, 0.46f), 0f, 0.35f);
+            var yellowWall = MapMaterial(new Color(0.85f, 0.68f, 0.22f), 0f, 0.35f);
+            var tealWall = MapMaterial(new Color(0.3f, 0.52f, 0.46f), 0f, 0.35f);
             BuildNuketownSide(root, north: true, tealWall);    // +Z: team 1, teal house
             BuildNuketownSide(root, north: false, yellowWall); // -Z: team 0, yellow house
 
             // --- Center street cover ---
             // School bus: THE central cover, slightly angled like the original.
-            var busMat = MakeMaterial(new Color(0.22f, 0.5f, 0.5f), 0.1f, 0.45f);
-            var busTrim = MakeMaterial(new Color(0.45f, 0.28f, 0.18f), 0.05f, 0.3f);
+            var busMat = MapMaterial(new Color(0.22f, 0.5f, 0.5f), 0.1f, 0.45f);
+            var busTrim = MapMaterial(new Color(0.45f, 0.28f, 0.18f), 0.05f, 0.3f);
             Box(root, "Bus", new Vector3(-2.2f, 1.55f, 0f), new Vector3(0, 8f, 0), new Vector3(2.5f, 2.9f, 10.5f), busMat);
             Box(root, "BusStripe", new Vector3(-2.2f, 1.1f, 0f), new Vector3(0, 8f, 0), new Vector3(2.6f, 0.5f, 10.6f), busTrim);
             // Moving truck north of the bus; two cars on the south half balance it.
-            var truckMat = MakeMaterial(new Color(0.72f, 0.7f, 0.66f), 0.1f, 0.4f);
+            var truckMat = MapMaterial(new Color(0.72f, 0.7f, 0.66f), 0.1f, 0.4f);
             Box(root, "TruckBox", new Vector3(4.4f, 1.5f, 4.2f), new Vector3(0, -6f, 0), new Vector3(2.3f, 2.6f, 6.2f), truckMat);
             Box(root, "TruckCab", new Vector3(4.9f, 0.9f, 8.1f), new Vector3(0, -6f, 0), new Vector3(2.2f, 1.6f, 1.8f), busTrim);
-            var carRed = MakeMaterial(new Color(0.55f, 0.15f, 0.12f), 0.2f, 0.5f);
-            var carBlue = MakeMaterial(new Color(0.4f, 0.5f, 0.6f), 0.2f, 0.5f);
+            var carRed = MapMaterial(new Color(0.55f, 0.15f, 0.12f), 0.2f, 0.5f);
+            var carBlue = MapMaterial(new Color(0.4f, 0.5f, 0.6f), 0.2f, 0.5f);
             Box(root, "Car", new Vector3(5.2f, 0.7f, -8f), new Vector3(0, 12f, 0), new Vector3(1.8f, 1.3f, 4.2f), carRed);
             Box(root, "Car", new Vector3(-6.4f, 0.7f, -9.5f), new Vector3(0, -20f, 0), new Vector3(1.8f, 1.3f, 4.2f), carBlue);
 
             // NUKETOWN welcome sign near the south cul-de-sac end.
-            var signPost = MakeMaterial(new Color(0.35f, 0.35f, 0.38f), 0.4f, 0.5f);
-            var signFace = MakeMaterial(new Color(0.9f, 0.88f, 0.8f), 0f, 0.4f);
+            var signPost = MapMaterial(new Color(0.35f, 0.35f, 0.38f), 0.4f, 0.5f);
+            var signFace = MapMaterial(new Color(0.9f, 0.88f, 0.8f), 0f, 0.4f);
             Box(root, "SignPost", new Vector3(-13.4f, 1.1f, -12.5f), Vector3.zero, new Vector3(0.18f, 2.2f, 0.18f), signPost);
             Box(root, "SignPost", new Vector3(-15.6f, 1.1f, -12.5f), Vector3.zero, new Vector3(0.18f, 2.2f, 0.18f), signPost);
             Box(root, "SignPanel", new Vector3(-14.5f, 2.6f, -12.5f), Vector3.zero, new Vector3(3.2f, 1.6f, 0.15f), signFace);
@@ -781,10 +841,10 @@ namespace FpsBase
             var side = new GameObject(north ? "SideNorth" : "SideSouth").transform;
             side.SetParent(mapRoot);
 
-            var trimMat = MakeMaterial(new Color(0.25f, 0.23f, 0.21f), 0.1f, 0.4f);   // roofs / dark trim
-            var floorMat = MakeMaterial(new Color(0.45f, 0.31f, 0.18f), 0f, 0.35f);   // interior wood
-            var fenceMat = MakeMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
-            var shedMat = MakeMaterial(new Color(0.42f, 0.33f, 0.22f), 0f, 0.3f);
+            var trimMat = MapMaterial(new Color(0.25f, 0.23f, 0.21f), 0.1f, 0.4f);   // roofs / dark trim
+            var floorMat = MapMaterial(new Color(0.45f, 0.31f, 0.18f), 0f, 0.35f);   // interior wood
+            var fenceMat = MapMaterial(new Color(0.5f, 0.38f, 0.24f), 0f, 0.3f);
+            var shedMat = MapMaterial(new Color(0.42f, 0.33f, 0.22f), 0f, 0.3f);
 
             // Local helper: wall piece from x0..x1, y0..y1 at depth z (thickness 0.25).
             void WallX(float x0, float x1, float y0, float y1, float z) =>
@@ -856,7 +916,7 @@ namespace FpsBase
             // Mailbox at the driveway edge (Mason / Woods in the original).
             Box(side, "MailPost", new Vector3(-3.5f, 0.5f, 15.9f), Vector3.zero, new Vector3(0.12f, 1f, 0.12f), trimMat);
             Box(side, "MailBox", new Vector3(-3.5f, 1.1f, 15.9f), Vector3.zero, new Vector3(0.5f, 0.35f, 0.35f),
-                MakeMaterial(new Color(0.7f, 0.12f, 0.1f), 0.1f, 0.5f));
+                MapMaterial(new Color(0.7f, 0.12f, 0.1f), 0.1f, 0.5f));
 
             if (!north)
                 side.localRotation = Quaternion.Euler(0f, 180f, 0f); // exact rotational twin
@@ -905,9 +965,9 @@ namespace FpsBase
             sea.transform.SetParent(root);
             sea.transform.position = new Vector3(0, -5f, 10f);
             sea.transform.localScale = new Vector3(60f, 1f, 60f);
-            sea.GetComponent<Renderer>().material = MakeMaterial(new Color(0.06f, 0.28f, 0.4f), 0.2f, 0.85f);
+            sea.GetComponent<Renderer>().material = MapMaterial(new Color(0.06f, 0.28f, 0.4f), 0.2f, 0.85f);
 
-            var rock = MakeMaterial(new Color(0.32f, 0.3f, 0.28f), 0.1f, 0.35f);       // exposed rock / cliffs
+            var rock = MapMaterial(new Color(0.32f, 0.3f, 0.28f), 0.1f, 0.35f);       // exposed rock / cliffs
 
             // THE walkable surface: solid box slabs (reliable BoxColliders) shaped
             // to the crescent, tops at y ~ 0. Every decorative cylinder below has
@@ -919,11 +979,11 @@ namespace FpsBase
             Box(root, "IslandFloor", new Vector3(-40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
             Box(root, "IslandFloor", new Vector3(0f, -1.02f, 6f), Vector3.zero, new Vector3(42f, 2f, 38f), rock);
             Box(root, "IslandFloor", new Vector3(40f, -1.02f, 9f), Vector3.zero, new Vector3(56f, 2f, 42f), rock);
-            var greenBiome = MakeMaterial(new Color(0.28f, 0.55f, 0.16f));
-            var limeBiome = MakeMaterial(new Color(0.55f, 0.74f, 0.22f));
-            var yellowBiome = MakeMaterial(new Color(0.86f, 0.72f, 0.28f));
-            var redBiome = MakeMaterial(new Color(0.5f, 0.16f, 0.13f));
-            var sandHub = MakeMaterial(new Color(0.82f, 0.75f, 0.55f));
+            var greenBiome = MapMaterial(new Color(0.28f, 0.55f, 0.16f));
+            var limeBiome = MapMaterial(new Color(0.55f, 0.74f, 0.22f));
+            var yellowBiome = MapMaterial(new Color(0.86f, 0.72f, 0.28f));
+            var redBiome = MapMaterial(new Color(0.5f, 0.16f, 0.13f));
+            var sandHub = MapMaterial(new Color(0.82f, 0.75f, 0.55f));
 
             // Rounded landmass: overlapping discs (rounded tops at y=0) sitting on a
             // rock shelf that fills every seam, so the island reads as one organic
@@ -985,7 +1045,7 @@ namespace FpsBase
         {
             // Raised stone dais with a ring of pillars — the "transition" nexus.
             Cylinder(root, "Hub_Dais", new Vector3(PStoryHub.x, 0.25f, PStoryHub.z), new Vector3(11f, 0.5f, 11f), rock);
-            var pillar = MakeMaterial(new Color(0.45f, 0.43f, 0.4f), 0.2f, 0.4f);
+            var pillar = MapMaterial(new Color(0.45f, 0.43f, 0.4f), 0.2f, 0.4f);
             for (int i = 0; i < 8; i++)
             {
                 float a = i * 45f * Mathf.Deg2Rad;
@@ -999,9 +1059,9 @@ namespace FpsBase
 
         private static void BuildForest(Transform root)
         {
-            var trunk = MakeMaterial(new Color(0.32f, 0.22f, 0.13f));
-            var leaves = MakeMaterial(new Color(0.16f, 0.42f, 0.14f));
-            var leaves2 = MakeMaterial(new Color(0.22f, 0.5f, 0.18f));
+            var trunk = MapMaterial(new Color(0.32f, 0.22f, 0.13f));
+            var leaves = MapMaterial(new Color(0.16f, 0.42f, 0.14f));
+            var leaves2 = MapMaterial(new Color(0.22f, 0.5f, 0.18f));
             var c = PStoryCenters[0];
             for (int i = 0; i < 9; i++)
             {
@@ -1016,8 +1076,8 @@ namespace FpsBase
 
         private static void BuildPlains(Transform root)
         {
-            var boulder = MakeMaterial(new Color(0.5f, 0.52f, 0.5f), 0.2f, 0.4f);
-            var bush = MakeMaterial(new Color(0.3f, 0.55f, 0.22f));
+            var boulder = MapMaterial(new Color(0.5f, 0.52f, 0.5f), 0.2f, 0.4f);
+            var bush = MapMaterial(new Color(0.3f, 0.55f, 0.22f));
             var c = PStoryCenters[1];
             foreach (var o in new[] { new Vector3(-6, 0, 4), new Vector3(5, 0, -3), new Vector3(-2, 0, 8), new Vector3(8, 0, 5) })
                 Sphere(root, "Boulder", c + o + new Vector3(0, 0.8f, 0), new Vector3(2.2f, 1.4f, 2.2f), boulder);
@@ -1027,7 +1087,7 @@ namespace FpsBase
 
         private static void BuildDesert(Transform root)
         {
-            var cactus = MakeMaterial(new Color(0.24f, 0.48f, 0.27f));
+            var cactus = MapMaterial(new Color(0.24f, 0.48f, 0.27f));
             var c = PStoryCenters[2];
             foreach (var o in new[] { new Vector3(-6, 0, 3), new Vector3(6, 0, -2), new Vector3(0, 0, 8), new Vector3(9, 0, 4) })
             {
@@ -1035,14 +1095,14 @@ namespace FpsBase
                 Cylinder(root, "CactusArm", c + o + new Vector3(0.6f, 2.2f, 0), new Vector3(0.4f, 0.7f, 0.4f), cactus);
             }
             Sphere(root, "Dune", c + new Vector3(-8, -0.6f, -4), new Vector3(10f, 2.4f, 8f),
-                MakeMaterial(new Color(0.9f, 0.78f, 0.34f)));
+                MapMaterial(new Color(0.9f, 0.78f, 0.34f)));
             Sphere(root, "Dune2", c + new Vector3(7, -0.7f, 7), new Vector3(8f, 2f, 7f),
-                MakeMaterial(new Color(0.88f, 0.74f, 0.3f)));
+                MapMaterial(new Color(0.88f, 0.74f, 0.3f)));
         }
 
         private static void BuildVolcano(Transform root)
         {
-            var darkRock = MakeMaterial(new Color(0.14f, 0.11f, 0.11f), 0.3f, 0.3f);
+            var darkRock = MapMaterial(new Color(0.14f, 0.11f, 0.11f), 0.3f, 0.3f);
             var lava = MakeEmissiveMaterial(new Color(1f, 0.4f, 0.1f), 2.8f);
             var c = PStoryCenters[3];
             // A cone volcano (stacked shrinking cylinders) with a glowing crater.
@@ -1062,7 +1122,7 @@ namespace FpsBase
         private static void Signpost(Transform root, string text, Vector3 pos, Material signMat)
         {
             Cylinder(root, "SignPost", pos + new Vector3(0, 1.2f, 0), new Vector3(0.2f, 1.2f, 0.2f),
-                MakeMaterial(new Color(0.3f, 0.22f, 0.13f)));
+                MapMaterial(new Color(0.3f, 0.22f, 0.13f)));
             Box(root, "SignPanel", pos + new Vector3(0, 2.4f, 0), Vector3.zero, new Vector3(3f, 1f, 0.15f), signMat);
             AreaLabel(root, text, pos + new Vector3(0, 2.4f, 0.12f), 0.28f);
         }
@@ -1094,7 +1154,7 @@ namespace FpsBase
             col.isTrigger = true; // trigger only — you walk onto it
             // A thin solid disc under the trigger so players don't fall through.
             Cylinder(root, name + "_Base", pos + Vector3.down * 0.1f, new Vector3(3.2f, 0.1f, 3.2f),
-                MakeMaterial(new Color(0.2f, 0.3f, 0.4f), 0.3f, 0.5f));
+                MapMaterial(new Color(0.2f, 0.3f, 0.4f), 0.3f, 0.5f));
             return go.AddComponent<TeleportPad>();
         }
 
@@ -1144,7 +1204,7 @@ namespace FpsBase
             ground.name = "Ground";
             ground.transform.SetParent(root);
             ground.transform.localScale = new Vector3(sizeX / 10f, 1f, sizeZ / 10f);
-            var mat = MakeMaterial(Color.white, 0f, 0.25f);
+            var mat = MapMaterial(Color.white, 0f, 0.25f);
             mat.mainTexture = MakeTileTexture(a, b);
             mat.mainTextureScale = new Vector2(sizeX / 8f, sizeZ / 8f);
             ground.GetComponent<Renderer>().material = mat;
