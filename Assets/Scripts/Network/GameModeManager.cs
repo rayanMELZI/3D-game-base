@@ -236,7 +236,10 @@ namespace FpsBase
             // respawn all players onto the new map so nobody is left falling
             // into the void in a kill-Y loop.
             if (IsServer && previous != index)
+            {
                 ForEachPlayer(p => p.ServerRespawn());
+                ForEachBot(b => b.ServerRespawn());
+            }
         }
 
         // ------------------------------------------------------------------
@@ -664,6 +667,11 @@ namespace FpsBase
                 player.Score.Value = 0;
                 player.ServerRespawn();
             });
+            ForEachBot(bot =>
+            {
+                bot.ServerResetStats();
+                bot.ServerRespawn();
+            });
         }
 
         // ------------------------------------------------------------------
@@ -676,6 +684,13 @@ namespace FpsBase
                 && client.PlayerObject != null)
                 return client.PlayerObject.GetComponent<NetworkPlayer>();
             return null;
+        }
+
+        private static void ForEachBot(System.Action<BotAgent> action)
+        {
+            foreach (var bot in BotAgent.All.ToArray())
+                if (bot != null && bot.IsSpawned)
+                    action(bot);
         }
 
         private static ClientRpcParams OwnerOnly(ulong clientId) =>
