@@ -235,9 +235,14 @@ namespace FpsBase
                     float z = Mathf.Max(magFront + b.extents.z + 0.03f, Mathf.Lerp(trigger, bore.z, 0.55f));
                     z = Mathf.Min(z, bore.z - b.extents.z - 0.02f) + Nudge(def, AttachmentType.Foregrip).z;
                     // Only the handguard counts: bipods, loops and guards hang lower.
-                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, bore.y - 0.02f, bore.y - 0.09f);
-                    var target = new Vector3(0f, bottom + Nudge(def, AttachmentType.Foregrip).y, z);
-                    grip.transform.localPosition += target - new Vector3(b.center.x, b.max.y - 0.004f, b.center.z);
+                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, float.NaN, bore.y - 0.09f);
+                    if (float.IsNaN(bottom))
+                        Strip(grip); // no handguard to clamp onto (P90, MP7): the stat still applies
+                    else
+                    {
+                        var target = new Vector3(0f, bottom + Nudge(def, AttachmentType.Foregrip).y, z);
+                        grip.transform.localPosition += target - new Vector3(b.center.x, b.max.y - 0.004f, b.center.z);
+                    }
                 }
             }
 
