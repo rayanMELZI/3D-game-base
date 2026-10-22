@@ -16,6 +16,10 @@ namespace FpsBase
         public Vector3 pullRestPosition;
         public Quaternion pullRestRotation;
         public Light muzzleFlash;
+        /// <summary>True when an optic is mounted: aim through <see cref="opticSight"/>.</summary>
+        public bool hasOpticSight;
+        /// <summary>Centre of the optic's lens (red dot), in model-root space.</summary>
+        public Vector3 opticSight;
     }
 
     /// <summary>
@@ -57,8 +61,9 @@ namespace FpsBase
             // A built-in suppressor is part of the model already: no extra can.
             int mountedMask = def.integralSuppressor
                 ? attachmentMask & ~Attachments.Bit(AttachmentType.Suppressor) : attachmentMask;
+            Vector3? opticSight = null;
             if (mountedMask != 0)
-                AddAttachments(root.transform, mountedMask, ref muzzlePos, magazine, def);
+                opticSight = AddAttachments(root.transform, mountedMask, ref muzzlePos, magazine, def);
 
             ApplyColor(root, colorIndex);
 
@@ -95,7 +100,9 @@ namespace FpsBase
                 pull = pull,
                 pullRestPosition = pull != null ? pull.localPosition : Vector3.zero,
                 pullRestRotation = pull != null ? pull.localRotation : Quaternion.identity,
-                muzzleFlash = flash
+                muzzleFlash = flash,
+                hasOpticSight = opticSight.HasValue,
+                opticSight = opticSight ?? Vector3.zero
             };
         }
 
@@ -163,11 +170,13 @@ namespace FpsBase
         private static readonly System.Collections.Generic.Dictionary<Mesh, (Vector3[] vertices, int[] triangles)> meshData =
             new System.Collections.Generic.Dictionary<Mesh, (Vector3[], int[])>();
 
-        private static void AddAttachments(Transform holder, int mask, ref Vector3 muzzlePos, Transform magazine, WeaponDefinition def)
+        /// <summary>Mounts the add-ons; returns the optic's sight point if one was mounted.</summary>
+        private static Vector3? AddAttachments(Transform holder, int mask, ref Vector3 muzzlePos, Transform magazine, WeaponDefinition def)
         {
+            Vector3? sight = null;
             var parts = MeasureParts(holder);
             if (parts.Count == 0)
-                return;
+                return null;
             Bounds all = parts[0].bounds;
             foreach (var p in parts) all.Encapsulate(p.bounds);
             float trigger = TriggerZ(holder, parts, magazine);
@@ -209,6 +218,7 @@ namespace FpsBase
                     float top = TopAt(parts, z - b.extents.z * 0.8f, z + b.extents.z * 0.8f, all.max.y);
                     var target = new Vector3(0f, top + Nudge(def, AttachmentType.Optic).y, z);
                     optic.transform.localPosition += target - new Vector3(b.center.x, b.min.y, b.center.z);
+                    sight = AddRedDot(holder, optic.transform);
                 }
             }
 
@@ -244,6 +254,24 @@ namespace FpsBase
                     }
                 }
             }
+            return sight;
+        }
+
+        /// <summary>
+        /// A small glowing dot in the middle of the optic's lens; returns its
+        /// position (holder space) so ADS can line the dot up with the screen centre.
+        /// </summary>
+        private static Vector3 AddRedDot(Transform holder, Transform optic)
+        {
+            Transform lens = null;
+            foreach (var t in optic.GetComponentsInChildren<Transform>())
+                if (t.name.IndexOf("lens", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    lens = t;
+            Bounds b = BoundsIn(holder, lens != null ? lens : optic);
+            var dot = new Vector3(b.center.x, b.center.y, b.center.z);
+            Part(holder, PrimitiveType.Sphere, dot, Vector3.zero, Vector3.one * 0.0035f,
+                EnvironmentBuilder.SharedMaterial(new Color(1f, 0.08f, 0.05f), emission: 4f));
+            return dot;
         }
 
         /// <summary>Optional per-model correction (holder units) after the automatic fit.</summary>
