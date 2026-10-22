@@ -253,9 +253,18 @@ Assets/Scripts/
   UI/        HudOverlay · MenuWidgets · Nametag · OfflineMenu
   Network/   GameModeManager (modes/scores/maps/spawns) · NetworkPlayer · NetworkWeapon
              MainMenu · NetworkGameHud · MultiplayerBootstrap · SteamLobbyService
-Assets/Editor/  MultiplayerSetupTool · NewMapTool (Tools > FPS Base menu)
+Assets/Editor/  MultiplayerSetupTool · NewMapTool · PreviewRenderer (Tools > FPS Base menu)
 Assets/Resources/Maps/  your custom map prefabs (auto-listed in-game)
 ```
+
+## Preview renders (check visuals without playing)
+
+**Tools > FPS Base > Render Preview Sheets** writes PNG sheets to
+`PreviewRenders/`: every weapon bare and with all its add-ons, the
+first-person view and the aimed (ADS) view of each weapon, and three shots of
+every map. The same renders run on GitHub: push a branch named `render/...`
+and the **Render Preview** workflow publishes the images to the
+`render-output` branch.
 
 ## Extending
 
