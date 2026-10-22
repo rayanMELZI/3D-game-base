@@ -129,11 +129,10 @@ namespace FpsBase
             if (IsServer && IsSpawned && CurrentMode == GameMode.ZombieSurvival && !LobbyOpen.Value
                 && GetComponent<ZombieDirector>() == null)
                 gameObject.AddComponent<ZombieDirector>();
-            // Bots are disabled for now (buggy) — the toggle stays in the UI but
-            // never spawns a BotDirector. Re-enable by restoring this block.
-            // if (IsServer && IsSpawned && CurrentMode != GameMode.ZombieSurvival && !LobbyOpen.Value && BotsEnabled.Value
-            //     && GetComponent<BotDirector>() == null)
-            //     gameObject.AddComponent<BotDirector>();
+            // Networked bots: the director keeps BotCount bots in the match (none
+            // in the lobby, Zombie Survival or P Story).
+            if (IsServer && IsSpawned && GetComponent<BotDirector>() == null)
+                gameObject.AddComponent<BotDirector>();
         }
 
         public override void OnDestroy()
@@ -393,6 +392,11 @@ namespace FpsBase
                     bool sameTeam = IsTeamMode && p.Team.Value == team;
                     if (!sameTeam)
                         enemies.Add(p.transform.position);
+                });
+                ForEachBot(b =>
+                {
+                    if (!b.IsDead.Value && !(IsTeamMode && b.Team.Value == team))
+                        enemies.Add(b.transform.position);
                 });
             }
 
