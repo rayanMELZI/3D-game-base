@@ -26,6 +26,9 @@ namespace FpsBase
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> Deaths = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>Mode points (zombie survival: kills, headshots, waves survived). Reset each match.</summary>
+        public NetworkVariable<int> Score = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> GunGameLevel = new NetworkVariable<int>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<int> KillStreak = new NetworkVariable<int>(
