@@ -7,7 +7,10 @@ namespace FpsBase
     /// the emissive trims/visors/tracers glow, ACES filmic tonemapping with a
     /// warm grade, and a soft vignette. Implemented as a classic OnRenderImage
     /// effect using Assets/Shaders/SundownPost.shader.
+    /// ExecuteAlways so editor preview renders (Tools > FPS Base > Render
+    /// Preview Sheets) show the same grade as the game.
     /// </summary>
+    [ExecuteAlways]
     [RequireComponent(typeof(Camera))]
     public class SundownPostEffect : MonoBehaviour
     {
