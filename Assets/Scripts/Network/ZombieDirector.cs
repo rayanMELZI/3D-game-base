@@ -104,6 +104,8 @@ namespace FpsBase
         {
             state = State.Intermission;
             nextWaveAt = Time.time + delay;
+            if (wave == 0)
+                mode.ZombieWave.Value = 0; // fresh match: clear the last game's wave
             mode.ZombieWaveStartsAt.Value = NetworkManager.Singleton.ServerTime.Time + delay;
         }
 
