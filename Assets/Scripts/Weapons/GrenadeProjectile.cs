@@ -156,6 +156,8 @@ namespace FpsBase
                     networkHealth.ServerExplosionDamage(amount, attackerId, point);
                 else if (mode == DamageMode.Server && pair.Key is ZombieAgent zombie)
                     zombie.ServerExplosionDamage(amount, attackerId); // credit the shooter, not the host
+                else if (mode == DamageMode.Server && pair.Key is BotAgent bot)
+                    bot.ServerApplyDamage(amount, false, attackerId); // same for networked bots
                 else
                     pair.Key.TakeDamage(amount, false);
             }
