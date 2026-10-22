@@ -1,0 +1,83 @@
+name: Render Preview
+
+# Renders preview sheets (weapons with/without add-ons, first-person
+# viewmodels, maps) with Assets/Editor/PreviewRenderer.cs and publishes the
+# PNGs to the `render-output` branch, so visual changes can be checked
+# without opening Unity. Runs on pushes to render/** branches or by hand.
+
+on:
+  push:
+    branches:
+      - 'render/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the PNGs to the render-output branch
+
+concurrency:
+  group: render-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render preview sheets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: false
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # Same Library cache as the compile check (same target platform).
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-StandaloneWindows64-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-StandaloneWindows64-
+            Library-
+
+      - name: Render (Unity batch mode)
+        uses: game-ci/unity-builder@v4
+        continue-on-error: true
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: StandaloneWindows64
+          buildName: Preview
+          buildMethod: FpsBase.EditorTools.PreviewRenderer.RenderFromCI
+          versioning: None
+
+      - name: Publish renders to the render-output branch
+        if: always()
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/out
+          sudo cp -r PreviewRenders/. /tmp/out/ 2>/dev/null || echo "Unity produced no renders (compile error or crash)." > /tmp/out/FAILED.txt
+          # Compiler errors, if any (the render method never runs then).
+          sudo grep -rhoE "[^\"]*error CS[0-9]+[^\"]*" Library/Bee 2>/dev/null | sort -u | head -100 > /tmp/out/compile-errors.txt || true
+          echo "${GITHUB_SHA} ${GITHUB_REF_NAME}" > /tmp/out/source.txt
+          sudo chown -R "$(id -u):$(id -g)" /tmp/out
+          cd /tmp/out
+          git init -q -b render-output
+          git config user.name "render-preview"
+          git config user.email "render-preview@users.noreply.github.com"
+          git add -A
+          git commit -qm "Renders for ${GITHUB_REF_NAME} ${GITHUB_SHA}"
+          git push -qf "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" render-output
