@@ -72,11 +72,21 @@ namespace FpsBase
         public NetworkVariable<ulong> LastKillerId = new NetworkVariable<ulong>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        // Zombie survival, written by ZombieDirector on the server, read by the HUD.
+        public NetworkVariable<int> ZombieWave = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<int> ZombiesRemaining = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>Server time (NetworkManager.ServerTime) at which the next wave starts.</summary>
+        public NetworkVariable<double> ZombieWaveStartsAt = new NetworkVariable<double>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         public float restartDelay = 8f;
 
         public GameMode CurrentMode => (GameMode)Mode.Value;
         public bool IsMatchActive => MatchActive.Value && !LobbyOpen.Value;
         public bool IsTeamMode => CurrentMode == GameMode.Duel || CurrentMode == GameMode.TeamDeathmatch;
+        public bool IsZombieMode => CurrentMode == GameMode.ZombieSurvival;
 
         public int ScoreLimit
         {
@@ -156,7 +166,7 @@ namespace FpsBase
         {
             if (!IsServer || !LobbyOpen.Value) return;
             if (CurrentMode == GameMode.ZombieSurvival)
-                MapIndex.Value = Mathf.Min(5, MapCatalog.Count - 1);
+                MapIndex.Value = MapCatalog.DarkMapIndex();
             if (CurrentMode == GameMode.PStory)
                 MapIndex.Value = MapCatalog.PStoryMapIndex();
             LobbyOpen.Value = false;
@@ -178,6 +188,8 @@ namespace FpsBase
             // Preview the forced maps in the lobby card as the host cycles.
             if (CurrentMode == GameMode.PStory)
                 MapIndex.Value = MapCatalog.PStoryMapIndex();
+            if (CurrentMode == GameMode.ZombieSurvival)
+                MapIndex.Value = MapCatalog.DarkMapIndex();
         }
 
         public void HostToggleBots()
@@ -280,6 +292,8 @@ namespace FpsBase
 
         public bool AreSameTeam(ulong a, ulong b)
         {
+            if (IsZombieMode)
+                return true;  // co-op: survivors never hurt each other
             if (!IsTeamMode)
                 return false; // FFA / Gun Game: everyone is a target
             int teamA = TeamOf(a);
@@ -294,18 +308,30 @@ namespace FpsBase
         public Vector3 GetSpawnPoint(int team)
         {
             int side = IsTeamMode ? Mathf.Abs(team) % 2 : -1;
-            var candidates = MapCatalog.SpawnCandidates(MapIndex.Value, side);
+            var candidates = IsZombieMode
+                ? MapCatalog.SurvivorSpawnCandidates(MapIndex.Value)
+                : MapCatalog.SpawnCandidates(MapIndex.Value, side);
 
-            // Positions of everyone currently alive except this team's members.
+            // Positions of everyone currently alive except this team's members
+            // (zombie survival: the living zombies are the enemies).
             var enemies = new List<Vector3>();
-            ForEachPlayer(p =>
+            if (IsZombieMode)
             {
-                if (p == null || !p.IsSpawned || p.IsDead.Value)
-                    return;
-                bool sameTeam = IsTeamMode && p.Team.Value == team;
-                if (!sameTeam)
-                    enemies.Add(p.transform.position);
-            });
+                foreach (var z in ZombieAgent.Active)
+                    if (z != null && z.IsAlive)
+                        enemies.Add(z.transform.position);
+            }
+            else
+            {
+                ForEachPlayer(p =>
+                {
+                    if (p == null || !p.IsSpawned || p.IsDead.Value)
+                        return;
+                    bool sameTeam = IsTeamMode && p.Team.Value == team;
+                    if (!sameTeam)
+                        enemies.Add(p.transform.position);
+                });
+            }
 
             Vector3 best = SnapToGround(candidates[0]);
             float bestScore = float.NegativeInfinity;
@@ -331,7 +357,7 @@ namespace FpsBase
         }
 
         /// <summary>Raycast down onto real geometry so the spawn is never floating over a hole.</summary>
-        private static Vector3 SnapToGround(Vector3 pos)
+        public static Vector3 SnapToGround(Vector3 pos)
         {
             // Cast from just above the candidate — NOT from high up, or indoor
             // maps snap the spawn onto their own ceiling/rooftops (this put
@@ -399,8 +425,79 @@ namespace FpsBase
                 }
             }
 
+            if (attackerId == ulong.MaxValue)
+            {
+                // Killed by a zombie (or a bot): no player to credit.
+                KillFeedClientRpc(IsZombieMode ? $"{NameOf(victimId)}  WAS OVERRUN" : $"{NameOf(victimId)}  DOWN");
+                return;
+            }
             string verb = noScope ? "NO-SCOPE" : (headshot ? "HEADSHOT" : "eliminated");
             KillFeedClientRpc($"{NameOf(attackerId)}  {verb}  {NameOf(victimId)}");
+        }
+
+        // ------------------------------------------------------------------
+        // Zombie survival (server, called by ZombieAgent / ZombieDirector)
+        // ------------------------------------------------------------------
+
+        public const int ZombieKillPoints = 100;
+        public const int ZombieHeadshotPoints = 150;
+        public const int WaveSurvivedPoints = 50;
+
+        /// <summary>A zombie died: points, kill count and a little XP for whoever killed it.</summary>
+        public void ServerZombieKilled(ulong attackerId, bool headshot)
+        {
+            if (!IsServer || !IsMatchActive)
+                return;
+            var attacker = PlayerOf(attackerId);
+            if (attacker == null)
+                return;
+            attacker.Kills.Value++;
+            attacker.Score.Value += headshot ? ZombieHeadshotPoints : ZombieKillPoints;
+            attacker.AwardXpClientRpc(headshot ? 35 : 25, headshot ? XpReason.Headshot : XpReason.Kill,
+                false, 0, OwnerOnly(attackerId));
+        }
+
+        /// <summary>Wave cleared: every survivor still standing earns points for it.</summary>
+        public void ServerZombieWaveCleared(int wave)
+        {
+            if (!IsServer)
+                return;
+            ForEachPlayer(p =>
+            {
+                if (!p.Spectating.Value && !p.IsDead.Value)
+                    p.Score.Value += WaveSurvivedPoints * wave;
+            });
+            KillFeedClientRpc($"WAVE {wave} CLEARED");
+        }
+
+        /// <summary>New wave: the fallen get back up.</summary>
+        public void ServerReviveSurvivors()
+        {
+            if (!IsServer)
+                return;
+            ForEachPlayer(p =>
+            {
+                if (!p.Spectating.Value && p.IsDead.Value)
+                    p.ServerRespawn();
+            });
+        }
+
+        /// <summary>Every survivor is down at once: the match ends (no winner), XP by waves reached.</summary>
+        public void ServerZombieGameOver(int wave)
+        {
+            if (!IsServer || !MatchActive.Value)
+                return;
+            MatchActive.Value = false;
+            WinnerTeam.Value = 0; // shows the end banner (the HUD prints OVERRUN in this mode)
+            WinnerName.Value = default;
+            int xp = MatchCompleteXp + 50 * Mathf.Max(0, wave - 1);
+            ForEachPlayer(player =>
+            {
+                if (!player.Spectating.Value)
+                    player.AwardXpClientRpc(xp, XpReason.MatchComplete, false, 0, OwnerOnly(player.OwnerClientId));
+            });
+            KillFeedClientRpc($"OVERRUN AT WAVE {wave}");
+            StartCoroutine(RestartRoutine());
         }
 
         public string NameOf(ulong clientId)
@@ -456,6 +553,7 @@ namespace FpsBase
                 player.Deaths.Value = 0;
                 player.GunGameLevel.Value = 0;
                 player.KillStreak.Value = 0;
+                player.Score.Value = 0;
                 player.ServerRespawn();
             });
         }
