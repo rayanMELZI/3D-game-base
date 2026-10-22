@@ -316,6 +316,26 @@ namespace FpsBase
                 GUI.DrawTexture(new Rect(center.x + blip.x - 4f, center.y + blip.y - 4f, 8f, 8f), whiteTex);
             }
 
+            // Networked bots follow the same rules (teammates always, enemies per setting).
+            foreach (var bot in BotAgent.All)
+            {
+                if (bot == null || !bot.Alive)
+                    continue;
+                bool teammate = gameMode.IsTeamMode && bot.Team.Value == radarSelf.Team.Value;
+                if (!teammate && !alwaysShow && Time.time - bot.LastShotTime > FirePingSeconds)
+                    continue;
+
+                Vector3 delta = bot.transform.position - myPos;
+                var local = Quaternion.Euler(0f, -myYaw, 0f) * delta;
+                var blip = new Vector2(local.x, -local.z) * (RadarSize / 2f / RadarRange);
+                blip = Vector2.ClampMagnitude(blip, RadarSize / 2f - 6f);
+
+                GUI.color = teammate
+                    ? new Color(0.35f, 0.65f, 1f)
+                    : new Color(1f, 0.25f, 0.2f);
+                GUI.DrawTexture(new Rect(center.x + blip.x - 4f, center.y + blip.y - 4f, 8f, 8f), whiteTex);
+            }
+
             // Me: white arrowhead in the center (always pointing up = my facing).
             GUI.color = Color.white;
             GUI.DrawTexture(new Rect(center.x - 3f, center.y - 5f, 6f, 10f), whiteTex);
