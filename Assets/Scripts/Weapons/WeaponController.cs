@@ -960,6 +960,9 @@ namespace FpsBase
                         if (damageable is NetworkHealth networkHealth)
                             networkHealth.TakeDamageShot(damagePerPellet, headshot,
                                 weapon.model == WeaponModelType.Sniper && !IsZoomed);
+                        else if (damageable is BotAgent bot)
+                            bot.TakeDamageShot(damagePerPellet, headshot,
+                                weapon.model == WeaponModelType.Sniper && !IsZoomed);
                         else
                             damageable.TakeDamage(damagePerPellet, headshot);
                         anyHit = true;
