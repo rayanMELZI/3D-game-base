@@ -415,17 +415,44 @@ namespace FpsBase
 
         // ------------------------------------------------------------------
 
+        private struct ScoreRow
+        {
+            public string name;
+            public int team, level, kills, deaths, score;
+            public bool dead, local, bot;
+        }
+
         private void DrawScoreboard(GameModeManager gameMode)
         {
             bool zombies = gameMode.IsZombieMode;
-            var players = Players()
-                .OrderByDescending(p => zombies ? p.Score.Value : p.Kills.Value)
-                .ThenByDescending(p => p.Kills.Value)
-                .ThenBy(p => p.Deaths.Value)
+            var rows = new System.Collections.Generic.List<ScoreRow>();
+            foreach (var p in Players())
+            {
+                if (p == null) continue;
+                rows.Add(new ScoreRow
+                {
+                    name = p.PlayerName.Value.IsEmpty ? $"Player {p.OwnerClientId + 1}" : p.PlayerName.Value.ToString(),
+                    team = p.Team.Value, level = p.CareerLevel.Value, kills = p.Kills.Value,
+                    deaths = p.Deaths.Value, score = p.Score.Value, dead = p.IsDead.Value, local = p.IsOwner,
+                });
+            }
+            foreach (var b in BotAgent.All)
+            {
+                if (b == null || !b.IsSpawned) continue;
+                rows.Add(new ScoreRow
+                {
+                    name = b.DisplayName, team = b.Team.Value, kills = b.Kills.Value,
+                    deaths = b.Deaths.Value, dead = b.IsDead.Value, bot = true,
+                });
+            }
+            var ordered = rows
+                .OrderByDescending(r => zombies ? r.score : r.kills)
+                .ThenByDescending(r => r.kills)
+                .ThenBy(r => r.deaths)
                 .ToArray();
 
             float w = 560f;
-            float h = 92f + players.Length * 30f;
+            float h = 92f + ordered.Length * 30f;
             var panel = new Rect((Screen.width - w) / 2f, Screen.height * 0.18f, w, h);
             GUI.color = new Color(0f, 0f, 0f, 0.82f);
             GUI.DrawTexture(panel, Texture2D.whiteTexture);
@@ -441,23 +468,21 @@ namespace FpsBase
             GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 50, 20), zombies ? "PTS" : "D", headerStyle);
 
             float y = panel.y + 66f;
-            foreach (var player in players)
+            foreach (var row in ordered)
             {
-                var color = EnvironmentBuilder.TeamColor(player.Team.Value);
+                var color = EnvironmentBuilder.TeamColor(row.team);
                 GUI.color = color;
                 GUI.DrawTexture(new Rect(panel.x + 20, y + 5, 12, 12), Texture2D.whiteTexture);
                 GUI.color = Color.white;
 
-                rowStyle.normal.textColor = player.IsOwner ? MenuWidgets.Accent : Color.white;
-                string name = player.PlayerName.Value.IsEmpty
-                    ? $"Player {player.OwnerClientId + 1}" : player.PlayerName.Value.ToString();
-                if (player.IsDead.Value)
-                    name += "  (dead)";
+                rowStyle.normal.textColor = row.local ? MenuWidgets.Accent
+                    : row.bot ? new Color(1f, 1f, 1f, 0.75f) : Color.white;
+                string name = row.dead ? row.name + "  (dead)" : row.name;
                 GUI.Label(new Rect(panel.x + 42, y, 300, 24), name, rowStyle);
-                GUI.Label(new Rect(panel.x + w - 170, y, 60, 24), player.CareerLevel.Value.ToString(), rowStyle);
-                GUI.Label(new Rect(panel.x + w - 110, y, 40, 24), player.Kills.Value.ToString(), rowStyle);
+                GUI.Label(new Rect(panel.x + w - 170, y, 60, 24), row.bot ? "BOT" : row.level.ToString(), rowStyle);
+                GUI.Label(new Rect(panel.x + w - 110, y, 40, 24), row.kills.ToString(), rowStyle);
                 GUI.Label(new Rect(panel.x + w - 60, y, 50, 24),
-                    (zombies ? player.Score.Value : player.Deaths.Value).ToString(), rowStyle);
+                    (zombies ? row.score : row.deaths).ToString(), rowStyle);
                 y += 30f;
             }
         }
