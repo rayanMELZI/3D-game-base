@@ -175,11 +175,12 @@ namespace FpsBase
                     zombie != null ? zombie.transform.position : default, zombie != null, ObjectKey(zombie));
         }
 
-        public void ServerBotDamage(float amount, Component bot)
+        /// <summary>A networked bot's shot (resolved on the server): the bot gets the kill
+        /// credit like a player, and the victim's hit arrow points at it.</summary>
+        public void ServerBotDamage(float amount, bool headshot, BotAgent bot)
         {
-            if (IsServer)
-                ApplyDamageOnServer(amount, false, ulong.MaxValue, false,
-                    bot != null ? bot.transform.position : default, bot != null, ObjectKey(bot));
+            if (IsServer && bot != null)
+                ApplyDamageOnServer(amount, headshot, bot.BotId, false, bot.transform.position, true, bot.BotId);
         }
     }
 }
