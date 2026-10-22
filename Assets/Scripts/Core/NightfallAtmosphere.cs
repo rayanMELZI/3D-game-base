@@ -93,6 +93,7 @@ namespace FpsBase
             RenderSettings.fogMode = FogMode.Exponential;
             RenderSettings.fogColor = new Color(0.03f, 0.035f, 0.06f);
             RenderSettings.fogDensity = fogDensity;
+            DynamicGI.UpdateEnvironment(); // reflections from the night sky, not the sunset
         }
 
         private void OnDisable()
@@ -112,6 +113,7 @@ namespace FpsBase
             RenderSettings.fogMode = saved.fogMode;
             RenderSettings.fogColor = saved.fogColor;
             RenderSettings.fogDensity = saved.fogDensity;
+            DynamicGI.UpdateEnvironment();
 
             if (flashlight != null)
                 Destroy(flashlight.gameObject);
