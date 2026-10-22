@@ -63,8 +63,12 @@ namespace FpsBase
             true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> LobbyOpen = new NetworkVariable<bool>(
             true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-        public NetworkVariable<bool> BotsEnabled = new NetworkVariable<bool>(
-            true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        /// <summary>Bots added to the match by the host (0 = none). Capped by the free player
+        /// slots; never in Zombie Survival or P Story. See BotDirector.</summary>
+        public NetworkVariable<int> BotCount = new NetworkVariable<int>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public const int MaxBots = 7;
+        private const string BotCountPref = "botCount";
         public NetworkVariable<int> WinnerTeam = new NetworkVariable<int>(
             -1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<FixedString64Bytes> WinnerName = new NetworkVariable<FixedString64Bytes>(
@@ -148,6 +152,7 @@ namespace FpsBase
                 SniperOnly.Value = PendingSniperOnly;
                 RadarMode.Value = PendingRadarMode;
                 ClassLoadout.Value = PendingClassLoadout;
+                BotCount.Value = Mathf.Clamp(PlayerPrefs.GetInt(BotCountPref, 0), 0, MaxBots);
                 ScoreTeam0.Value = 0;
                 ScoreTeam1.Value = 0;
                 WinnerTeam.Value = -1;
@@ -192,9 +197,13 @@ namespace FpsBase
                 MapIndex.Value = MapCatalog.DarkMapIndex();
         }
 
-        public void HostToggleBots()
+        /// <summary>Lobby: cycle the bot count 0..MaxBots (remembered for the next host).</summary>
+        public void HostCycleBots(int direction)
         {
-            if (IsServer && LobbyOpen.Value) BotsEnabled.Value = !BotsEnabled.Value;
+            if (!IsServer || !LobbyOpen.Value) return;
+            BotCount.Value = (BotCount.Value + direction + MaxBots + 1) % (MaxBots + 1);
+            PlayerPrefs.SetInt(BotCountPref, BotCount.Value);
+            PlayerPrefs.Save();
         }
 
         public void HostToggleClassLoadout()
