@@ -14,11 +14,13 @@ namespace FpsBase
     [RequireComponent(typeof(Camera))]
     public class SundownPostEffect : MonoBehaviour
     {
-        [Range(0f, 3f)] public float bloomIntensity = 1.2f;
-        [Range(0f, 2f)] public float bloomThreshold = 1f;
-        [Range(0f, 2f)] public float saturation = 1.15f;
-        [Range(0.5f, 1.5f)] public float contrast = 1.05f;
-        [Range(0f, 1f)] public float vignette = 0.35f;
+        // Threshold above plain sunlit surfaces: only emissives/tracers glow,
+        // bright floors no longer bleed a milky haze over the whole frame.
+        [Range(0f, 3f)] public float bloomIntensity = 0.8f;
+        [Range(0f, 2f)] public float bloomThreshold = 1.35f;
+        [Range(0f, 2f)] public float saturation = 1.18f;
+        [Range(0.5f, 1.5f)] public float contrast = 1.12f;
+        [Range(0f, 1f)] public float vignette = 0.38f;
 
         private Material material;
 
