@@ -100,19 +100,19 @@ namespace FpsBase
                 return;
 
             // First free name, so a replaced bot doesn't duplicate a living one's name.
-            string name = null;
+            string botName = null;
             foreach (var candidate in Names)
             {
                 bool taken = false;
                 foreach (var bot in existing)
                     if (bot.DisplayName == "BOT " + candidate) { taken = true; break; }
-                if (!taken) { name = "BOT " + candidate; break; }
+                if (!taken) { botName = "BOT " + candidate; break; }
             }
 
             var go = Instantiate(source);
             var agent = go.GetComponent<BotAgent>();
             agent.pendingTeam = gameMode.AssignTeam(ulong.MaxValue);
-            agent.pendingName = name ?? $"BOT {existing.Count + 1}";
+            agent.pendingName = botName ?? $"BOT {existing.Count + 1}";
             go.GetComponent<NetworkObject>().Spawn(true);
         }
 
