@@ -207,8 +207,8 @@ namespace FpsBase
 
             if (Attachments.Has(mask, AttachmentType.Optic))
             {
-                foreach (var sight in IronSights(holder))
-                    sight.gameObject.SetActive(false);
+                foreach (var ironSight in IronSights(holder))
+                    ironSight.gameObject.SetActive(false);
                 var optic = MountAddon("Optic", holder, scale);
                 if (optic != null)
                 {
