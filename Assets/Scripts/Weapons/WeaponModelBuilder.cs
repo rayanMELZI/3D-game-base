@@ -171,16 +171,20 @@ namespace FpsBase
             Bounds all = parts[0].bounds;
             foreach (var p in parts) all.Encapsulate(p.bounds);
             float trigger = TriggerZ(holder, parts, magazine);
+            // Handguns get smaller add-ons (compact red-dot, short can).
+            float scale = def.model == WeaponModelType.Pistol ? 0.6f : AddonScale;
 
             if (Attachments.Has(mask, AttachmentType.Suppressor))
             {
-                var can = MountAddon("Suppressor", holder);
+                // Screwed on the real barrel tip (some muzzle points sit ahead of it).
+                muzzlePos.z = BarrelTip(parts, muzzlePos);
+                var can = MountAddon("Suppressor", holder, scale);
                 if (can != null)
                 {
-                    // Rear of the can on the muzzle, centred on the bore.
+                    // Rear of the can on the barrel tip, centred on the bore.
                     var b = BoundsIn(holder, can.transform);
-                    can.transform.localPosition += muzzlePos - new Vector3(b.center.x, b.center.y, b.min.z + 0.005f);
-                    muzzlePos.z += b.size.z - 0.005f; // the flash now exits the can
+                    can.transform.localPosition += muzzlePos - new Vector3(b.center.x, b.center.y, b.min.z + 0.01f);
+                    muzzlePos.z += b.size.z - 0.01f; // the flash now exits the can
                 }
                 else
                 {
@@ -195,7 +199,7 @@ namespace FpsBase
             {
                 foreach (var sight in IronSights(holder))
                     sight.gameObject.SetActive(false);
-                var optic = MountAddon("Optic", holder);
+                var optic = MountAddon("Optic", holder, scale);
                 if (optic != null)
                 {
                     var b = BoundsIn(holder, optic.transform);
@@ -210,7 +214,7 @@ namespace FpsBase
 
             if (Attachments.Has(mask, AttachmentType.Foregrip))
             {
-                var grip = MountAddon("Foregrip", holder);
+                var grip = MountAddon("Foregrip", holder, scale);
                 if (grip != null)
                 {
                     var b = BoundsIn(holder, grip.transform);
@@ -230,7 +234,7 @@ namespace FpsBase
                     StretchMagazine(holder, magazine, 1.45f);
                 else
                 {
-                    var mag = MountAddon("ExtendedMag", holder);
+                    var mag = MountAddon("ExtendedMag", holder, scale);
                     if (mag != null)
                     {
                         var b = BoundsIn(holder, mag.transform);
@@ -248,7 +252,7 @@ namespace FpsBase
             return Vector3.zero;
         }
 
-        private static GameObject MountAddon(string name, Transform holder)
+        private static GameObject MountAddon(string name, Transform holder, float scale)
         {
             var prefab = Resources.Load<GameObject>("Weapons/Attachments/" + name);
             if (prefab == null) return null;
@@ -256,7 +260,7 @@ namespace FpsBase
             instance.name = name;
             instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.identity;
-            instance.transform.localScale = Vector3.one * AddonScale;
+            instance.transform.localScale = Vector3.one * scale;
             foreach (var collider in instance.GetComponentsInChildren<Collider>()) Strip(collider);
             return instance;
         }
@@ -410,6 +414,21 @@ namespace FpsBase
             if (hand != null) return holder.InverseTransformPoint(hand.position).z + 0.06f;
             if (magazine != null) return BoundsIn(holder, magazine).center.z - 0.06f;
             return 0.02f; // weapons are fitted with the trigger near the holder origin
+        }
+
+        /// <summary>Front end of the barrel: the model's foremost point around the bore axis.</summary>
+        private static float BarrelTip(System.Collections.Generic.List<PartBox> parts, Vector3 muzzle)
+        {
+            float tip = float.MinValue;
+            foreach (var p in parts)
+            {
+                if (p.points == null) continue;
+                foreach (var v in p.points)
+                    if (Mathf.Abs(v.x - muzzle.x) < 0.03f && Mathf.Abs(v.y - muzzle.y) < 0.03f
+                        && v.z > muzzle.z - 0.3f && v.z > tip)
+                        tip = v.z;
+            }
+            return tip > float.MinValue ? tip : muzzle.z;
         }
 
         /// <summary>Highest point of the model within [z0, z1], iron sights excluded.</summary>
