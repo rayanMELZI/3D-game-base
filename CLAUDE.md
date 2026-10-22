@@ -64,6 +64,15 @@ is the onboarding brief for AI assistants working on the repo.
   re-run after changing the rig structure) · `NewMapTool` (starter custom map)
   · `BakeMapTool` (bake a code map into an editable prefab with real material
   assets + spawn markers).
+  · `PreviewRenderer` (Tools > FPS Base > Render Preview Sheets: PNG sheets of
+  every weapon bare/with all add-ons, first-person hip + ADS views on the
+  Arena, 3 shots per map, plus `bounds.txt` with every part's bounds).
+- **Visual checks without Unity**: push to any `render/**` branch →
+  `.github/workflows/render-preview.yml` runs PreviewRenderer in batch mode and
+  force-pushes the PNGs (or `FAILED.txt` + `compile-errors.txt`) to the
+  `render-output` branch. Clone that branch and look at the images before
+  calling visual work done. Edit-mode renders skip runtime-only scripts
+  (NIGHTFALL darkness, SKYFREIGHT clouds).
 
 ## Key invariants / gotchas
 
@@ -121,6 +130,14 @@ is the onboarding brief for AI assistants working on the repo.
   The owner saves it (`GameSettings.AwardExperience`, PlayerPrefs `experience`)
   and writes the owner-permission `CareerLevel` NetworkVariable that the lobby
   and scoreboard read. Curve: level n at 100 × (n-1)² XP.
+- **Add-on models are fitted, not hand-placed**: `WeaponModelBuilder.AddAttachments`
+  measures each model's mesh (weapon FBXs have Read/Write on for this): optic
+  on the receiver top over the trigger with iron sights (`*_sight`, `ironsight`,
+  `_Optic_`) folded, suppressor on the measured barrel tip/bore, foregrip under
+  the handguard (skipped when there is none), extended mag = the gun's own
+  magazine stretched (none on tube shotguns/launcher). Per-model tweaks:
+  `Nudge`. With an optic, ADS aims through the red dot
+  (`WeaponModelInstance.opticSight`, `WeaponController.AdsPosition`).
 - **Add-ons are per class**: `GameSettings.ClassAttachments[class][weapon]`
   (prefs `class{c}Att{i}`, migrated from the old global `weaponAtt{i}`).
   Full-arsenal mode uses the selected class's add-ons. `WeaponController`
