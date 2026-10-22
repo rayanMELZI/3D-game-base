@@ -84,6 +84,17 @@ is the onboarding brief for AI assistants working on the repo.
 - **Code-generated materials can't be saved in prefabs/scenes** — play-mode
   copies go pink. `BakeMapTool` saves material assets properly; `MapCatalog`
   gray-fallbacks missing ones at runtime.
+- **Zombie survival** is networked: `ZombieDirector` (server-only, on the
+  GameModeManager object) spawns `Assets/Prefabs/NetworkZombie.prefab`
+  (NetworkObject + `ZombieNetworkTransform` + `ZombieAgent`, registered in
+  `DefaultNetworkPrefabs.asset`) in waves at `MapCatalog.ZombieSpawnCandidates`
+  far from survivors. `ZombieAgent`: server movement/attacks/HP, shots reach it
+  through `IDamageable` → `DamageRpc`; visuals (tinted Survivalist skin, arms
+  out, red eyes) built on every peer. Co-op (`AreSameTeam` true), the fallen
+  stay down until the next wave, everyone down = `ServerZombieGameOver`.
+  Wave/remaining/countdown live in GameModeManager NetworkVariables, points in
+  `NetworkPlayer.Score`. The mode forces NIGHTFALL (`BuildNightfall`, lighting
+  by `NightfallAtmosphere`, restored when the map unloads).
 - **Custom maps** live in `Assets/Resources/Maps/` (prefab name → menu name,
   needs `SpawnPoint` children or falls back to a spawn ring). Nuketown is one
   of these now (`Nuketown.prefab`), not a built-in.
