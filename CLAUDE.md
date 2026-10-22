@@ -95,6 +95,20 @@ is the onboarding brief for AI assistants working on the repo.
   Wave/remaining/countdown live in GameModeManager NetworkVariables, points in
   `NetworkPlayer.Score`. The mode forces NIGHTFALL (`BuildNightfall`, lighting
   by `NightfallAtmosphere`, restored when the map unloads).
+- **Bots** are networked: `BotDirector` (server-only, on the GameModeManager
+  object) keeps `GameModeManager.BotCount` bots (host lobby setting 0–7,
+  PlayerPrefs `botCount`, capped by free player slots; none in the lobby,
+  Zombie Survival or P Story) by spawning `Assets/Prefabs/NetworkBot.prefab`
+  (NetworkObject + `BotNetworkTransform` + `BotAgent`, in
+  `DefaultNetworkPrefabs.asset`), and balances team modes. `BotAgent`: body
+  from `Core/BotRig` (player capsule + humanoid hitboxes + skin) built on every
+  peer, server-only AI (LOS, reaction time, aim error that settles while
+  tracking, bursts, hitscan resolved on the server, straight delayed splash for
+  RPG/GL), paths on a NavMesh baked at runtime per map from the map colliders
+  (`BotNavigation`, fallback steering). Bots stand in for client ids with
+  `BotAgent.BotId` (`IdBase + NetworkObjectId`): `GameModeManager.TeamOf`/
+  `NameOf`/`BotOf`/`CombatantTransform`, `ReportKill` → `ReportBotKill`,
+  `NetworkHealth.ServerBotDamage`. Bots get no XP; a bot can win FFA/Gun Game.
 - **Custom maps** live in `Assets/Resources/Maps/` (prefab name → menu name,
   needs `SpawnPoint` children or falls back to a spawn ring). Nuketown is one
   of these now (`Nuketown.prefab`), not a built-in.
