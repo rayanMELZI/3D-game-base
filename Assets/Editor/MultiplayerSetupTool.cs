@@ -19,6 +19,8 @@ namespace FpsBase.EditorTools
     {
         private const string PrefabPath = "Assets/Prefabs/NetworkPlayer.prefab";
         private const string ScenePath = "Assets/Scenes/Multiplayer.unity";
+        private const string ZombiePrefabPath = "Assets/Prefabs/NetworkZombie.prefab";
+        private const string PrefabListPath = "Assets/DefaultNetworkPrefabs.asset";
 
         [MenuItem("Tools/FPS Base/Setup Multiplayer (Scene + Player Prefab)")]
         public static void Setup()
@@ -80,6 +82,9 @@ namespace FpsBase.EditorTools
                 networkManager.NetworkConfig = new NetworkConfig();
             networkManager.NetworkConfig.NetworkTransport = transport;
             networkManager.NetworkConfig.PlayerPrefab = playerPrefab;
+            var prefabList = EnsureZombiePrefabRegistered();
+            if (prefabList != null && !networkManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Contains(prefabList))
+                networkManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(prefabList);
             networkManager.NetworkConfig.ConnectionApproval = true; // enforced player limits
             transport.ConnectionData.Address = "127.0.0.1";
             transport.ConnectionData.Port = MainMenu.Port;
@@ -99,6 +104,28 @@ namespace FpsBase.EditorTools
             uiGo.AddComponent<NetworkGameHud>();
 
             EditorSceneManager.SaveScene(scene, ScenePath);
+        }
+
+        /// <summary>
+        /// Zombie survival spawns Assets/Prefabs/NetworkZombie.prefab at runtime:
+        /// it must be in the network prefab list on every build.
+        /// </summary>
+        private static NetworkPrefabsList EnsureZombiePrefabRegistered()
+        {
+            var list = AssetDatabase.LoadAssetAtPath<NetworkPrefabsList>(PrefabListPath);
+            var zombie = AssetDatabase.LoadAssetAtPath<GameObject>(ZombiePrefabPath);
+            if (list == null || zombie == null)
+            {
+                Debug.LogWarning("[MultiplayerSetup] NetworkZombie prefab or DefaultNetworkPrefabs missing: zombie survival won't spawn zombies.");
+                return list;
+            }
+            if (!list.PrefabList.Any(p => p.Prefab == zombie))
+            {
+                list.Add(new NetworkPrefab { Prefab = zombie });
+                EditorUtility.SetDirty(list);
+                AssetDatabase.SaveAssets();
+            }
+            return list;
         }
 
         /// <summary>
