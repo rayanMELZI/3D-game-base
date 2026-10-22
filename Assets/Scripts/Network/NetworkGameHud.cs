@@ -85,8 +85,12 @@ namespace FpsBase
                 {
                     SfxSynth.Play2D(SfxSynth.WinJingle(), 0.9f);
                     var killer = FindPlayer(gameMode.LastKillerId.Value);
-                    if (killer != null)
-                        DeathCam.Begin(killer.transform, "FINAL KILL");
+                    Transform killerTransform = killer != null ? killer.transform : null;
+                    foreach (var bot in BotAgent.All)
+                        if (killerTransform == null && bot != null && bot.IsSpawned && bot.BotId == gameMode.LastKillerId.Value)
+                            killerTransform = bot.transform;
+                    if (killerTransform != null)
+                        DeathCam.Begin(killerTransform, "FINAL KILL");
                 }
                 else
                 {
