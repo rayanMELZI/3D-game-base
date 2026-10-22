@@ -254,6 +254,9 @@ namespace FpsBase
                     if (player.OwnerClientId != newClientId)
                         used[Mathf.Abs(player.Team.Value) % 8] = true;
                 });
+                foreach (var bot in BotAgent.All)
+                    if (bot != null && bot.IsSpawned && bot.BotId != newClientId)
+                        used[Mathf.Abs(bot.Team.Value) % 8] = true;
                 for (int i = 0; i < used.Length; i++)
                     if (!used[i])
                         return i;
@@ -268,6 +271,13 @@ namespace FpsBase
                 if (player.Team.Value == 0) team0++;
                 else team1++;
             });
+            foreach (var bot in BotAgent.All)
+            {
+                if (bot == null || !bot.IsSpawned || bot.BotId == newClientId)
+                    continue;
+                if (bot.Team.Value == 0) team0++;
+                else team1++;
+            }
             return team0 <= team1 ? 0 : 1;
         }
 
@@ -285,8 +295,25 @@ namespace FpsBase
                 else other++;
             });
 
+            foreach (var bot in BotAgent.All)
+            {
+                if (bot == null || !bot.IsSpawned)
+                    continue;
+                if (bot.Team.Value == myTeam) mine++;
+                else other++;
+            }
+
             if (other >= mine)
-                return false; // would unbalance
+            {
+                // Would unbalance: trade places with a bot of the other team, if any.
+                BotAgent swap = null;
+                foreach (var bot in BotAgent.All)
+                    if (bot != null && bot.IsSpawned && bot.Team.Value != myTeam)
+                        swap = bot;
+                if (swap == null)
+                    return false;
+                swap.ServerSetTeam(myTeam);
+            }
 
             player.Team.Value = 1 - myTeam;
             player.ServerRespawn();
@@ -296,7 +323,31 @@ namespace FpsBase
         public int TeamOf(ulong clientId)
         {
             var player = PlayerOf(clientId);
-            return player != null ? player.Team.Value : -1;
+            if (player != null)
+                return player.Team.Value;
+            var bot = BotOf(clientId);
+            return bot != null ? bot.Team.Value : -1;
+        }
+
+        /// <summary>The networked bot with this BotId (bots stand in for client ids in kill credit/teams).</summary>
+        public BotAgent BotOf(ulong id)
+        {
+            if (!BotAgent.IsBotId(id))
+                return null;
+            foreach (var bot in BotAgent.All)
+                if (bot != null && bot.IsSpawned && bot.BotId == id)
+                    return bot;
+            return null;
+        }
+
+        /// <summary>The player or bot behind an attacker id (null for zombies / unknown).</summary>
+        public Transform CombatantTransform(ulong id)
+        {
+            var player = PlayerOf(id);
+            if (player != null)
+                return player.transform;
+            var bot = BotOf(id);
+            return bot != null ? bot.transform : null;
         }
 
         public bool AreSameTeam(ulong a, ulong b)
@@ -514,6 +565,9 @@ namespace FpsBase
             var player = PlayerOf(clientId);
             if (player != null && !player.PlayerName.Value.IsEmpty)
                 return player.PlayerName.Value.ToString();
+            var bot = BotOf(clientId);
+            if (bot != null)
+                return bot.DisplayName;
             return $"Player {clientId + 1}";
         }
 
