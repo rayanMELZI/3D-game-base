@@ -447,9 +447,18 @@ namespace FpsBase
                 victim.Deaths.Value++;
                 victim.KillStreak.Value = 0;
             }
+            var victimBot = victim == null ? BotOf(victimId) : null;
+            if (victimBot != null)
+            {
+                victimBot.Deaths.Value++;
+                victimBot.KillStreak.Value = 0;
+            }
 
             var attacker = PlayerOf(attackerId);
-            if (attackerId != victimId && attacker != null)
+            var attackerBot = attacker == null && attackerId != victimId ? BotOf(attackerId) : null;
+            if (attackerBot != null)
+                ReportBotKill(attackerBot);
+            else if (attackerId != victimId && attacker != null)
             {
                 attacker.Kills.Value++;
                 attacker.KillStreak.Value++;
@@ -493,6 +502,41 @@ namespace FpsBase
             }
             string verb = noScope ? "NO-SCOPE" : (headshot ? "HEADSHOT" : "eliminated");
             KillFeedClientRpc($"{NameOf(attackerId)}  {verb}  {NameOf(victimId)}");
+        }
+
+        /// <summary>A bot scored a kill: same stats, streaks and win conditions as a player, no XP.</summary>
+        private void ReportBotKill(BotAgent bot)
+        {
+            bot.Kills.Value++;
+            bot.KillStreak.Value++;
+            LastKillerId.Value = bot.BotId;
+            int streak = bot.KillStreak.Value;
+            if (streak >= 5 && streak % 5 == 0)
+                KillFeedClientRpc($"{bot.DisplayName}  KILLSTREAK  {streak}");
+
+            switch (CurrentMode)
+            {
+                case GameMode.Duel:
+                case GameMode.TeamDeathmatch:
+                    if (bot.Team.Value == 0) ScoreTeam0.Value++;
+                    else ScoreTeam1.Value++;
+                    if (ScoreTeam0.Value >= ScoreLimit) EndMatch(0, null);
+                    else if (ScoreTeam1.Value >= ScoreLimit) EndMatch(1, null);
+                    break;
+
+                case GameMode.FreeForAll:
+                    if (bot.Kills.Value >= ScoreLimit)
+                        EndMatch(bot.Team.Value, null, bot.DisplayName);
+                    break;
+
+                case GameMode.GunGame:
+                    bot.GunGameLevel.Value++;
+                    if (bot.GunGameLevel.Value >= GunGameOrder.Length)
+                        EndMatch(bot.Team.Value, null, bot.DisplayName);
+                    else
+                        bot.ServerRefreshWeapon(); // next weapon of the ladder
+                    break;
+            }
         }
 
         // ------------------------------------------------------------------
@@ -572,14 +616,15 @@ namespace FpsBase
         }
 
         /// <param name="winner">The winning player in solo modes; null = the whole team won.</param>
-        private void EndMatch(int winnerTeam, NetworkPlayer winner)
+        /// <param name="botWinnerName">A bot won a solo mode (FFA / Gun Game): no player gets the win XP.</param>
+        private void EndMatch(int winnerTeam, NetworkPlayer winner, string botWinnerName = null)
         {
             if (!MatchActive.Value)
                 return; // already ended: never award match XP twice
             MatchActive.Value = false;
             WinnerTeam.Value = winnerTeam;
-            WinnerName.Value = winner != null ? NameOf(winner.OwnerClientId) : "";
-            AwardMatchXp(winnerTeam, winner);
+            WinnerName.Value = winner != null ? NameOf(winner.OwnerClientId) : (botWinnerName ?? "");
+            AwardMatchXp(winnerTeam, winner, botWinnerName != null);
             StartCoroutine(RestartRoutine());
         }
 
@@ -588,13 +633,13 @@ namespace FpsBase
 
         /// <summary>Everyone who played (spectators excluded) gets XP once per match end;
         /// the winners get the bigger reward.</summary>
-        private void AwardMatchXp(int winnerTeam, NetworkPlayer winner)
+        private void AwardMatchXp(int winnerTeam, NetworkPlayer winner, bool botWon = false)
         {
             ForEachPlayer(player =>
             {
                 if (player.Spectating.Value)
                     return;
-                bool won = winner != null ? player == winner : player.Team.Value == winnerTeam;
+                bool won = winner != null ? player == winner : !botWon && player.Team.Value == winnerTeam;
                 player.AwardXpClientRpc(won ? WinXp : MatchCompleteXp,
                     won ? XpReason.Win : XpReason.MatchComplete, false, 0, OwnerOnly(player.OwnerClientId));
             });
