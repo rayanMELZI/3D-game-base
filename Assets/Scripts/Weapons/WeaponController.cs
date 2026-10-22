@@ -418,6 +418,17 @@ namespace FpsBase
         // Viewmodel motion: idle sway, movement lag/bob, ADS, recoil and sprint pose
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// Where the model sits at full ADS: the weapon's tuned iron-sight
+        /// offset, or, with an optic mounted, the lens centre on the screen centre.
+        /// </summary>
+        public static Vector3 AdsPosition(WeaponDefinition weapon, WeaponModelInstance model, float verticalOffset)
+        {
+            if (model.hasOpticSight)
+                return new Vector3(weapon.adsOffset.x - model.opticSight.x, -model.opticSight.y, weapon.adsOffset.z);
+            return weapon.adsOffset + Vector3.up * verticalOffset;
+        }
+
         private void AnimateViewmodel(WeaponDefinition weapon, WeaponModelInstance model, bool sprinting)
         {
             float deltaTime = Time.deltaTime;
@@ -436,7 +447,7 @@ namespace FpsBase
             smoothedMoveInput = Vector2.Lerp(smoothedMoveInput, moveInput, 10f * deltaTime);
             locomotionCycle += deltaTime * Mathf.Lerp(2f, walkBobSpeed, walkingBlend);
 
-            Vector3 adsPosition = weapon.adsOffset + Vector3.up * adsVerticalOffset;
+            Vector3 adsPosition = AdsPosition(weapon, model, adsVerticalOffset);
             Vector3 basePos = Vector3.Lerp(weapon.viewOffset, adsPosition, adsBlend);
             Vector3 baseEuler = Vector3.zero;
 
