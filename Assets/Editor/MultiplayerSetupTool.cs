@@ -20,6 +20,7 @@ namespace FpsBase.EditorTools
         private const string PrefabPath = "Assets/Prefabs/NetworkPlayer.prefab";
         private const string ScenePath = "Assets/Scenes/Multiplayer.unity";
         private const string ZombiePrefabPath = "Assets/Prefabs/NetworkZombie.prefab";
+        private const string BotPrefabPath = "Assets/Prefabs/NetworkBot.prefab";
         private const string PrefabListPath = "Assets/DefaultNetworkPrefabs.asset";
 
         [MenuItem("Tools/FPS Base/Setup Multiplayer (Scene + Player Prefab)")]
@@ -83,6 +84,7 @@ namespace FpsBase.EditorTools
             networkManager.NetworkConfig.NetworkTransport = transport;
             networkManager.NetworkConfig.PlayerPrefab = playerPrefab;
             var prefabList = EnsureZombiePrefabRegistered();
+            EnsureBotPrefabRegistered(prefabList);
             if (prefabList != null && !networkManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Contains(prefabList))
                 networkManager.NetworkConfig.Prefabs.NetworkPrefabsLists.Add(prefabList);
             networkManager.NetworkConfig.ConnectionApproval = true; // enforced player limits
@@ -126,6 +128,26 @@ namespace FpsBase.EditorTools
                 AssetDatabase.SaveAssets();
             }
             return list;
+        }
+
+        /// <summary>
+        /// Bots (BotDirector) spawn Assets/Prefabs/NetworkBot.prefab at runtime:
+        /// keep it in the same network prefab list.
+        /// </summary>
+        private static void EnsureBotPrefabRegistered(NetworkPrefabsList list)
+        {
+            var bot = AssetDatabase.LoadAssetAtPath<GameObject>(BotPrefabPath);
+            if (list == null || bot == null)
+            {
+                Debug.LogWarning("[MultiplayerSetup] NetworkBot prefab or DefaultNetworkPrefabs missing: no bots in matches.");
+                return;
+            }
+            if (!list.PrefabList.Any(p => p.Prefab == bot))
+            {
+                list.Add(new NetworkPrefab { Prefab = bot });
+                EditorUtility.SetDirty(list);
+                AssetDatabase.SaveAssets();
+            }
         }
 
         /// <summary>
