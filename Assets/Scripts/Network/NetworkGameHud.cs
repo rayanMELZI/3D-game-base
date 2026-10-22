@@ -195,6 +195,14 @@ namespace FpsBase
                 GUI.Label(new Rect(left.x + 16, ry, left.width - 32, 24), name + tag, rowStyle);
                 ry += 26f;
             }
+            // Bots only join once the match starts (they'd run around the lobby otherwise).
+            if (gameMode.BotCount.Value > 0 && ModeAllowsBots(gameMode))
+            {
+                rowStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
+                GUI.Label(new Rect(left.x + 16, ry, left.width - 32, 24),
+                    $"+ {gameMode.BotCount.Value} bot{(gameMode.BotCount.Value > 1 ? "s" : "")} at match start", rowStyle);
+                ry += 26f;
+            }
 
             // ---- RIGHT: map "card" (name + mode; no real thumbnail exists) ----
             var right = new Rect(centerX + 170f, top, 300f, colH);
@@ -238,6 +246,11 @@ namespace FpsBase
                     gameMode.HostToggleClassLoadout();
                 if (GUI.Button(Slot(), $"MINIMAP: {RadarLabel(gameMode.RadarMode.Value)}"))
                     gameMode.HostCycleRadar();
+
+                var botRow = Slot();
+                if (GUI.Button(new Rect(botRow.x, botRow.y, 54, bh), "◀")) gameMode.HostCycleBots(-1);
+                GUI.Label(new Rect(botRow.x + 60, botRow.y, botRow.width - 120, bh), BotsLabel(gameMode), CenteredRow());
+                if (GUI.Button(new Rect(botRow.xMax - 54, botRow.y, 54, bh), "▶")) gameMode.HostCycleBots(1);
 
                 my += 6f;
                 var start = Slot(); start.height = 52f;
@@ -283,6 +296,16 @@ namespace FpsBase
                 case GameMode.PStory: return "P STORY";
                 default: return "GUN GAME";
             }
+        }
+
+        private static bool ModeAllowsBots(GameModeManager gm) =>
+            gm.CurrentMode != GameMode.ZombieSurvival && gm.CurrentMode != GameMode.PStory;
+
+        private static string BotsLabel(GameModeManager gm)
+        {
+            if (!ModeAllowsBots(gm))
+                return "BOTS: NOT IN THIS MODE";
+            return gm.BotCount.Value == 0 ? "BOTS: NONE" : $"BOTS: {gm.BotCount.Value}";
         }
 
         private static string RadarLabel(int mode) =>
