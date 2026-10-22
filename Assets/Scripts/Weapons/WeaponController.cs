@@ -424,8 +424,10 @@ namespace FpsBase
         /// </summary>
         public static Vector3 AdsPosition(WeaponDefinition weapon, WeaponModelInstance model, float verticalOffset)
         {
+            // The lens ~26 cm from the eye so the optic fills the sight picture.
             if (model.hasOpticSight)
-                return new Vector3(weapon.adsOffset.x - model.opticSight.x, -model.opticSight.y, weapon.adsOffset.z);
+                return new Vector3(weapon.adsOffset.x - model.opticSight.x, -model.opticSight.y,
+                    Mathf.Min(weapon.adsOffset.z, 0.26f - model.opticSight.z));
             return weapon.adsOffset + Vector3.up * verticalOffset;
         }
 
