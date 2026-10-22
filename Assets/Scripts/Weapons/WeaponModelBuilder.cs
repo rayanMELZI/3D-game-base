@@ -182,12 +182,13 @@ namespace FpsBase
             float trigger = TriggerZ(holder, parts, magazine);
             // Handguns get smaller add-ons (compact red-dot, short can).
             float scale = def.model == WeaponModelType.Pistol ? 0.6f : AddonScale;
+            // Real end of the barrel, centred on its bore (some muzzle points
+            // sit ahead of or above the barrel). Measured before the can goes on.
+            Vector3 bore = BarrelTip(parts, muzzlePos);
 
             if (Attachments.Has(mask, AttachmentType.Suppressor))
             {
-                // Screwed on the real barrel tip, centred on its bore (some
-                // muzzle points sit ahead of or above the barrel).
-                muzzlePos = BarrelTip(parts, muzzlePos);
+                muzzlePos = bore;
                 var can = MountAddon("Suppressor", holder, scale);
                 if (can != null)
                 {
@@ -231,10 +232,10 @@ namespace FpsBase
                     var b = BoundsIn(holder, grip.transform);
                     // Under the handguard: between the magazine and the muzzle.
                     float magFront = magazine != null ? BoundsIn(holder, magazine).max.z : trigger + 0.08f;
-                    float z = Mathf.Max(magFront + b.extents.z + 0.03f, Mathf.Lerp(trigger, muzzlePos.z, 0.55f));
-                    z = Mathf.Min(z, muzzlePos.z - b.extents.z - 0.02f) + Nudge(def, AttachmentType.Foregrip).z;
+                    float z = Mathf.Max(magFront + b.extents.z + 0.03f, Mathf.Lerp(trigger, bore.z, 0.55f));
+                    z = Mathf.Min(z, bore.z - b.extents.z - 0.02f) + Nudge(def, AttachmentType.Foregrip).z;
                     // Only the handguard counts: bipods, loops and guards hang lower.
-                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, muzzlePos.y - 0.02f, muzzlePos.y - 0.09f);
+                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, bore.y - 0.02f, bore.y - 0.09f);
                     var target = new Vector3(0f, bottom + Nudge(def, AttachmentType.Foregrip).y, z);
                     grip.transform.localPosition += target - new Vector3(b.center.x, b.max.y - 0.004f, b.center.z);
                 }
