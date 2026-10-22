@@ -77,7 +77,11 @@ namespace FpsBase
             int winner = gameMode.WinnerTeam.Value;
             if (winner != lastWinner)
             {
-                if (winner >= 0)
+                if (winner >= 0 && gameMode.IsZombieMode)
+                {
+                    SfxSynth.Play2D(SfxSynth.Death(), 0.9f); // overrun: no winner, no final kill cam
+                }
+                else if (winner >= 0)
                 {
                     SfxSynth.Play2D(SfxSynth.WinJingle(), 0.9f);
                     var killer = FindPlayer(gameMode.LastKillerId.Value);
@@ -326,7 +330,11 @@ namespace FpsBase
             modeStyle.normal.textColor = new Color(1f, 1f, 1f, 0.6f);
             GUI.Label(new Rect(cx - 260, 8, 520, 18), ModeTitle(gameMode), modeStyle);
 
-            if (gameMode.IsTeamMode)
+            if (gameMode.IsZombieMode)
+            {
+                DrawZombieScores(gameMode, cx);
+            }
+            else if (gameMode.IsTeamMode)
             {
                 DrawScoreBlock(new Rect(cx - 110, 30, 90, 42), EnvironmentBuilder.Team0Color, gameMode.ScoreTeam0.Value.ToString());
                 DrawScoreBlock(new Rect(cx + 20, 30, 90, 42), EnvironmentBuilder.Team1Color, gameMode.ScoreTeam1.Value.ToString());
@@ -341,6 +349,33 @@ namespace FpsBase
                         : $"KILLS {local.Kills.Value} / {gameMode.ScoreLimit}";
                     DrawScoreBlock(new Rect(cx - 130, 30, 260, 42), EnvironmentBuilder.TeamColor(local.Team.Value), progress);
                 }
+            }
+        }
+
+        private static readonly Color ZombieColor = new Color(0.55f, 0.85f, 0.35f);
+
+        /// <summary>Zombie survival: wave + zombies left (or the countdown to the next wave), and your points.</summary>
+        private void DrawZombieScores(GameModeManager gameMode, float cx)
+        {
+            int wave = gameMode.ZombieWave.Value;
+            int left = gameMode.ZombiesRemaining.Value;
+            string waveText;
+            if (left > 0)
+                waveText = $"WAVE {wave}  ·  {left} LEFT";
+            else
+            {
+                double remaining = gameMode.ZombieWaveStartsAt.Value - NetworkManager.Singleton.ServerTime.Time;
+                waveText = gameMode.IsMatchActive && remaining > 0
+                    ? $"WAVE {wave + 1} IN {Mathf.CeilToInt((float)remaining)}"
+                    : $"WAVE {Mathf.Max(wave, 1)}";
+            }
+            DrawScoreBlock(new Rect(cx - 170, 30, 340, 42), ZombieColor, waveText);
+
+            var local = LocalPlayer();
+            if (local != null)
+            {
+                subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+                GUI.Label(new Rect(cx - 170, 76, 340, 22), $"SCORE {local.Score.Value}  ·  KILLS {local.Kills.Value}", subStyle);
             }
         }
 
@@ -382,8 +417,10 @@ namespace FpsBase
 
         private void DrawScoreboard(GameModeManager gameMode)
         {
+            bool zombies = gameMode.IsZombieMode;
             var players = Players()
-                .OrderByDescending(p => p.Kills.Value)
+                .OrderByDescending(p => zombies ? p.Score.Value : p.Kills.Value)
+                .ThenByDescending(p => p.Kills.Value)
                 .ThenBy(p => p.Deaths.Value)
                 .ToArray();
 
@@ -401,7 +438,7 @@ namespace FpsBase
             GUI.Label(new Rect(panel.x + 20, panel.y + 40, 300, 20), "PLAYER", headerStyle);
             GUI.Label(new Rect(panel.x + w - 170, panel.y + 40, 60, 20), "LVL", headerStyle);
             GUI.Label(new Rect(panel.x + w - 110, panel.y + 40, 40, 20), "K", headerStyle);
-            GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 40, 20), "D", headerStyle);
+            GUI.Label(new Rect(panel.x + w - 60, panel.y + 40, 50, 20), zombies ? "PTS" : "D", headerStyle);
 
             float y = panel.y + 66f;
             foreach (var player in players)
@@ -419,7 +456,8 @@ namespace FpsBase
                 GUI.Label(new Rect(panel.x + 42, y, 300, 24), name, rowStyle);
                 GUI.Label(new Rect(panel.x + w - 170, y, 60, 24), player.CareerLevel.Value.ToString(), rowStyle);
                 GUI.Label(new Rect(panel.x + w - 110, y, 40, 24), player.Kills.Value.ToString(), rowStyle);
-                GUI.Label(new Rect(panel.x + w - 60, y, 40, 24), player.Deaths.Value.ToString(), rowStyle);
+                GUI.Label(new Rect(panel.x + w - 60, y, 50, 24),
+                    (zombies ? player.Score.Value : player.Deaths.Value).ToString(), rowStyle);
                 y += 30f;
             }
         }
@@ -428,6 +466,17 @@ namespace FpsBase
 
         private void DrawBanners(NetworkManager nm, GameModeManager gameMode)
         {
+            if (!gameMode.IsMatchActive && gameMode.WinnerTeam.Value >= 0 && gameMode.IsZombieMode)
+            {
+                bannerStyle.normal.textColor = new Color(0.9f, 0.2f, 0.15f);
+                GUI.Label(new Rect(0, Screen.height * 0.16f, Screen.width, 60), "OVERRUN", bannerStyle);
+                int waves = Mathf.Max(0, gameMode.ZombieWave.Value - 1);
+                subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
+                GUI.Label(new Rect(0, Screen.height * 0.16f + 62, Screen.width, 24),
+                    $"Survived {waves} wave{(waves == 1 ? "" : "s")}  ·  next match starting soon...", subStyle);
+                return;
+            }
+
             if (!gameMode.IsMatchActive && gameMode.WinnerTeam.Value >= 0)
             {
                 var color = EnvironmentBuilder.TeamColor(gameMode.WinnerTeam.Value);
@@ -450,12 +499,14 @@ namespace FpsBase
             if (localPlayer != null && localPlayer.IsDead.Value)
             {
                 bannerStyle.normal.textColor = new Color(1f, 0.3f, 0.25f);
-                GUI.Label(new Rect(0, Screen.height * 0.14f, Screen.width, 56), "ELIMINATED", bannerStyle);
+                GUI.Label(new Rect(0, Screen.height * 0.14f, Screen.width, 56),
+                    gameMode.IsZombieMode ? "DOWN" : "ELIMINATED", bannerStyle);
 
                 subStyle.normal.textColor = new Color(1f, 1f, 1f, 0.85f);
                 string camLabel = DeathCam.CurrentLabel;
+                string waiting = gameMode.IsZombieMode ? "Back up at the start of the next wave" : "Respawning...";
                 GUI.Label(new Rect(0, Screen.height * 0.14f + 58, Screen.width, 24),
-                    camLabel != null ? camLabel : "Respawning...", subStyle);
+                    camLabel != null ? camLabel : waiting, subStyle);
             }
         }
 
