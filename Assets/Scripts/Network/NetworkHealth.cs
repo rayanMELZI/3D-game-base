@@ -105,10 +105,10 @@ namespace FpsBase
             // when given, otherwise the attacking player's position.
             if (!hasSource)
             {
-                var attacker = gameMode != null ? gameMode.PlayerOf(attackerId) : null;
+                var attacker = gameMode != null ? gameMode.CombatantTransform(attackerId) : null;
                 if (attacker != null)
                 {
-                    sourcePosition = attacker.transform.position;
+                    sourcePosition = attacker.position;
                     hasSource = true;
                 }
             }
