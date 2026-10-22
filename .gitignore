@@ -32,3 +32,6 @@ Thumbs.db
 sysinfo.txt
 *.stackdump
 crashlytics-build.properties
+
+# Preview sheets from Tools > FPS Base > Render Preview Sheets
+/PreviewRenders/
