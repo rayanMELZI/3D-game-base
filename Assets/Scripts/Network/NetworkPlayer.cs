@@ -445,6 +445,9 @@ namespace FpsBase
         {
             Spectating.Value = spectate;
             if (spectate) IsDead.Value = true;
+            else if (GameModeManager.Instance != null && GameModeManager.Instance.IsZombieMode
+                     && GameModeManager.Instance.ZombieWave.Value > 0)
+                return; // joins the survivors at the next wave (no free revive mid-wave)
             else ServerRespawn();
         }
 
