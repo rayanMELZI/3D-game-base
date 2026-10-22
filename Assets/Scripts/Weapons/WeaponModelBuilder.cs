@@ -187,7 +187,7 @@ namespace FpsBase
             instance.transform.localPosition = position;
             instance.transform.localRotation = Quaternion.identity;
             instance.transform.localScale = scale;
-            foreach (var collider in instance.GetComponentsInChildren<Collider>()) Object.Destroy(collider);
+            foreach (var collider in instance.GetComponentsInChildren<Collider>()) Strip(collider);
             return true;
         }
 
@@ -384,9 +384,9 @@ namespace FpsBase
 
             // Weapon models are purely cosmetic; strip any colliders/rigidbodies.
             foreach (var col in model.GetComponentsInChildren<Collider>())
-                Object.Destroy(col);
+                Strip(col);
             foreach (var rb in model.GetComponentsInChildren<Rigidbody>())
-                Object.Destroy(rb);
+                Strip(rb);
 
             muzzlePos = fit.muzzle;
             return true;
@@ -548,12 +548,19 @@ namespace FpsBase
         private static void Part(Transform parent, PrimitiveType type, Vector3 pos, Vector3 euler, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(type);
-            Object.Destroy(go.GetComponent<Collider>()); // weapon models are cosmetic only
+            Strip(go.GetComponent<Collider>()); // weapon models are cosmetic only
             go.transform.SetParent(parent, false);
             go.transform.localPosition = pos;
             go.transform.localRotation = Quaternion.Euler(euler);
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().material = mat;
+        }
+
+        // Edit-mode builds (preview renders) can't use the deferred Destroy.
+        private static void Strip(Object target)
+        {
+            if (Application.isPlaying) Object.Destroy(target);
+            else Object.DestroyImmediate(target);
         }
 
         // Shared cache: weapon models are rebuilt on every switch (Gun Game
