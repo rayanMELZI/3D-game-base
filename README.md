@@ -12,6 +12,11 @@ from code. Rename the game in `GameSettings.GameTitle`.
 - **Modes:** 1v1 Duel · Team Deathmatch · Free-For-All · **Gun Game** (race
   through all 9 weapons, knife kill wins) — plus a **Snipers Only** toggle for
   any mode · **Zombie Survival** with escalating waves on Nightfall
+- **Bots:** the host sets 0–7 bots in the lobby (BOTS ◀ ▶); they join when the
+  match starts, fill free slots, take a team, shoot, die and respawn like
+  players, show in the kill feed / scoreboard / minimap. Not in Zombie
+  Survival or P Story. If none appear, run *Tools → FPS Base → Setup
+  Multiplayer* once (it registers `NetworkBot.prefab`).
 - **Maps:** Arena · **Nuketown-style** (two houses, street, bus) ·
   **Backrooms** (yellow maze, humming light panels) · **Skyfreight** (inside a
   giant cargo plane in flight: cargo deck, upper deck, cockpit, open rear ramp
