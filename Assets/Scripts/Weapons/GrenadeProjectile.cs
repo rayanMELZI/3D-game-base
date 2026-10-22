@@ -154,6 +154,8 @@ namespace FpsBase
                 float amount = damage * falloff;
                 if (mode == DamageMode.Server && pair.Key is NetworkHealth networkHealth)
                     networkHealth.ServerExplosionDamage(amount, attackerId, point);
+                else if (mode == DamageMode.Server && pair.Key is ZombieAgent zombie)
+                    zombie.ServerExplosionDamage(amount, attackerId); // credit the shooter, not the host
                 else
                     pair.Key.TakeDamage(amount, false);
             }
