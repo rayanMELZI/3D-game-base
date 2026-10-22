@@ -224,7 +224,7 @@ namespace FpsBase
                 }
             }
 
-            if (Attachments.Has(mask, AttachmentType.Foregrip))
+            if (Attachments.Has(mask, AttachmentType.Foregrip) && !HasBuiltInForegrip(def))
             {
                 var grip = MountAddon("Foregrip", holder, scale);
                 if (grip != null)
@@ -284,6 +284,9 @@ namespace FpsBase
                 EnvironmentBuilder.SharedMaterial(new Color(1f, 0.08f, 0.05f), emission: 4f));
             return dot;
         }
+
+        /// <summary>Models whose own front grip already is the foregrip (the stat still applies).</summary>
+        private static bool HasBuiltInForegrip(WeaponDefinition def) => def.modelName == "Modern/Rifle_7_Used"; // MP7
 
         /// <summary>Optional per-model correction (holder units) after the automatic fit.</summary>
         private static Vector3 Nudge(WeaponDefinition def, AttachmentType type)
