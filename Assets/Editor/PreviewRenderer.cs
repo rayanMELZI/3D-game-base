@@ -229,16 +229,26 @@ namespace FpsBase.EditorTools
             for (int s = 0; s * perSheet < weapons.Length; s++)
             {
                 var sheet = NewSheet(cols, rows);
+                var adsSheet = NewSheet(cols, rows);
                 for (int k = 0; k < perSheet && s * perSheet + k < weapons.Length; k++)
                 {
                     var def = weapons[s * perSheet + k];
-                    var model = WeaponModelBuilder.Build(def, cam.transform, def.viewOffset, false,
-                        Attachments.AllowedMask(def.model), 0);
+                    int mask = Attachments.AllowedMask(def.model);
+                    var model = WeaponModelBuilder.Build(def, cam.transform, def.viewOffset, false, mask, 0);
+                    cam.fieldOfView = 70f;
                     DrawCell(cam, sheet, k % cols, rows - 1 - k / cols);
+
+                    // Full ADS, as WeaponController poses it (no sway), at the zoomed FOV.
+                    model.root.transform.localPosition = WeaponController.AdsPosition(def, model, 0.07f);
+                    if (def.zoomFov > 0f)
+                        cam.fieldOfView = def.zoomFov * Attachments.ZoomFovMultiplier(mask);
+                    DrawCell(cam, adsSheet, k % cols, rows - 1 - k / cols);
                     UnityEngine.Object.DestroyImmediate(model.root);
                 }
                 Save(sheet, Path.Combine(outDir, $"viewmodels_{s + 1:00}.png"));
+                Save(adsSheet, Path.Combine(outDir, $"ads_{s + 1:00}.png"));
             }
+            cam.fieldOfView = 70f;
             UnityEngine.Object.DestroyImmediate(cam.gameObject);
         }
 
