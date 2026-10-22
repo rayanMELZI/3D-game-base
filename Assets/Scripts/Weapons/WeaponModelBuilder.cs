@@ -185,8 +185,9 @@ namespace FpsBase
 
             if (Attachments.Has(mask, AttachmentType.Suppressor))
             {
-                // Screwed on the real barrel tip (some muzzle points sit ahead of it).
-                muzzlePos.z = BarrelTip(parts, muzzlePos);
+                // Screwed on the real barrel tip, centred on its bore (some
+                // muzzle points sit ahead of or above the barrel).
+                muzzlePos = BarrelTip(parts, muzzlePos);
                 var can = MountAddon("Suppressor", holder, scale);
                 if (can != null)
                 {
@@ -232,23 +233,27 @@ namespace FpsBase
                     float magFront = magazine != null ? BoundsIn(holder, magazine).max.z : trigger + 0.08f;
                     float z = Mathf.Max(magFront + b.extents.z + 0.03f, Mathf.Lerp(trigger, muzzlePos.z, 0.55f));
                     z = Mathf.Min(z, muzzlePos.z - b.extents.z - 0.02f) + Nudge(def, AttachmentType.Foregrip).z;
-                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, muzzlePos.y - 0.02f);
+                    // Only the handguard counts: bipods, loops and guards hang lower.
+                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, muzzlePos.y - 0.02f, muzzlePos.y - 0.09f);
                     var target = new Vector3(0f, bottom + Nudge(def, AttachmentType.Foregrip).y, z);
                     grip.transform.localPosition += target - new Vector3(b.center.x, b.max.y - 0.004f, b.center.z);
                 }
             }
 
-            if (Attachments.Has(mask, AttachmentType.ExtendedMag))
+            // Tube-fed shotguns and the break-action launcher carry the extra
+            // rounds out of sight: no visible mag there (the stat still applies).
+            bool visibleMag = def.model != WeaponModelType.Shotgun && def.model != WeaponModelType.GrenadeLauncher;
+            if (visibleMag && Attachments.Has(mask, AttachmentType.ExtendedMag))
             {
                 if (magazine != null)
-                    StretchMagazine(holder, magazine, 1.45f);
+                    StretchMagazine(holder, magazine, def.model == WeaponModelType.Pistol ? 1.3f : 1.45f);
                 else
                 {
                     var mag = MountAddon("ExtendedMag", holder, scale);
                     if (mag != null)
                     {
                         var b = BoundsIn(holder, mag.transform);
-                        float bottom = BottomAt(parts, null, trigger + 0.04f, trigger + 0.04f + b.size.z, all.min.y);
+                        float bottom = BottomAt(parts, null, trigger + 0.04f, trigger + 0.04f + b.size.z, all.min.y, float.MinValue);
                         var target = new Vector3(0f, bottom + 0.01f, trigger + 0.05f + b.extents.z);
                         mag.transform.localPosition += target - new Vector3(b.center.x, b.max.y, b.center.z);
                     }
@@ -444,19 +449,38 @@ namespace FpsBase
             return 0.02f; // weapons are fitted with the trigger near the holder origin
         }
 
-        /// <summary>Front end of the barrel: the model's foremost point around the bore axis.</summary>
-        private static float BarrelTip(System.Collections.Generic.List<PartBox> parts, Vector3 muzzle)
+        /// <summary>
+        /// Front end of the barrel: the model's foremost point around the bore
+        /// axis, with x/y re-centred on the cross-section found there.
+        /// </summary>
+        private static Vector3 BarrelTip(System.Collections.Generic.List<PartBox> parts, Vector3 muzzle)
         {
+            const float band = 0.035f;
             float tip = float.MinValue;
             foreach (var p in parts)
             {
                 if (p.points == null) continue;
                 foreach (var v in p.points)
-                    if (Mathf.Abs(v.x - muzzle.x) < 0.03f && Mathf.Abs(v.y - muzzle.y) < 0.03f
+                    if (Mathf.Abs(v.x - muzzle.x) < band && Mathf.Abs(v.y - muzzle.y) < band
                         && v.z > muzzle.z - 0.3f && v.z > tip)
                         tip = v.z;
             }
-            return tip > float.MinValue ? tip : muzzle.z;
+            if (tip == float.MinValue)
+                return muzzle;
+
+            // Cross-section of the last centimetre of barrel.
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            foreach (var p in parts)
+            {
+                if (p.points == null) continue;
+                foreach (var v in p.points)
+                    if (v.z > tip - 0.01f && Mathf.Abs(v.x - muzzle.x) < band && Mathf.Abs(v.y - muzzle.y) < band)
+                    {
+                        min = Vector2.Min(min, new Vector2(v.x, v.y));
+                        max = Vector2.Max(max, new Vector2(v.x, v.y));
+                    }
+            }
+            return new Vector3((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, tip);
         }
 
         /// <summary>Highest point of the model within [z0, z1], iron sights excluded.</summary>
@@ -471,14 +495,15 @@ namespace FpsBase
             return top > float.MinValue ? top : fallback;
         }
 
-        /// <summary>Lowest point of the model within [z0, z1], magazine excluded.</summary>
-        private static float BottomAt(System.Collections.Generic.List<PartBox> parts, Transform magazine, float z0, float z1, float fallback)
+        /// <summary>Lowest point of the model within [z0, z1], magazine and parts deeper than <paramref name="floor"/> excluded.</summary>
+        private static float BottomAt(System.Collections.Generic.List<PartBox> parts, Transform magazine, float z0, float z1, float fallback, float floor)
         {
             float bottom = float.MaxValue;
             foreach (var p in parts)
             {
                 if (magazine != null && p.transform.IsChildOf(magazine)) continue;
-                if (SliceY(p, z0, z1, out float minY, out _))
+                // Parts reaching below the floor (bipod legs, a P90's loop) are skipped.
+                if (SliceY(p, z0, z1, out float minY, out _) && minY >= floor)
                     bottom = Mathf.Min(bottom, minY);
             }
             return bottom < float.MaxValue ? bottom : fallback;
@@ -832,8 +857,9 @@ namespace FpsBase
             Part(t, PrimitiveType.Cylinder, new Vector3(0, 0.02f, 0.2f), new Vector3(90, 0, 0), new Vector3(0.056f, 0.16f, 0.056f), metal); // 40 mm barrel
             Part(t, PrimitiveType.Cylinder, new Vector3(0, 0.02f, 0.355f), new Vector3(90, 0, 0), new Vector3(0.064f, 0.012f, 0.064f), accent); // muzzle ring
             Part(t, PrimitiveType.Cube, new Vector3(0, -0.02f, 0.16f), Vector3.zero, new Vector3(0.05f, 0.035f, 0.18f), wood);        // forend
-            Part(t, PrimitiveType.Cube, new Vector3(0, 0.072f, 0.04f), Vector3.zero, new Vector3(0.03f, 0.04f, 0.006f), accent);     // leaf sight
-            Part(t, PrimitiveType.Cube, new Vector3(0, 0.056f, 0.33f), Vector3.zero, new Vector3(0.008f, 0.02f, 0.01f), metal);      // front blade
+            // Named *_sight so a mounted optic folds them away.
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.072f, 0.04f), Vector3.zero, new Vector3(0.03f, 0.04f, 0.006f), accent).name = "Leaf_sight";
+            Part(t, PrimitiveType.Cube, new Vector3(0, 0.056f, 0.33f), Vector3.zero, new Vector3(0.008f, 0.02f, 0.01f), metal).name = "Front_sight";
             Part(t, PrimitiveType.Cube, new Vector3(0, -0.075f, -0.07f), new Vector3(-18, 0, 0), new Vector3(0.04f, 0.1f, 0.05f), grip); // grip
             Part(t, PrimitiveType.Cube, new Vector3(0, -0.03f, -0.24f), new Vector3(-6, 0, 0), new Vector3(0.05f, 0.085f, 0.22f), wood); // stock
             Part(t, PrimitiveType.Cube, new Vector3(0, -0.042f, -0.355f), new Vector3(-6, 0, 0), new Vector3(0.052f, 0.09f, 0.02f), grip); // butt pad
@@ -876,7 +902,7 @@ namespace FpsBase
 
         // ------------------------------------------------------------------
 
-        private static void Part(Transform parent, PrimitiveType type, Vector3 pos, Vector3 euler, Vector3 scale, Material mat)
+        private static GameObject Part(Transform parent, PrimitiveType type, Vector3 pos, Vector3 euler, Vector3 scale, Material mat)
         {
             var go = GameObject.CreatePrimitive(type);
             Strip(go.GetComponent<Collider>()); // weapon models are cosmetic only
@@ -885,6 +911,7 @@ namespace FpsBase
             go.transform.localRotation = Quaternion.Euler(euler);
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().material = mat;
+            return go;
         }
 
         // Edit-mode builds (preview renders) can't use the deferred Destroy.
