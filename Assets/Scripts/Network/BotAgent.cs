@@ -89,6 +89,7 @@ namespace FpsBase
             controller = GetComponent<CharacterController>();
             netTransform = GetComponent<NetworkTransform>();
             lastPosition = transform.position;
+            navPath = new NavMeshPath();
         }
 
         public override void OnNetworkSpawn()
@@ -949,7 +950,7 @@ namespace FpsBase
         private const float Gravity = -20f;
         private const float JumpVelocity = 6.9f; // ~1.2 m, like players
 
-        private readonly NavMeshPath navPath = new NavMeshPath();
+        private NavMeshPath navPath; // created in Awake: Unity forbids it in field initializers
         private readonly List<Vector3> corners = new List<Vector3>();
         private int cornerIndex;
         private Vector3 pathGoal;
