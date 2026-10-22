@@ -58,7 +58,7 @@ namespace FpsBase
             int mountedMask = def.integralSuppressor
                 ? attachmentMask & ~Attachments.Bit(AttachmentType.Suppressor) : attachmentMask;
             if (mountedMask != 0)
-                AddAttachments(root.transform, mountedMask, ref muzzlePos);
+                AddAttachments(root.transform, mountedMask, ref muzzlePos, magazine, def);
 
             ApplyColor(root, colorIndex);
 
@@ -137,58 +137,342 @@ namespace FpsBase
         }
 
         // ------------------------------------------------------------------
-        // Add-on models (procedural, positioned relative to the muzzle/holder).
-        // First pass — good enough to read at a glance; exact per-weapon fit is
-        // best nudged visually in Unity if any piece clips the base model.
+        // Add-ons, fitted to each model from its measured parts.
+        //
+        // Every weapon is measured in holder space (renderer bounds per part),
+        // then: the optic sits on the receiver top above the trigger and the
+        // iron sights fold away; the suppressor's rear lines up with the muzzle;
+        // the foregrip hangs under the handguard, ahead of the magazine; the
+        // extended mag stretches the weapon's own magazine downwards. One scale
+        // for every add-on keeps them true to size next to each other. Per-model
+        // nudges, if one still looks off: AddonNudge.
         // ------------------------------------------------------------------
 
-        private static void AddAttachments(Transform holder, int mask, ref Vector3 muzzlePos)
+        /// <summary>Add-on model scale (the pack is metre-built, like the AR_ weapons at 0.85).</summary>
+        private const float AddonScale = 0.85f;
+
+        private struct PartBox
         {
-            var black = MakeMat(new Color(0.06f, 0.06f, 0.07f), 0.3f, 0.4f);
-            var metal = MakeMat(new Color(0.14f, 0.14f, 0.15f), 0.65f, 0.72f);
-            var dot = MakeMat(new Color(0.95f, 0.12f, 0.08f), 0.2f, 0.9f);
+            public Transform transform;
+            public Bounds bounds;
+            public Vector3[] points; // mesh vertices in holder space (null: unreadable, use bounds)
+            public int[] triangles;
+        }
+
+        // Vertices + triangles per mesh: models are rebuilt on every weapon switch.
+        private static readonly System.Collections.Generic.Dictionary<Mesh, (Vector3[] vertices, int[] triangles)> meshData =
+            new System.Collections.Generic.Dictionary<Mesh, (Vector3[], int[])>();
+
+        private static void AddAttachments(Transform holder, int mask, ref Vector3 muzzlePos, Transform magazine, WeaponDefinition def)
+        {
+            var parts = MeasureParts(holder);
+            if (parts.Count == 0)
+                return;
+            Bounds all = parts[0].bounds;
+            foreach (var p in parts) all.Encapsulate(p.bounds);
+            float trigger = TriggerZ(holder, parts, magazine);
 
             if (Attachments.Has(mask, AttachmentType.Suppressor))
             {
-                const float len = 0.13f;
-                var centre = muzzlePos + new Vector3(0, 0, len * 0.5f - 0.01f);
-                if (!ImportedAttachment("Suppressor", holder, centre, new Vector3(0.32f, 0.32f, 0.32f)))
-                    Part(holder, PrimitiveType.Cylinder, centre, new Vector3(90, 0, 0), new Vector3(0.05f, len * 0.5f, 0.05f), black);
-                muzzlePos += new Vector3(0, 0, len); // the flash now exits the can
+                var can = MountAddon("Suppressor", holder);
+                if (can != null)
+                {
+                    // Rear of the can on the muzzle, centred on the bore.
+                    var b = BoundsIn(holder, can.transform);
+                    can.transform.localPosition += muzzlePos - new Vector3(b.center.x, b.center.y, b.min.z + 0.005f);
+                    muzzlePos.z += b.size.z - 0.005f; // the flash now exits the can
+                }
+                else
+                {
+                    const float len = 0.13f;
+                    Part(holder, PrimitiveType.Cylinder, muzzlePos + new Vector3(0, 0, len * 0.5f), new Vector3(90, 0, 0),
+                        new Vector3(0.045f, len * 0.5f, 0.045f), MakeMat(new Color(0.06f, 0.06f, 0.07f), 0.3f, 0.4f));
+                    muzzlePos.z += len;
+                }
             }
+
             if (Attachments.Has(mask, AttachmentType.Optic))
             {
-                float z = Mathf.Min(0.02f, muzzlePos.z - 0.3f); // sit over the receiver, behind the muzzle
-                ImportedAttachment("Optic", holder, new Vector3(0, 0.085f, z), new Vector3(0.3f, 0.3f, 0.3f));
-                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.085f, z), Vector3.zero, new Vector3(0.05f, 0.03f, 0.06f), black); // mount
-                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.108f, z), Vector3.zero, new Vector3(0.046f, 0.016f, 0.05f), black); // hood
-                Part(holder, PrimitiveType.Cube, new Vector3(0, 0.097f, z + 0.006f), Vector3.zero, new Vector3(0.008f, 0.008f, 0.006f), dot); // red dot
+                foreach (var sight in IronSights(holder))
+                    sight.gameObject.SetActive(false);
+                var optic = MountAddon("Optic", holder);
+                if (optic != null)
+                {
+                    var b = BoundsIn(holder, optic.transform);
+                    // Over the trigger, a little forward; on the highest surface
+                    // under its footprint (rail/receiver top, sights excluded).
+                    float z = trigger + b.size.z * 0.35f + Nudge(def, AttachmentType.Optic).z;
+                    float top = TopAt(parts, z - b.extents.z * 0.8f, z + b.extents.z * 0.8f, all.max.y);
+                    var target = new Vector3(0f, top + Nudge(def, AttachmentType.Optic).y, z);
+                    optic.transform.localPosition += target - new Vector3(b.center.x, b.min.y, b.center.z);
+                }
             }
+
             if (Attachments.Has(mask, AttachmentType.Foregrip))
             {
-                float z = Mathf.Max(0.12f, muzzlePos.z - 0.2f);
-                if (!ImportedAttachment("Foregrip", holder, new Vector3(0, -0.085f, z), new Vector3(0.3f, 0.3f, 0.3f)))
-                    Part(holder, PrimitiveType.Cube, new Vector3(0, -0.085f, z), new Vector3(6, 0, 0), new Vector3(0.028f, 0.09f, 0.032f), black);
+                var grip = MountAddon("Foregrip", holder);
+                if (grip != null)
+                {
+                    var b = BoundsIn(holder, grip.transform);
+                    // Under the handguard: between the magazine and the muzzle.
+                    float magFront = magazine != null ? BoundsIn(holder, magazine).max.z : trigger + 0.08f;
+                    float z = Mathf.Max(magFront + b.extents.z + 0.03f, Mathf.Lerp(trigger, muzzlePos.z, 0.55f));
+                    z = Mathf.Min(z, muzzlePos.z - b.extents.z - 0.02f) + Nudge(def, AttachmentType.Foregrip).z;
+                    float bottom = BottomAt(parts, magazine, z - b.extents.z, z + b.extents.z, muzzlePos.y - 0.02f);
+                    var target = new Vector3(0f, bottom + Nudge(def, AttachmentType.Foregrip).y, z);
+                    grip.transform.localPosition += target - new Vector3(b.center.x, b.max.y - 0.004f, b.center.z);
+                }
             }
+
             if (Attachments.Has(mask, AttachmentType.ExtendedMag))
             {
-                // A longer mag hanging below the normal magazine well.
-                if (!ImportedAttachment("ExtendedMag", holder, new Vector3(0, -0.185f, 0.02f), new Vector3(0.28f, 0.28f, 0.28f)))
-                    Part(holder, PrimitiveType.Cube, new Vector3(0, -0.185f, 0.02f), new Vector3(10, 0, 0), new Vector3(0.036f, 0.11f, 0.052f), metal);
+                if (magazine != null)
+                    StretchMagazine(holder, magazine, 1.45f);
+                else
+                {
+                    var mag = MountAddon("ExtendedMag", holder);
+                    if (mag != null)
+                    {
+                        var b = BoundsIn(holder, mag.transform);
+                        float bottom = BottomAt(parts, null, trigger + 0.04f, trigger + 0.04f + b.size.z, all.min.y);
+                        var target = new Vector3(0f, bottom + 0.01f, trigger + 0.05f + b.extents.z);
+                        mag.transform.localPosition += target - new Vector3(b.center.x, b.max.y, b.center.z);
+                    }
+                }
             }
         }
 
-        private static bool ImportedAttachment(string name, Transform holder, Vector3 position, Vector3 scale)
+        /// <summary>Optional per-model correction (holder units) after the automatic fit.</summary>
+        private static Vector3 Nudge(WeaponDefinition def, AttachmentType type)
+        {
+            return Vector3.zero;
+        }
+
+        private static GameObject MountAddon(string name, Transform holder)
         {
             var prefab = Resources.Load<GameObject>("Weapons/Attachments/" + name);
-            if (prefab == null) return false;
+            if (prefab == null) return null;
             var instance = Object.Instantiate(prefab, holder, false);
             instance.name = name;
-            instance.transform.localPosition = position;
+            instance.transform.localPosition = Vector3.zero;
             instance.transform.localRotation = Quaternion.identity;
-            instance.transform.localScale = scale;
+            instance.transform.localScale = Vector3.one * AddonScale;
             foreach (var collider in instance.GetComponentsInChildren<Collider>()) Strip(collider);
-            return true;
+            return instance;
+        }
+
+        /// <summary>Every visible part of the bare model with its bounds in holder space.</summary>
+        private static System.Collections.Generic.List<PartBox> MeasureParts(Transform holder)
+        {
+            var list = new System.Collections.Generic.List<PartBox>();
+            foreach (var r in holder.GetComponentsInChildren<Renderer>())
+            {
+                if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer)
+                    continue;
+                var box = new PartBox { transform = r.transform, bounds = RendererBoundsIn(holder, r) };
+                PointsIn(holder, r, ref box);
+                list.Add(box);
+            }
+            return list;
+        }
+
+        /// <summary>Bounds of everything under <paramref name="target"/>, in holder space.</summary>
+        private static Bounds BoundsIn(Transform holder, Transform target)
+        {
+            bool any = false;
+            var result = new Bounds(holder.InverseTransformPoint(target.position), Vector3.zero);
+            foreach (var r in target.GetComponentsInChildren<Renderer>())
+            {
+                var b = RendererBoundsIn(holder, r);
+                if (any) result.Encapsulate(b); else result = b;
+                any = true;
+            }
+            return result;
+        }
+
+        private static Bounds RendererBoundsIn(Transform holder, Renderer r)
+        {
+            Bounds local;
+            var filter = r.GetComponent<MeshFilter>();
+            if (filter != null && filter.sharedMesh != null) local = filter.sharedMesh.bounds;
+            else if (r is SkinnedMeshRenderer skinned && skinned.sharedMesh != null) local = skinned.sharedMesh.bounds;
+            else return new Bounds(holder.InverseTransformPoint(r.bounds.center), r.bounds.size);
+
+            Matrix4x4 toHolder = holder.worldToLocalMatrix * r.transform.localToWorldMatrix;
+            var result = new Bounds(toHolder.MultiplyPoint3x4(local.center), Vector3.zero);
+            for (int i = 0; i < 8; i++)
+            {
+                var corner = local.center + Vector3.Scale(local.extents,
+                    new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                result.Encapsulate(toHolder.MultiplyPoint3x4(corner));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// The part's mesh in holder space, so a one-piece model is measured by
+        /// its real silhouette (top of the receiver, bottom of the handguard)
+        /// instead of its whole box. Needs Read/Write on the model import;
+        /// unreadable meshes fall back to their bounds.
+        /// </summary>
+        private static void PointsIn(Transform holder, Renderer r, ref PartBox box)
+        {
+            var filter = r.GetComponent<MeshFilter>();
+            Mesh mesh = filter != null ? filter.sharedMesh : null;
+            if (mesh == null)
+                return;
+            if (!meshData.TryGetValue(mesh, out var data))
+            {
+                data = mesh.isReadable ? (mesh.vertices, mesh.triangles) : (null, null);
+                meshData[mesh] = data;
+            }
+            if (data.vertices == null || data.triangles == null || data.triangles.Length == 0)
+                return;
+            Matrix4x4 toHolder = holder.worldToLocalMatrix * r.transform.localToWorldMatrix;
+            var points = new Vector3[data.vertices.Length];
+            for (int i = 0; i < points.Length; i++)
+                points[i] = toHolder.MultiplyPoint3x4(data.vertices[i]);
+            box.points = points;
+            box.triangles = data.triangles;
+        }
+
+        /// <summary>
+        /// Lowest and highest y of a part's surface within the slab z0..z1:
+        /// triangle edges clipped to the slab, so long low-poly faces count too.
+        /// </summary>
+        private static bool SliceY(PartBox p, float z0, float z1, out float minY, out float maxY)
+        {
+            minY = float.MaxValue;
+            maxY = float.MinValue;
+            if (p.bounds.max.z <= z0 || p.bounds.min.z >= z1)
+                return false;
+            if (p.points == null)
+            {
+                minY = p.bounds.min.y;
+                maxY = p.bounds.max.y;
+                return true;
+            }
+            var v = p.points;
+            var t = p.triangles;
+            for (int i = 0; i + 2 < t.Length; i += 3)
+                for (int e = 0; e < 3; e++)
+                {
+                    Vector3 a = v[t[i + e]], b = v[t[i + (e + 1) % 3]];
+                    if ((a.z < z0 && b.z < z0) || (a.z > z1 && b.z > z1))
+                        continue;
+                    // Clip the edge to the slab, keep the y of both clipped ends.
+                    float dz = b.z - a.z;
+                    float ta = 0f, tb = 1f;
+                    if (Mathf.Abs(dz) > 1e-6f)
+                    {
+                        float t0 = (z0 - a.z) / dz, t1 = (z1 - a.z) / dz;
+                        ta = Mathf.Clamp01(Mathf.Min(t0, t1));
+                        tb = Mathf.Clamp01(Mathf.Max(t0, t1));
+                    }
+                    float ya = Mathf.Lerp(a.y, b.y, ta), yb = Mathf.Lerp(a.y, b.y, tb);
+                    minY = Mathf.Min(minY, Mathf.Min(ya, yb));
+                    maxY = Mathf.Max(maxY, Mathf.Max(ya, yb));
+                }
+            return maxY >= minY;
+        }
+
+        private static bool IsSightName(string name)
+        {
+            string n = name.ToLowerInvariant();
+            return n.Contains("ironsight") || n.Contains("_optic_") || n.EndsWith("_sight")
+                   || n.Contains("_sight_") || n.Contains("rearsight") || n.Contains("frontsight");
+        }
+
+        /// <summary>The model's own iron sights (topmost matching transforms only).</summary>
+        private static System.Collections.Generic.List<Transform> IronSights(Transform holder)
+        {
+            var list = new System.Collections.Generic.List<Transform>();
+            foreach (var t in holder.GetComponentsInChildren<Transform>())
+                if (IsSightName(t.name) && (t.parent == null || !IsSightName(t.parent.name)))
+                    list.Add(t);
+            return list;
+        }
+
+        private static bool UnderSight(Transform t)
+        {
+            for (; t != null; t = t.parent)
+                if (IsSightName(t.name)) return true;
+            return false;
+        }
+
+        /// <summary>Where the trigger hand is along the barrel (holder z).</summary>
+        private static float TriggerZ(Transform holder, System.Collections.Generic.List<PartBox> parts, Transform magazine)
+        {
+            foreach (var p in parts)
+                if (p.transform.name.EndsWith("_trigger", System.StringComparison.OrdinalIgnoreCase))
+                    return p.bounds.center.z;
+            var hand = FindDeepChild(holder, "RightHandGrip");
+            if (hand != null) return holder.InverseTransformPoint(hand.position).z + 0.06f;
+            if (magazine != null) return BoundsIn(holder, magazine).center.z - 0.06f;
+            return 0.02f; // weapons are fitted with the trigger near the holder origin
+        }
+
+        /// <summary>Highest point of the model within [z0, z1], iron sights excluded.</summary>
+        private static float TopAt(System.Collections.Generic.List<PartBox> parts, float z0, float z1, float fallback)
+        {
+            float top = float.MinValue;
+            foreach (var p in parts)
+            {
+                if (!UnderSight(p.transform) && SliceY(p, z0, z1, out _, out float maxY))
+                    top = Mathf.Max(top, maxY);
+            }
+            return top > float.MinValue ? top : fallback;
+        }
+
+        /// <summary>Lowest point of the model within [z0, z1], magazine excluded.</summary>
+        private static float BottomAt(System.Collections.Generic.List<PartBox> parts, Transform magazine, float z0, float z1, float fallback)
+        {
+            float bottom = float.MaxValue;
+            foreach (var p in parts)
+            {
+                if (magazine != null && p.transform.IsChildOf(magazine)) continue;
+                if (SliceY(p, z0, z1, out float minY, out _))
+                    bottom = Mathf.Min(bottom, minY);
+            }
+            return bottom < float.MaxValue ? bottom : fallback;
+        }
+
+        /// <summary>
+        /// Extended mag = the weapon's own magazine, longer: scaled along its
+        /// long axis, the end in the magazine well kept in place.
+        /// </summary>
+        private static void StretchMagazine(Transform holder, Transform magazine, float factor)
+        {
+            Bounds local = default;
+            bool any = false;
+            foreach (var filter in magazine.GetComponentsInChildren<MeshFilter>())
+            {
+                if (filter.sharedMesh == null) continue;
+                Matrix4x4 toMag = magazine.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+                var mb = filter.sharedMesh.bounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    var corner = toMag.MultiplyPoint3x4(mb.center + Vector3.Scale(mb.extents,
+                        new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+                    if (any) local.Encapsulate(corner); else local = new Bounds(corner, Vector3.zero);
+                    any = true;
+                }
+            }
+            if (!any) return;
+
+            // Long axis in the magazine's own space; its upper end (holder y) is the well.
+            int axis = local.size.x >= local.size.y && local.size.x >= local.size.z ? 0 : local.size.y >= local.size.z ? 1 : 2;
+            Vector3 dir = Vector3.zero;
+            dir[axis] = local.extents[axis];
+            Vector3 endA = local.center + dir, endB = local.center - dir;
+            Vector3 well = holder.InverseTransformPoint(magazine.TransformPoint(endA)).y
+                           >= holder.InverseTransformPoint(magazine.TransformPoint(endB)).y ? endA : endB;
+
+            Vector3 before = magazine.TransformPoint(well);
+            var scale = magazine.localScale;
+            scale[axis] *= factor;
+            magazine.localScale = scale;
+            magazine.position += before - magazine.TransformPoint(well);
         }
 
         // ------------------------------------------------------------------
