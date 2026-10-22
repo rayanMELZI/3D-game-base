@@ -525,7 +525,9 @@ namespace FpsBase
             {
                 Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } },
             });
-            StartCoroutine(RespawnAfterDelay());
+            // Zombie survival: the fallen stay down until the next wave (ZombieDirector revives them).
+            if (GameModeManager.Instance == null || !GameModeManager.Instance.IsZombieMode)
+                StartCoroutine(RespawnAfterDelay());
         }
 
         [ClientRpc]
