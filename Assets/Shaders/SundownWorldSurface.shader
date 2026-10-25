@@ -3,7 +3,8 @@
 // stretches on scaled boxes:
 //  - broad blotches + mid grain + fine speckle (3D value noise) on albedo,
 //  - smoothness breakup from the same grain,
-//  - darker wall bases near the floor (cheap contact occlusion).
+//  - darker wall bases near the floor (cheap contact occlusion),
+//  - a faint world-space bump from the same noise (uneven plaster/concrete).
 Shader "Sundown/WorldSurface"
 {
     Properties
@@ -16,6 +17,7 @@ Shader "Sundown/WorldSurface"
         _Grain ("Grain strength", Range(0,1)) = 0.32
         _GrainScale ("Grain per metre", Float) = 2.2
         _Grime ("Wall base darkening", Range(0,1)) = 0.4
+        _Bump ("Surface relief", Range(0,1)) = 0.3
     }
     SubShader
     {
@@ -34,12 +36,14 @@ Shader "Sundown/WorldSurface"
         half _Grain;
         float _GrainScale;
         half _Grime;
+        half _Bump;
 
         struct Input
         {
             float2 uv_MainTex;
             float3 worldPos;
             float3 worldNormal;
+            INTERNAL_DATA
         };
 
         float Hash(float3 p)
@@ -71,11 +75,24 @@ Shader "Sundown/WorldSurface"
             fixed4 c = tex2D(_MainTex, IN.uv_MainTex) * _Color;
             half shade = 1.0 + (grain - 0.5) * 2.0 * _Grain;
 
+            float3 n = WorldNormalVector(IN, float3(0, 0, 1));
+
             // Walls (not floors/ceilings) get darker over their bottom ~60 cm.
-            half wall = 1.0 - abs(IN.worldNormal.y);
+            half wall = 1.0 - abs(n.y);
             half grime = lerp(1.0, saturate(0.62 + p.y * 0.62), wall * _Grime);
 
             o.Albedo = c.rgb * shade * grime;
+
+            // Relief: tilt the normal against the gradient of the grain noise.
+            float e = 0.08;
+            float3 q = p * _GrainScale;
+            float3 grad = float3(Noise(q + float3(e, 0, 0)), Noise(q + float3(0, e, 0)), Noise(q + float3(0, 0, e))) - mid;
+            grad /= e;
+            grad -= n * dot(grad, n);
+            float3 bumped = normalize(n - grad * _Bump * 0.5);
+            float3 t = WorldNormalVector(IN, float3(1, 0, 0));
+            float3 b = WorldNormalVector(IN, float3(0, 1, 0));
+            o.Normal = normalize(float3(dot(bumped, t), dot(bumped, b), dot(bumped, n)));
             o.Metallic = _Metallic;
             o.Smoothness = saturate(_Glossiness * (0.75 + (mid - 0.5) * 0.9 + fine * 0.25));
             o.Emission = _EmissionColor.rgb;
