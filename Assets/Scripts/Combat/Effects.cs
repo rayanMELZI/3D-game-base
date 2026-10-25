@@ -12,6 +12,25 @@ namespace FpsBase
     /// </summary>
     public static class Effects
     {
+        /// <summary>Editor preview renders (PreviewRenderer): build the effects outside play mode.</summary>
+        public static bool AllowInEditMode;
+
+        /// <summary>Preview renders only: advance every shared particle system by this much time.</summary>
+        public static void SimulateForPreview(float seconds)
+        {
+            foreach (var ps in new[] { Particles.sparks, Particles.dust, Particles.fire, Particles.smoke, Particles.flash })
+                if (ps != null)
+                    ps.Simulate(seconds, true, false, false);
+        }
+
+        /// <summary>Preview renders only: clear every particle.</summary>
+        public static void ClearForPreview()
+        {
+            foreach (var ps in new[] { Particles.sparks, Particles.dust, Particles.fire, Particles.smoke, Particles.flash })
+                if (ps != null)
+                    ps.Clear(true);
+        }
+
         /// <summary>Classic charm: the character bursts into glowing physical cubes.</summary>
         public static void SpawnDeathBurst(Vector3 center, Color color)
         {
@@ -150,7 +169,7 @@ namespace FpsBase
 
             public static bool Ready()
             {
-                if (!Application.isPlaying || failed)
+                if ((!Application.isPlaying && !Effects.AllowInEditMode) || failed)
                     return false;
                 if (root != null)
                     return true;
@@ -162,7 +181,8 @@ namespace FpsBase
                 }
 
                 root = new GameObject("SharedEffects");
-                Object.DontDestroyOnLoad(root);
+                if (Application.isPlaying)
+                    Object.DontDestroyOnLoad(root);
                 var additive = MakeMaterial(shader, true, 1.6f);
                 var blended = MakeMaterial(shader, false, 1f);
                 var hot = MakeMaterial(shader, true, 3f);
@@ -359,7 +379,10 @@ namespace FpsBase
 
                 var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 quad = go.GetComponent<MeshFilter>().sharedMesh;
-                Object.Destroy(go);
+                if (Application.isPlaying)
+                    Object.Destroy(go);
+                else
+                    Object.DestroyImmediate(go);
                 return true;
             }
 
