@@ -20,12 +20,12 @@ namespace FpsBase
     {
         // Threshold above plain sunlit surfaces: only emissives/tracers glow,
         // bright floors no longer bleed a milky haze over the whole frame.
-        [Range(0f, 3f)] public float bloomIntensity = 0.55f;
-        [Range(0f, 4f)] public float bloomThreshold = 1.6f;
-        [Range(0.2f, 3f)] public float exposure = 1.0f;
+        [Range(0f, 3f)] public float bloomIntensity = 0.35f;
+        [Range(0f, 4f)] public float bloomThreshold = 2.2f;
+        [Range(0.2f, 3f)] public float exposure = 1.08f;
         [Range(0f, 2f)] public float saturation = 1.1f;
         [Range(0.5f, 1.5f)] public float contrast = 1.06f;
-        [Range(0f, 1f)] public float vignette = 0.32f;
+        [Range(0f, 1f)] public float vignette = 0.18f;
         /// <summary>Added to the shadows (cool), multiplies the highlights (warm).</summary>
         public Color lift = new Color(0.0f, 0.012f, 0.03f);
         public Color gain = new Color(1.03f, 1.0f, 0.95f);

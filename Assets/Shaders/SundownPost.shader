@@ -142,7 +142,7 @@ Shader "Hidden/SundownPost"
 
                 float2 d = i.uv - 0.5;
                 d.x *= _MainTex_TexelSize.y / _MainTex_TexelSize.x * 0.75 + 0.25;
-                p *= 1.0 - _Vignette * smoothstep(0.15, 0.85, dot(d, d) * 2.2);
+                p *= 1.0 - _Vignette * smoothstep(0.35, 1.4, dot(d, d) * 2.2);
 
                 // Output: perceptual alpha luma for FXAA, colour in the target space.
                 float outLuma = dot(p, float3(0.299, 0.587, 0.114));
