@@ -46,7 +46,7 @@ namespace FpsBase
             var flash = flashGo.AddComponent<Light>();
             flash.type = LightType.Point;
             flash.color = new Color(1f, 0.7f, 0.35f);
-            flash.intensity = 8f;
+            flash.intensity = 5f;
             flash.range = 16f;
             flashGo.AddComponent<LightFade>().lifetime = 0.35f;
 
@@ -58,14 +58,14 @@ namespace FpsBase
                 return;
             }
 
-            for (int i = 0; i < 14; i++)
-                Particles.Emit(Particles.fire, center + Random.insideUnitSphere * 0.6f + Vector3.up * 0.4f,
-                    Random.insideUnitSphere * 3.5f + Vector3.up * 1.5f, Random.Range(1.4f, 2.8f),
-                    Random.Range(0.35f, 0.65f), new Color(1f, Random.Range(0.45f, 0.7f), 0.2f));
+            for (int i = 0; i < 10; i++)
+                Particles.Emit(Particles.fire, center + Random.insideUnitSphere * 0.7f + Vector3.up * 0.5f,
+                    Random.insideUnitSphere * 3.5f + Vector3.up * 1.5f, Random.Range(1.3f, 2.4f),
+                    Random.Range(0.35f, 0.65f), new Color(1f, Random.Range(0.35f, 0.55f), 0.12f, 0.8f));
             for (int i = 0; i < 12; i++)
                 Particles.Emit(Particles.smoke, center + Random.insideUnitSphere * 1f + Vector3.up * 0.6f,
                     Random.insideUnitSphere * 1.2f + Vector3.up * Random.Range(0.8f, 2f), Random.Range(2f, 3.6f),
-                    Random.Range(2.2f, 3.8f), new Color(0.16f, 0.15f, 0.14f, 0.75f));
+                    Random.Range(2.2f, 3.8f), new Color(0.32f, 0.3f, 0.28f, 0.6f));
             for (int i = 0; i < 28; i++)
                 Particles.Emit(Particles.sparks, center + Vector3.up * 0.3f,
                     Random.insideUnitSphere * 13f + Vector3.up * 4f, Random.Range(0.04f, 0.08f),
@@ -90,9 +90,9 @@ namespace FpsBase
                 return;
             if (flesh)
             {
-                for (int i = 0; i < 6; i++)
+                for (int i = 0; i < 8; i++)
                     Particles.Emit(Particles.dust, point + normal * 0.05f,
-                        (normal + Random.insideUnitSphere * 0.7f) * Random.Range(0.6f, 1.6f), Random.Range(0.12f, 0.24f),
+                        (normal + Random.insideUnitSphere * 0.7f) * Random.Range(0.6f, 1.6f), Random.Range(0.18f, 0.32f),
                         Random.Range(0.25f, 0.45f), new Color(0.45f, 0.03f, 0.03f, 0.85f));
                 return;
             }
@@ -183,7 +183,7 @@ namespace FpsBase
                 root = new GameObject("SharedEffects");
                 if (Application.isPlaying)
                     Object.DontDestroyOnLoad(root);
-                var additive = MakeMaterial(shader, true, 1.6f);
+                var additive = MakeMaterial(shader, true, 1.1f);
                 var blended = MakeMaterial(shader, false, 1f);
                 var hot = MakeMaterial(shader, true, 3f);
 
