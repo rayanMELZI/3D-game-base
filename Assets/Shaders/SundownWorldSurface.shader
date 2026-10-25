@@ -17,7 +17,7 @@ Shader "Sundown/WorldSurface"
         _Grain ("Grain strength", Range(0,1)) = 0.32
         _GrainScale ("Grain per metre", Float) = 2.2
         _Grime ("Wall base darkening", Range(0,1)) = 0.4
-        _Bump ("Surface relief", Range(0,1)) = 0.3
+        _Bump ("Surface relief", Range(0,1)) = 0.25
     }
     SubShader
     {
@@ -89,7 +89,7 @@ Shader "Sundown/WorldSurface"
             float3 grad = float3(Noise(q + float3(e, 0, 0)), Noise(q + float3(0, e, 0)), Noise(q + float3(0, 0, e))) - mid;
             grad /= e;
             grad -= n * dot(grad, n);
-            float3 bumped = normalize(n - grad * _Bump * 0.5);
+            float3 bumped = normalize(n - grad * _Bump * 0.12);
             float3 t = WorldNormalVector(IN, float3(1, 0, 0));
             float3 b = WorldNormalVector(IN, float3(0, 1, 0));
             o.Normal = normalize(float3(dot(bumped, t), dot(bumped, b), dot(bumped, n)));
