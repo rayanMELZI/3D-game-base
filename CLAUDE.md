@@ -66,7 +66,16 @@ is the onboarding brief for AI assistants working on the repo.
   assets + spawn markers).
   · `PreviewRenderer` (Tools > FPS Base > Render Preview Sheets: PNG sheets of
   every weapon bare/with all add-ons, first-person hip + ADS views on the
-  Arena, 3 shots per map, plus `bounds.txt` with every part's bounds).
+  Arena, 3 shots per map, an effects sheet (impacts, decals, explosion,
+  muzzle flash), plus `bounds.txt` with every part's bounds).
+- **Rendering**: built-in pipeline, **linear colour space**. `Core/PostFx`
+  (`SundownPostEffect` + `Shaders/SundownPost.shader`) does AO from the depth
+  texture (Medium quality and up), two-level bloom, ACES + split-tone grade,
+  vignette and FXAA (only when MSAA is off). Code-built maps use
+  `Sundown/WorldSurface`. `Combat/Effects` draws impacts/muzzle flashes/
+  explosions from shared world-space particle systems (`Sundown/Particle`,
+  always-included shader) and keeps a ring of 96 decals parented to `MapRoot`;
+  remote shots get their impact from `WeaponController.SpawnRemoteImpact`.
 - **Visual checks without Unity**: push to any `render/**` branch →
   `.github/workflows/render-preview.yml` runs PreviewRenderer in batch mode and
   force-pushes the PNGs (or `FAILED.txt` + `compile-errors.txt`) to the
