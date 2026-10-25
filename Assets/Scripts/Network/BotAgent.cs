@@ -920,6 +920,10 @@ namespace FpsBase
 
             if (!weapon.isMelee)
                 WeaponController.SpawnTracerLine(from, endPoint);
+            if (!weapon.isMelee && hasWeaponModel && weaponModel.root.activeInHierarchy)
+                Effects.SpawnMuzzleFlash(weaponModel.muzzle, weapon.integralSuppressor, 1.3f);
+            if (!weapon.isProjectile)
+                WeaponController.SpawnRemoteImpact(from, endPoint);
             SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, weapon.integralSuppressor), from, 0.8f, weapon.shotPitch);
 
             if (weapon.isProjectile)
