@@ -22,8 +22,8 @@ namespace FpsBase
         // bright floors no longer bleed a milky haze over the whole frame.
         [Range(0f, 3f)] public float bloomIntensity = 0.35f;
         [Range(0f, 4f)] public float bloomThreshold = 2.2f;
-        [Range(0.2f, 3f)] public float exposure = 1.08f;
-        [Range(0f, 2f)] public float saturation = 1.1f;
+        [Range(0.2f, 3f)] public float exposure = 1.0f;
+        [Range(0f, 2f)] public float saturation = 1.05f;
         [Range(0.5f, 1.5f)] public float contrast = 1.06f;
         [Range(0f, 1f)] public float vignette = 0.18f;
         /// <summary>Added to the shadows (cool), multiplies the highlights (warm).</summary>
@@ -32,8 +32,8 @@ namespace FpsBase
 
         [Header("Ambient occlusion")]
         public bool ambientOcclusion = true;
-        [Range(0f, 1.5f)] public float aoIntensity = 0.85f;
-        [Range(0.1f, 3f)] public float aoRadius = 0.7f;
+        [Range(0f, 1.5f)] public float aoIntensity = 1.0f;
+        [Range(0.1f, 3f)] public float aoRadius = 0.9f;
         public float aoFadeStart = 45f;
         public float aoFadeEnd = 90f;
 
