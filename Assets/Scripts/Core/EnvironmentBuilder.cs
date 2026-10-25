@@ -1037,7 +1037,8 @@ namespace FpsBase
             {
                 if (col.isTrigger) continue;                 // teleporter pads
                 if (col.gameObject.name == "IslandFloor") continue; // the walkable floor
-                Object.Destroy(col);
+                if (Application.isPlaying) Object.Destroy(col);
+                else Object.DestroyImmediate(col); // bake tool / preview renders run in edit mode
             }
         }
 
