@@ -1,0 +1,22 @@
+Graphics device: OpenGLCore (llvmpipe (LLVM 15.0.7, 256 bits))
+wrote weapons_01.png
+wrote weapons_02.png
+wrote weapons_03.png
+wrote weapons_04.png
+wrote weapons_05.png
+wrote weapons_06.png
+wrote weapons_07.png
+wrote viewmodels_01.png
+wrote ads_01.png
+wrote viewmodels_02.png
+wrote ads_02.png
+map row 1: ARENA
+map row 2: BACKROOMS
+map row 3: DUSTBOWL WEST
+map row 4: ABYSS
+map row 5: SKYFREIGHT
+map row 6: NIGHTFALL
+map row 7: P STORY ISLAND
+map row 8: NUKETOWN NEW
+wrote maps.png
+wrote effects.png
