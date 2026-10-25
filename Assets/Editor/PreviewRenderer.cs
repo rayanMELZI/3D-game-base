@@ -312,6 +312,7 @@ namespace FpsBase.EditorTools
             EnvironmentBuilder.SetupLightingAndSky();
             MapCatalog.Build(0);
             DynamicGI.UpdateEnvironment();
+            Physics.SyncTransforms(); // edit mode: the new map colliders aren't in the physics scene yet
             Effects.AllowInEditMode = true;
             try
             {
