@@ -165,6 +165,11 @@ namespace FpsBase
             bool arcing = weapon.isProjectile && weapon.projectileGravity > 0f;
             if (!weapon.isMelee && !arcing)
                 WeaponController.SpawnTracerLine(from, endPoint);
+            bool silenced = Attachments.Has(AttachmentMask.Value, AttachmentType.Suppressor) || weapon.integralSuppressor;
+            if (!weapon.isMelee && hasThirdPersonModel && thirdPersonModel.root.activeInHierarchy)
+                Effects.SpawnMuzzleFlash(thirdPersonModel.muzzle, silenced, 1.3f);
+            if (!weapon.isProjectile)
+                WeaponController.SpawnRemoteImpact(from, endPoint);
 
             // Positional gunshot so you can hear where enemies are firing from
             // (a suppressor makes their shots much quieter).
