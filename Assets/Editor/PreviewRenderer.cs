@@ -68,6 +68,7 @@ namespace FpsBase.EditorTools
                 Step("weapons", () => RenderWeapons(outDir));
                 Step("viewmodels", () => RenderViewmodels(outDir));
                 Step("maps", () => RenderMaps(outDir));
+                Step("effects", () => RenderEffects(outDir));
             }
             finally
             {
@@ -299,6 +300,82 @@ namespace FpsBase.EditorTools
                 log.AppendLine($"map row {i + 1}: {MapCatalog.Name(i)}");
             }
             Save(sheet, Path.Combine(outDir, "maps.png"));
+        }
+
+        // ------------------------------------------------------------------
+        // Effects (impacts, decals, explosion, muzzle flash) on the Arena
+        // ------------------------------------------------------------------
+
+        private static void RenderEffects(string outDir)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EnvironmentBuilder.SetupLightingAndSky();
+            MapCatalog.Build(0);
+            DynamicGI.UpdateEnvironment();
+            Effects.AllowInEditMode = true;
+            try
+            {
+                var cam = MakeCamera(Color.black);
+                cam.clearFlags = CameraClearFlags.Skybox;
+                cam.fieldOfView = 70f;
+                cam.nearClipPlane = 0.05f;
+                PostFx.Attach(cam);
+                var sheet = NewSheet(3, 2);
+
+                // Bullet impacts on the south cover wall (z = -10, x = -10), seen from 3 m.
+                cam.transform.position = new Vector3(-10f, 1.3f, -13.2f);
+                cam.transform.rotation = Quaternion.Euler(4f, 0f, 0f);
+                var wall = Physics.Raycast(cam.transform.position, Vector3.forward, out var hit, 10f) ? hit.collider : null;
+                for (int i = 0; i < 14; i++)
+                {
+                    Vector3 p = new Vector3(-10f + UnityEngine.Random.Range(-1.6f, 1.6f), UnityEngine.Random.Range(0.3f, 1.5f), -10.26f);
+                    Effects.SpawnImpact(p, Vector3.back, wall, false);
+                }
+                Effects.SimulateForPreview(0.06f);
+                DrawCell(cam, sheet, 0, 1);
+                Effects.SimulateForPreview(0.5f);
+                DrawCell(cam, sheet, 1, 1); // holes once the sparks/dust are gone
+
+                // Hit on a character: red puff, no hole.
+                Effects.ClearForPreview();
+                Effects.SpawnImpact(new Vector3(-10f, 1.2f, -11f), Vector3.back, null, true);
+                Effects.SimulateForPreview(0.08f);
+                DrawCell(cam, sheet, 2, 1);
+
+                // Explosion on open floor: fireball, then the smoke column and scorch.
+                Effects.ClearForPreview();
+                cam.transform.position = new Vector3(-4f, 1.62f, -24f);
+                cam.transform.rotation = Quaternion.Euler(2f, 0f, 0f);
+                Effects.SpawnExplosion(new Vector3(-4f, 0.05f, -17f));
+                foreach (var t in UnityEngine.Object.FindObjectsByType<TimedShrink>())
+                    UnityEngine.Object.DestroyImmediate(t.gameObject); // physics debris doesn't move in edit mode
+                Effects.SimulateForPreview(0.12f);
+                DrawCell(cam, sheet, 0, 0);
+                foreach (var l in UnityEngine.Object.FindObjectsByType<LightFade>())
+                    UnityEngine.Object.DestroyImmediate(l.gameObject);
+                Effects.SimulateForPreview(1.2f);
+                DrawCell(cam, sheet, 1, 0);
+
+                // Muzzle flash on the rifle viewmodel.
+                Effects.ClearForPreview();
+                cam.transform.position = new Vector3(-6f, 1.62f, -22f);
+                cam.transform.rotation = Quaternion.Euler(4f, 20f, 0f);
+                var weapons = WeaponDefinition.CreateDefaultLoadout();
+                var def = weapons[4];
+                var model = WeaponModelBuilder.Build(def, cam.transform, def.viewOffset, false, 0, 0);
+                Effects.SpawnMuzzleFlash(model.muzzle, false);
+                Effects.SimulateForPreview(0.01f);
+                model.muzzleFlash.enabled = true;
+                DrawCell(cam, sheet, 2, 0);
+                UnityEngine.Object.DestroyImmediate(model.root);
+
+                Save(sheet, Path.Combine(outDir, "effects.png"));
+                UnityEngine.Object.DestroyImmediate(cam.gameObject);
+            }
+            finally
+            {
+                Effects.AllowInEditMode = false;
+            }
         }
 
         private static Bounds MapBounds()
