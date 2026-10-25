@@ -170,9 +170,9 @@ namespace FpsBase
             RenderSettings.sun = sun;
 
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.47f, 0.5f, 0.62f);
-            RenderSettings.ambientEquatorColor = new Color(0.4f, 0.37f, 0.38f);
-            RenderSettings.ambientGroundColor = new Color(0.2f, 0.17f, 0.16f);
+            RenderSettings.ambientSkyColor = new Color(0.56f, 0.6f, 0.72f);
+            RenderSettings.ambientEquatorColor = new Color(0.5f, 0.47f, 0.46f);
+            RenderSettings.ambientGroundColor = new Color(0.3f, 0.26f, 0.24f);
 
             // Light haze only: the old density washed out everything past 30 m.
             RenderSettings.fog = true;
@@ -184,7 +184,7 @@ namespace FpsBase
             // from code is otherwise never captured, so metal (guns, hulls)
             // reflected nothing and looked flat black.
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
-            RenderSettings.reflectionIntensity = 0.85f;
+            RenderSettings.reflectionIntensity = 1f;
             DynamicGI.UpdateEnvironment();
         }
 
