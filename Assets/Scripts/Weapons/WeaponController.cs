@@ -162,7 +162,6 @@ namespace FpsBase
         private bool switchSwapped;
 
         private static Material tracerMaterial;
-        private static Material impactMaterial;
 
         private bool IsSwitching => pendingSwitchIndex >= 0;
 
@@ -901,13 +900,14 @@ namespace FpsBase
                 endPoint = FireHitscan(weapon);
 
             // Shared feedback.
+            int mask = MaskFor(CurrentIndex);
+            bool suppressed = Attachments.Has(mask, AttachmentType.Suppressor);
             if (model.muzzleFlash != null && model.root.activeSelf && !weapon.isMelee)
             {
                 model.muzzleFlash.enabled = true;
                 flashOffTime = Time.time + 0.045f;
+                Effects.SpawnMuzzleFlash(model.muzzle, suppressed || weapon.integralSuppressor);
             }
-            int mask = MaskFor(CurrentIndex);
-            bool suppressed = Attachments.Has(mask, AttachmentType.Suppressor);
             SfxSynth.PlayAt(SfxSynth.Shot(weapon.model, suppressed), shootCamera.transform.position, 0.85f * Attachments.ShotVolumeMultiplier(mask), weapon.shotPitch);
             float recoilScale = Attachments.RecoilMultiplier(mask);
             float visualRecoil = Mathf.Clamp(weapon.recoil * recoilScale, 0.35f, 3f);
@@ -981,7 +981,7 @@ namespace FpsBase
                         anyHit = true;
                         anyHeadshot |= headshot;
                     }
-                    SpawnImpactMarker(hit.point, hit.normal);
+                    Effects.SpawnImpact(hit.point, hit.normal, hit.collider, damageable != null);
                 }
 
                 if (!weapon.isMelee)
@@ -1152,18 +1152,21 @@ namespace FpsBase
             UnityEngine.Object.Destroy(go, 0.05f);
         }
 
-        public static void SpawnImpactMarker(Vector3 point, Vector3 normal)
+        /// <summary>
+        /// Impact for a shot seen from afar (remote players, bots): the RPC only
+        /// carries the end point, so find the surface and its normal locally.
+        /// </summary>
+        public static void SpawnRemoteImpact(Vector3 from, Vector3 to)
         {
-            if (impactMaterial == null)
-                impactMaterial = EnvironmentBuilder.MakeEmissiveMaterial(new Color(1f, 0.75f, 0.3f), 2.2f);
-
-            var marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = "Impact";
-            UnityEngine.Object.Destroy(marker.GetComponent<Collider>());
-            marker.transform.position = point + normal * 0.02f;
-            marker.transform.localScale = Vector3.one * 0.12f;
-            marker.GetComponent<Renderer>().material = impactMaterial;
-            marker.AddComponent<TimedShrink>().lifetime = 0.3f;
+            Vector3 delta = to - from;
+            float distance = delta.magnitude;
+            if (distance < 0.05f)
+                return;
+            if (Physics.Raycast(from, delta / distance, out RaycastHit hit, distance + 0.1f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                && (hit.point - to).sqrMagnitude < 0.25f)
+                Effects.SpawnImpact(hit.point, hit.normal, hit.collider,
+                    hit.collider.GetComponentInParent<IDamageable>() != null);
         }
     }
 }
