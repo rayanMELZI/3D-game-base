@@ -1,0 +1,12 @@
+{
+  "name": "sundown-arena-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SUNDOWN ARENA in the browser: Three.js client + zero-dependency Node server (static files + WebSocket rooms).",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node tools/check.js"
+  },
+  "engines": { "node": ">=18" }
+}
