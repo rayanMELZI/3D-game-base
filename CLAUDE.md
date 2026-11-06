@@ -175,9 +175,23 @@ is the onboarding brief for AI assistants working on the repo.
   MoveX/MoveY blend, backward = loop at time scale -1); the driver fades the
   upper-body layer out while prone and `CharacterAimPose` lowers the aim pivot.
 
+## Web version (`web/`)
+
+- Browser port: Three.js client + zero-dependency Node server (`npm start`,
+  `npm run check`). `web/public/shared/` (weapons, maps, physics, nav,
+  match, AI) runs both in the page (offline) and in the server (online
+  rooms), so rules live in one place. See `web/README.md`.
+- It mirrors Unity data by hand: when a weapon is APPENDED to
+  `CreateDefaultLoadout()` or a built-in map changes in `EnvironmentBuilder`,
+  update `web/public/shared/weapons.js` / `maps.js` the same way (maps are
+  copied in Unity coordinates; `toThree` converts them).
+- Visual check: headless Chromium (Playwright) can screenshot
+  `/?solo=MODE,MAP,BOTS`.
+
 ## Docs
 
 - **`ROADMAP.md` — READ FIRST: the user's complete feature list + batch order.
   Nothing on it may be dropped; only the user checks items off.**
 - `README.md` — setup, controls, maps, Steam setup, update shipping.
+- `web/README.md` — the browser version.
 - `docs/STEAM_DISTRIBUTION.md` — SteamPipe/depots/branches, Win+macOS builds.
