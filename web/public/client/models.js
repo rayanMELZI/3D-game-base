@@ -115,8 +115,8 @@ export function makeHumanoid(color, kind = 'player', skin = 0) {
 // Weapons
 // ---------------------------------------------------------------------------
 
-const gunMetal = () => std('#2a2c30', { metalness: 0.7, roughness: 0.35 });
-const polymer = () => std('#1c1d20', { metalness: 0.1, roughness: 0.6 });
+const gunMetal = () => std('#5a5e66', { metalness: 0.55, roughness: 0.38 });
+const polymer = () => std('#3a3d42', { metalness: 0.1, roughness: 0.55 });
 const wood = () => std('#6b4426', { metalness: 0, roughness: 0.7 });
 const tan = () => std('#7d6a4a', { roughness: 0.7 });
 const olive = () => std('#4c5638', { roughness: 0.65 });
