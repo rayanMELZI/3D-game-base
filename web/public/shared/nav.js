@@ -7,6 +7,8 @@ const PROBE_Y = 2.6;
 
 export class NavGrid {
   constructor(world, map) {
+    this.world = world;
+    this.edges = new Map(); // lazily checked links between neighbouring cells
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const o of world.obbs) {
       if (o.name === 'Ground') {
@@ -103,6 +105,8 @@ export class NavGrid {
           if (Math.abs(this.height[n] - this.height[cur]) > 0.55) continue;
           // No corner cutting.
           if (di && dj && (!this.walkable(cj * W + ni) || !this.walkable(nj * W + ci))) continue;
+          // Thin walls can sit between two cell centres: check the link itself.
+          if (!this.#linkClear(cur, n)) continue;
           const cost = g.get(cur) + (di && dj ? 1.414 : 1);
           if (cost < (g.get(n) ?? Infinity)) {
             g.set(n, cost);
@@ -118,6 +122,25 @@ export class NavGrid {
     const pts = cells.map((c) => this.center(c));
     pts[pts.length - 1] = b.slice();
     return pts;
+  }
+
+  /** Body-wide line of sight between two cell centres at waist and knee height (cached). */
+  #linkClear(a, b) {
+    const key = a < b ? a * 1e6 + b : b * 1e6 + a;
+    let clear = this.edges.get(key);
+    if (clear !== undefined) return clear;
+    const pa = this.center(a), pb = this.center(b);
+    const dx = pb[0] - pa[0], dz = pb[2] - pa[2];
+    const len = Math.hypot(dx, dz);
+    const side = [(-dz / len) * 0.28, (dx / len) * 0.28];
+    clear = true;
+    for (const h of [0.5, 1.1])
+      for (const s of [-1, 0, 1]) {
+        const o = [pa[0] + side[0] * s, Math.max(pa[1], pb[1]) + h, pa[2] + side[1] * s];
+        if (this.world.raycast(o, [dx / len, 0, dz / len], len)) { clear = false; break; }
+      }
+    this.edges.set(key, clear);
+    return clear;
   }
 
   randomWalkable(rand = Math.random) {
