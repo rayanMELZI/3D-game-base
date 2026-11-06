@@ -86,6 +86,7 @@ export class WeaponController {
     this.nextFire = Math.max(this.nextFire, this.time + (instant ? 0 : 0.35));
     if (this.model) this.holder.remove(this.model.group);
     this.model = makeWeapon(this.def, this.att);
+    this.model.group.scale.setScalar(0.6); // the guns are life-size: shrink in first person
     this.model.group.traverse((o) => { o.castShadow = false; o.renderOrder = 10; if (o.material) { o.material = o.material.clone(); o.material.depthTest = true; } });
     this.holder.add(this.model.group);
   }
@@ -312,7 +313,8 @@ export class WeaponController {
   #viewmodel(dt, ctx) {
     const def = this.def;
     const [hip, adsPos] = VIEW[def.model];
-    const pos = hip.clone().lerp(adsPos.clone().setY(adsPos.y + (this.model ? 0.06 - this.model.sightY * 0.6 : 0)), this.ads);
+    // ADS: the sight line (model sightY, scaled) sits exactly on the camera axis.
+    const pos = hip.clone().lerp(new THREE.Vector3(0, -this.model.sightY * this.model.group.scale.y, adsPos.z), this.ads);
     // Bob and sway.
     const speed = ctx.player.speed;
     this.bob += dt * speed * (ctx.player.sprinting ? 1.6 : 1.8);
