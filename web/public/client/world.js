@@ -115,7 +115,23 @@ function makeSky(kind, sunDir) {
 // Build
 // ---------------------------------------------------------------------------
 
-export function buildWorld(scene, map, quality = 'high') {
+/** Bakes the sky into scene.environment so metals reflect something (DynamicGI.UpdateEnvironment). */
+function bakeEnvironment(renderer, scene, sky) {
+  if (!renderer) return null;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+  const copy = sky.clone();
+  copy.material = sky.material.clone();
+  copy.material.uniforms.sunC.value = sky.material.uniforms.sunC.value.clone().multiplyScalar(0.3);
+  envScene.add(copy);
+  const rt = pmrem.fromScene(envScene, 0, 0.1, 1000);
+  pmrem.dispose();
+  scene.environment = rt.texture;
+  scene.environmentIntensity = 0.55;
+  return rt;
+}
+
+export function buildWorld(scene, map, quality = 'high', renderer = null) {
   const root = new THREE.Group();
   root.name = 'MapRoot';
   const shadows = quality !== 'low';
@@ -141,7 +157,9 @@ export function buildWorld(scene, map, quality = 'high') {
   if (night) root.add(new THREE.AmbientLight(srgb([0.25, 0.3, 0.45]), 0.25));
 
   scene.fog = new THREE.FogExp2(srgb(map.fog.color), map.fog.density);
-  root.add(makeSky(map.sky, sunDir));
+  const sky = makeSky(map.sky, sunDir);
+  root.add(sky);
+  const envRT = bakeEnvironment(renderer, scene, sky);
 
   if (map.ground) {
     const g = map.ground;
@@ -201,7 +219,7 @@ export function buildWorld(scene, map, quality = 'high') {
   scene.add(root);
   return {
     root, atmosphere,
-    dispose() { scene.remove(root); root.traverse((o) => { if (o.geometry && o.geometry !== boxGeo && o.geometry !== cylGeo && o.geometry !== sphereGeo) o.geometry.dispose(); }); },
+    dispose() { scene.remove(root); if (envRT) envRT.dispose(); root.traverse((o) => { if (o.geometry && o.geometry !== boxGeo && o.geometry !== cylGeo && o.geometry !== sphereGeo) o.geometry.dispose(); }); },
   };
 }
 

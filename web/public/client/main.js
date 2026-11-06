@@ -116,7 +116,7 @@ function loadMap(index) {
   const map = getMap(index);
   G.map = map;
   G.world = new World(map);
-  G.view = buildWorld(scene, map, S.quality);
+  G.view = buildWorld(scene, map, S.quality, renderer);
   effects.clearDecals();
 }
 
