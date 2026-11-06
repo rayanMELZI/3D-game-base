@@ -56,6 +56,12 @@ from code. Rename the game in `GameSettings.GameTitle`.
 - Layered synthesized gunshots per weapon, explosions, join-wait window with
   cancel/timeout, floating nametags, humanoid characters with walk animation
 
+## Web version
+
+A browser build lives in [`web/`](web/README.md): same weapons, maps, modes,
+bots and zombies, playable offline in the page or online through a small
+Node server (`cd web && npm start`, then open http://localhost:8080).
+
 ## Setup (after pulling)
 
 1. Open the project, let it compile.
