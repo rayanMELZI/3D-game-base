@@ -42,8 +42,12 @@ export const Input = {
   },
 
   lock(canvas) {
-    const p = canvas.requestPointerLock?.({ unadjustedMovement: true });
-    if (p && p.catch) p.catch(() => canvas.requestPointerLock());
+    // Browsers refuse without a user gesture: the HUD then shows CLICK TO PLAY.
+    const retry = () => { const q = canvas.requestPointerLock(); if (q && q.catch) q.catch(() => {}); };
+    try {
+      const p = canvas.requestPointerLock?.({ unadjustedMovement: true });
+      if (p && p.catch) p.catch(retry);
+    } catch { retry(); }
   },
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); },
 
