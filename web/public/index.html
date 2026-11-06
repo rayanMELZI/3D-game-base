@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SUNDOWN ARENA</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="flash"></div>
+    <div id="scope"><div class="reticle"></div></div>
+    <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="damage"></div>
+    <div id="scores"></div>
+    <div id="killfeed"></div>
+    <canvas id="radar" width="180" height="180"></canvas>
+    <div id="health"><div id="hp-bar"><div id="hp-fill"></div></div><span id="hp-text">100</span></div>
+    <div id="protect">SPAWN PROTECTION</div>
+    <div id="weapon">
+      <div id="weapon-name"></div>
+      <div><span id="ammo"></span><span id="ammo-max"></span></div>
+      <div id="reload-hint"></div>
+      <div id="throwables"></div>
+    </div>
+    <div id="banner"><div id="banner-main"></div><div id="banner-sub"></div></div>
+    <div id="center-msg"></div>
+    <div id="xp"></div>
+    <div id="scoreboard"></div>
+  </div>
+
+  <div id="menu" class="hidden"></div>
+  <div id="fps"></div>
+
+  <script type="module" src="client/main.js"></script>
+</body>
+</html>
