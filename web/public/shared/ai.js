@@ -9,6 +9,8 @@ const DEG = Math.PI / 180;
 const SIGHT_RANGE = 90, HALF_FOV = 75;
 const INITIAL_AIM_ERROR = 7, SETTLED_AIM_ERROR = 1.3, AIM_SETTLE = 1.4, TURN_SPEED = 230;
 const WALK = 4.4, RUN = 6.8, GRAVITY = -20, EYE = 1.62;
+// Body radius for AI movement: matches the nav grid clearance so paths never snag on corners.
+const NAV_RADIUS = 0.3;
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -211,7 +213,7 @@ export class BotBrain {
     const move = dir ? [dir[0] * speed * mob * dt, dir[1] * speed * mob * dt] : [0, 0];
     if (!t && dir) e.yaw = turnToward(e.yaw, Math.atan2(-dir[0], -dir[1]), 6 * dt);
     this.vy += GRAVITY * dt;
-    const res = m.world.moveCharacter(e.p, [move[0], this.vy * dt, move[1]], 0.4, 1.8);
+    const res = m.world.moveCharacter(e.p, [move[0], this.vy * dt, move[1]], NAV_RADIUS, 1.8);
     if (res.grounded && this.vy < 0) this.vy = -1;
     if (res.hitCeiling && this.vy > 0) this.vy = 0;
 
@@ -321,7 +323,7 @@ export class ZombieBrain {
       if (d > 0.01 && d < 0.8) { mx += (dx / d) * (0.8 - d) * 0.5; mz += (dz / d) * (0.8 - d) * 0.5; }
     }
     this.vy += GRAVITY * dt;
-    const res = m.world.moveCharacter(z.p, [mx, this.vy * dt, mz], 0.35, 1.8);
+    const res = m.world.moveCharacter(z.p, [mx, this.vy * dt, mz], NAV_RADIUS, 1.8);
     if (res.grounded && this.vy < 0) this.vy = -1;
     if (z.p[1] < m.world.killY) { z.hp = 0; z.deadAt = m.time; }
   }
