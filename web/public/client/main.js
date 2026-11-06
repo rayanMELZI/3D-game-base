@@ -602,4 +602,4 @@ if (params.has('solo')) {
   setTimeout(() => send({ t: 'start' }), 300);
 }
 requestAnimationFrame(frame);
-window.__game = { G, player, weapons, send, camera };
+window.__game = { G, player, weapons, send, camera, Input };
