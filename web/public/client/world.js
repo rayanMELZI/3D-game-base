@@ -18,7 +18,7 @@ function grain() {
   const g = c.getContext('2d');
   const img = g.createImageData(128, 128);
   for (let i = 0; i < img.data.length; i += 4) {
-    const v = 236 + Math.random() * 19;
+    const v = 243 + Math.random() * 12;
     img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
     img.data[i + 3] = 255;
   }
@@ -201,7 +201,7 @@ export function buildWorld(scene, map, quality = 'high', renderer = null) {
   const lights = [];
   const maxLights = quality === 'low' ? 4 : quality === 'medium' ? 8 : 16;
   for (const l of map.lights.slice(0, maxLights)) {
-    const pl = new THREE.PointLight(srgb(l.color), l.intensity * 9, l.range * 1.2, 1.4);
+    const pl = new THREE.PointLight(srgb(l.color), l.intensity * 4.5, l.range * 1.2, 1.3);
     pl.position.set(l.p[0], l.p[1], l.p[2]);
     root.add(pl);
     lights.push(pl);
